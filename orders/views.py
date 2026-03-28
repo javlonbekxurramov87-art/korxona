@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q, Sum 
 from orders.models import Worker, Order     
 from datetime import date, timedelta, datetime
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 import csv 
 from django.urls import reverse_lazy
 from django.contrib.auth.views import LoginView
@@ -22,7 +22,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.admin.models import LogEntry, CHANGE, DELETION, ADDITION 
 
 from .models import Order, Notification, Worker 
-from .forms import OrderForm, StartImageUploadForm, FinishImageUploadForm
+from .forms import OrderForm, StartImageUploadForm, FinishImageUploadForm, MaterialForm
 
 from django.db.models import Count, Case, When, IntegerField
 
@@ -585,41 +585,451 @@ def track_location(request):
         
         return JsonResponse({"status": "ok", "trip_id": trip.id})
 
+# orders/views.py
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.admin.views.decorators import staff_member_required
+from .models import Order, Material, MaterialTransaction
+
+
 @login_required
+@staff_member_required
 def warehouse_dashboard(request):
-    if request.method == 'POST':
-        # POST kodi (rasmlarni saqlash va Telegramga yuborish) o'zgarishsiz qoladi
-        order_id = request.POST.get('order_id')
-        if order_id:
-            order = get_object_or_404(Order, id=order_id)
-            # ... (rasmlar va statusni saqlash kodi) ...
-            order.status = 'BAJARILDI'
-            order.work_finished_at = timezone.now()
-            order.save()
-            # ... (Telegram yuborish kodi) ...
-            return redirect('warehouse_dashboard')
+    """Ombordagi barcha materiallar qoldig'i"""
+    materials = Material.objects.all().order_by('quantity')
+    return render(request, 'orders/warehouse_dashboard.html', {'materials': materials})
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .models import Material, Category
 
-    # --- GET SO'ROVI (FILTR O'ZGARTIRILDI) ---
+@login_required
+@staff_member_required
+def edit_material(request, material_id):
+    """Materialni tahrirlash"""
+    material = get_object_or_404(Material, id=material_id)
     
-    # 1. Faqat PARENT (asosiy) va usta tugatgan buyurtmalar
-    ready_orders = Order.objects.filter(
-        status='USTA_TUGATDI',
-        parent_order__isnull=True
-    ).order_by('-work_finished_at') # Agar bu maydon usta tugatganda to'ldirilsa
+    if request.method == "POST":
+        name = request.POST.get('name', '').strip()
+        quantity = float(request.POST.get('quantity', 0))
+        unit = request.POST.get('unit', '')
+        min_stock = float(request.POST.get('min_stock', 0))
+        
+        # Kategoriya yangilash (agar kerak bo'lsa)
+        category_name = request.POST.get('category_name', '')
+        if category_name:
+            category_obj, _ = Category.objects.get_or_create(name=category_name.strip())
+            material.category = category_obj
+        
+        material.name = name
+        material.quantity = quantity
+        material.unit = unit
+        material.min_stock_level = min_stock
+        material.save()
+        
+        messages.success(request, f'"{material.name}" muvaffaqiyatli tahrirlandi!')
+        return redirect('orders:warehouse_dashboard')
+    
+    return render(request, 'orders/edit_material.html', {'material': material})
 
-    # 2. Topshirib bo'lingan asosiy buyurtmalar (oxirgi 20 tasi)
-    delivered_orders = Order.objects.filter(
-        status='BAJARILDI',
-        parent_order__isnull=True  # Faqat asosiy buyurtmalar chiqadi
-    ).order_by('-work_finished_at')[:20]
 
-    all_orders = list(ready_orders) + list(delivered_orders)
+@login_required
+@staff_member_required
+def delete_material(request, material_id):
+    """Materialni o'chirish"""
+    material = get_object_or_404(Material, id=material_id)
+    material_name = material.name
+    
+    if request.method == "POST":
+        material.delete()
+        messages.success(request, f'"{material_name}" muvaffaqiyatli o\'chirildi!')
+    
+    return redirect('orders:warehouse_dashboard')
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import JsonResponse
+from .models import Material, MaterialOutput, Category
+import json
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .models import Material, MaterialOutput, Category
+from django.shortcuts import render, redirect, get_object_or_404 # Mana buni tekshiring
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib import messages
+from decimal import Decimal
+from .models import Material, MaterialOutput
+
+@login_required
+@staff_member_required
+def material_output(request):
+    """Materialni ombordan chiqarish - To'liq to'g'rilangan variant"""
+    
+    if request.method == "POST":
+        m_id = request.POST.get('material_id')
+        
+        if not m_id:
+            messages.error(request, "Iltimos, materialni ro'yxatdan tanlang!")
+            return redirect('material_output')
+            
+        material = get_object_or_404(Material, id=m_id)
+        
+        try:
+            # 1. Miqdorni olish va Decimalga o'tkazish
+            quantity_str = request.POST.get('quantity', '0')
+            quantity = Decimal(quantity_str)
+            
+            # Formadan kelayotgan boshqa ma'lumotlar
+            recipient = request.POST.get('recipient', '').strip()
+            reason = request.POST.get('reason', '').strip()
+            
+            # 2. Validatsiya
+            if quantity <= 0:
+                messages.error(request, "Chiqarish miqdori 0 dan katta bo'lishi kerak!")
+                return redirect('material_output')
+            
+            if quantity > material.quantity:
+                messages.error(request, f"Omborda yetarli emas! Bor: {material.quantity} {material.unit}")
+                return redirect('material_output')
+
+            # 3. AMALNI BAJARISH: Ombordan ayirish
+            material.quantity -= quantity
+            material.save()
+            
+            # 4. TARIXGA YOZISH: Xatolikni oldini olish uchun faqat bor maydonlarni ishlatamiz
+            # DIQQAT: Agar modelingizda 'recipient' ustuni bo'lmasa, 'reason' ichiga qo'shib yuboramiz
+            full_reason = f"Qabul qildi: {recipient}. Izoh: {reason}"
+            
+            MaterialOutput.objects.create(
+                material=material,
+                quantity=quantity,
+                reason=full_reason, # Ko'pincha bu maydon barcha modellarda bo'ladi
+                user=request.user
+            )
+            
+            messages.success(request, f"{material.name} dan {quantity} muvaffaqiyatli chiqarildi!")
+            return redirect('warehouse_dashboard')
+            
+        except Exception as e:
+            # Agar ayirish bajarilib, tarixda xato bersa, terminalda ko'ramiz
+            print(f"--- KRITIK XATO: {e} ---")
+            messages.error(request, f"Tizimda xatolik: {str(e)}")
+            return redirect('material_output')
+    
+    # GET so'rovi: materiallarni yuborish
+    materials = Material.objects.filter(quantity__gt=0).order_by('name')
+    return render(request, 'orders/material_output.html', {'materials': materials})
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from .models import MaterialOutput
+
+@login_required
+@staff_member_required
+def output_history(request):
+    """
+    Chiqarish tarixi: 
+    - Material va Foydalanuvchi ma'lumotlarini bitta so'rovda oladi (select_related).
+    - Eng yangi amallarni ro'yxatning tepasiga chiqaradi (-created_at).
+    """
+    
+    # Agar 'created_at' xato bersa, '-id' deb o'zgartirib ko'ring
+    try:
+        outputs = MaterialOutput.objects.select_related('material', 'user').order_by('-created_at')
+    except:
+        # Ba'zi modellarda sana 'date_output' yoki 'id' bo'lishi mumkin
+        outputs = MaterialOutput.objects.select_related('material', 'user').order_by('-id')
+
+    return render(request, 'orders/output_history.html', {'outputs': outputs})
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from django.http import HttpResponse
+from .models import MaterialOutput
+
+def export_outputs_excel(request):
+    # 1. Yangi Excel kitobi yaratish
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Chiqarish Tarixi"
+
+    # --- STILLAR ---
+    # Sarlavha stili (To'q yashil fon, oq yozuv, qalin)
+    header_fill = PatternFill(start_color="16A34A", end_color="16A34A", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=12)
+    
+    # Markazlashtirish va Hoshiya (Border)
+    center_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'), 
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    # 2. Sarlavha ustunlarini yozish
+    columns = ['№', 'Sana', 'Vaqt', 'Material Nomi', 'Kategoriya', 'Miqdor', 'Birlik', 'Kimga / Sabab', 'Mas’ul Admin']
+    ws.append(columns)
+
+    # Sarlavha dizaynini qo'llash
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_alignment
+        cell.border = thin_border
+
+    # 3. Ma'lumotlarni bazadan olish
+    outputs = MaterialOutput.objects.select_related('material', 'user').all().order_by('-created_at')
+    
+    for index, output in enumerate(outputs, start=1):
+        row = [
+            index,
+            output.created_at.strftime('%d.%m.%Y'),
+            output.created_at.strftime('%H:%M'),
+            output.material.name,
+            output.material.category.name if output.material.category else "-",
+            output.quantity,
+            output.material.unit.upper(),
+            output.reason if output.reason else "-",
+            output.user.username
+        ]
+        ws.append(row)
+        
+        # Har bir satrga hoshiya va tekstni tekislashni qo'shish
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center", horizontal="left" if isinstance(cell.value, str) else "center")
+
+    # 4. Ustun kengligini avtomatik sozlash (Auto-fit)
+    column_widths = {
+        'A': 5, 'B': 12, 'C': 10, 'D': 30, 'E': 20, 
+        'F': 12, 'G': 10, 'H': 35, 'I': 15
+    }
+    for col, width in column_widths.items():
+        ws.column_dimensions[col].width = width
+
+    # 5. Faylni yuborish
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=chiqarish_tarixi.xlsx'
+    
+    wb.save(response)
+    return response
+
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from django.http import HttpResponse
+from .models import Material
+
+def export_inventory_excel(request):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Ombor Qoldig'i"
+
+    # --- RANG STRIFTLARI ---
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid") # To'q ko'k
+    low_stock_fill = PatternFill(start_color="FECACA", end_color="FECACA", fill_type="solid") # Och qizil
+    ok_stock_font = Font(color="059669", bold=True) # Yashil yozuv
+    danger_font = Font(color="DC2626", bold=True) # Qizil yozuv
+    header_font = Font(color="FFFFFF", bold=True, size=12)
+    
+    thin_side = Side(style='thin', color="000000")
+    thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # 1. Sarlavha (Katta Header)
+    ws.merge_cells('A1:G1')
+    ws['A1'] = "OMBORXONA JORIY QOLDIQ HISOBOTI"
+    ws['A1'].font = Font(bold=True, size=16, color="1E40AF")
+    ws['A1'].alignment = center_align
+    ws.row_dimensions[1].height = 30
+
+    # 2. Ustun nomlari (2-qator)
+    columns = ['№', 'Material Nomi', 'Kategoriya', 'Joriy Qoldiq', 'Birlik', 'Minimal Limit', 'Holat']
+    ws.append(columns)
+
+    for cell in ws[2]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+        cell.border = thin_border
+    ws.row_dimensions[2].height = 20
+
+    # 3. Ma'lumotlar
+    materials = Material.objects.select_related('category').all().order_by('name')
+    
+    for index, m in enumerate(materials, start=3):
+        is_low = m.quantity <= m.min_stock_level
+        status_text = "KAM QOLDI" if is_low else "YETARLI"
+        
+        row = [
+            index - 2,
+            m.name,
+            m.category.name if m.category else "-",
+            m.quantity,
+            m.unit.upper(),
+            m.min_stock_level,
+            status_text
+        ]
+        ws.append(row)
+        
+        # Har bir katakni formatlash
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            cell.alignment = center_align if cell.column != 2 else Alignment(horizontal="left", vertical="center", indent=1)
+            
+            # Agar mahsulot kam qolsa, butun qatorni och qizil qilish
+            if is_low:
+                cell.fill = low_stock_fill
+        
+        # Holat ustunini rangli qilish
+        status_cell = ws.cell(row=ws.max_row, column=7)
+        status_cell.font = danger_font if is_low else ok_stock_font
+
+    # 4. Ustun kengliklarini avtomatik va aniq sozlash
+    widths = [5, 40, 20, 15, 10, 15, 15]
+    for i, width in enumerate(widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
+
+    # 5. Faylni yuborish
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=Ombor_Hisoboti_{timezone.now().strftime("%d_%m_%Y")}.xlsx'
+    
+    wb.save(response)
+    return response
+@login_required
+@staff_member_required
+def bulk_output(request):
+    """Ko'p materiallarni bir vaqtda chiqarish"""
+    if request.method == "POST":
+        outputs_data = json.loads(request.POST.get('outputs_data', '[]'))
+        
+        for item in outputs_data:
+            material_id = item.get('material_id')
+            quantity = float(item.get('quantity', 0))
+            reason = item.get('reason', '')
+            
+            try:
+                material = Material.objects.get(id=material_id)
+                if quantity <= material.quantity:
+                    material.quantity -= quantity
+                    material.save()
+                    
+                    MaterialOutput.objects.create(
+                        material=material,
+                        quantity=quantity,
+                        reason=reason,
+                        user=request.user
+                    )
+            except Material.DoesNotExist:
+                continue
+        
+        messages.success(request, "Materiallar muvaffaqiyatli chiqarildi!")
+        return redirect('warehouse_dashboard')
+    
+    materials = Material.objects.filter(quantity__gt=0).order_by('name')
+    return render(request, 'orders/bulk_output.html', {'materials': materials})
+@staff_member_required
+@login_required
+def order_picking_list(request, order_id):
+    """
+    Buyurtma uchun 'Sarflash ro'yxati' (Picking List)
+    Bu funksiya ombordagi materiallar yetarli yoki yo'qligini tekshiradi.
+    """
+    order = get_object_or_404(Order, id=order_id)
+    
+    # 1. Kalkulyatordan hisob-kitoblarni olamiz
+    calc_data = order.calculate_materials()
+    
+    if not calc_data:
+        return render(request, 'orders/picking_list.html', {
+            'order': order,
+            'error': "Ushbu buyurtma turi uchun hisob-kitob mantiqi topilmadi."
+        })
+
+    # 2. Ombor bilan solishtirish (Report tayyorlash)
+    report = []
+    can_produce = True
+    
+    # Materiallar xaritasi: Kalkulyatordagi kalit so'z -> Bazadagi qidiriladigan nom
+    check_list = [
+        {'key': 'foam_volume', 'search': 'siryo', 'label': 'Siryo (Foam)'},
+        {'key': 'sheets_area', 'search': 'list', 'label': 'List (Metal)'},
+    ]
+
+    for item in check_list:
+        needed = calc_data.get(item['key'], 0)
+        # Bazadan nomiga qarab qidiramiz
+        material = Material.objects.filter(name__icontains=item['search']).first()
+        
+        available = material.quantity if material else 0
+        is_enough = available >= needed if material else False
+        
+        if not is_enough:
+            can_produce = False
+            
+        report.append({
+            'label': item['label'],
+            'needed': needed,
+            'available': available,
+            'status': is_enough,
+            'unit': material.unit if material else '?'
+        })
 
     context = {
-        'orders': all_orders,
-        'ready_count': ready_orders.count(),
+        'order': order,
+        'report': report,
+        'can_produce': can_produce,
+        'calc_data': calc_data
     }
-    return render(request, 'orders/warehouse_dashboard.html', context)
+    return render(request, 'orders/picking_list.html', context)
+from django.shortcuts import render, redirect
+from .models import Material, Category
+
+@login_required
+def add_material(request):
+    if request.method == "POST":
+        name = request.POST.get('name').strip() # Nomdagi bo'shliqlarni olib tashlaymiz
+        category_name = request.POST.get('category_name')
+        quantity = float(request.POST.get('quantity', 0))
+        unit = request.POST.get('unit')
+        min_stock = request.POST.get('min_stock', 0)
+
+        # Kategoriya mantiqi
+        category_obj = None
+        if category_name:
+            category_obj, created = Category.objects.get_or_create(name=category_name.strip())
+
+        # MAHSULOTNI TEKSHIRISH VA SAQLASH
+        # Nomiga qarab bazadan qidiramiz
+        material, created = Material.objects.get_or_create(
+            name=name,
+            defaults={
+                'category': category_obj,
+                'quantity': quantity,
+                'unit': unit,
+                'min_stock_level': min_stock
+            }
+        )
+
+        # Agar mahsulot allaqachon bor bo'lsa (created=False), shunchaki miqdorini qo'shamiz
+        if not created:
+            material.quantity = float(material.quantity) + quantity
+            material.save()
+
+        # Redirect qilishda xato bermasligi uchun loyiha nomini tekshiring
+        try:
+            return redirect('warehouse_dashboard')
+        except:
+            return redirect('warehouse_dashboard')
+
+    categories = Category.objects.all()
+    return render(request, 'orders/add_material.html', {'categories': categories})
+
 
 @login_required
 def guard_dashboard(request):
@@ -1892,7 +2302,7 @@ def material_transaction_create(request):
         
         if form.is_valid():
             try:
-                with transaction.atomic():
+                with db_transaction.atomic():
                     transaction_obj = form.save(commit=False)
                     transaction_obj.performed_by = request.user
                     
@@ -2253,10 +2663,14 @@ def find_material_by_code_api(request):
             return JsonResponse({'success': False, 'error': 'Kod kiritilmadi.'}, status=400)
         
         try:
-            # 1. Materialni topishga urinish (product_name orqali)
-            material = Material.objects.get(product_name__iexact=code)
-            is_new = False
-            
+            # 1. Materialni topishga urinish (product_name yoki code orqali)
+            material = Material.objects.filter(
+                product_name__iexact=code
+            ).first() or Material.objects.filter(code__iexact=code).first()
+            if material:
+                is_new = False
+            else:
+                raise Material.DoesNotExist
         except Material.DoesNotExist:
             # 2. Agar topilmasa, uni avtomatik yaratish!
             try:
@@ -2318,6 +2732,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .forms import MaterialTransactionForm # Forma mavjudligini taxmin qilamiz
 # ... (boshqa importlar)
 
+@login_required
 def add_transaction_view(request):
     """
     Yangi omborxona harakatini (kirim yoki chiqim) qo'shish.
@@ -2349,6 +2764,7 @@ from django.shortcuts import get_object_or_404
 
 
 @require_POST
+@login_required
 def remove_transaction_view(request):
     """
     Omborxona materialini chiqim qilish (omborxona zaxirasidan olib tashlash)
@@ -2368,21 +2784,20 @@ def remove_transaction_view(request):
         
         with transaction.atomic():
             # Zaxira yetarli yoki yo'qligini tekshirish
-            if material.current_stock < quantity:
-                return JsonResponse({'success': False, 'error': f'Zaxirada yetarli {material.unit} mavjud emas. (Mavjud: {material.current_stock})'}, status=400)
+            if material.quantity < quantity:
+                return JsonResponse({'success': False, 'error': f'Zaxirada yetarli {material.unit} mavjud emas. (Mavjud: {material.quantity})'}, status=400)
             
             # 1. Zaxirani yangilash
-            material.current_stock -= quantity
+            material.quantity -= quantity
             material.save()
             
             # 2. Tranzaksiyani yaratish (Chiqim)
             MaterialTransaction.objects.create(
                 material=material,
                 transaction_type='OUT', # Chiqim
-                quantity=quantity,
-                unit=material.unit,
-                reason=reason,
-                # user=request.user # Agar foydalanuvchi tizimga kirgan bo'lsa
+                quantity_change=quantity,
+                performed_by=request.user if request.user.is_authenticated else None,
+                notes=reason
             )
         
         return JsonResponse({'success': True, 'message': 'Chiqim muvaffaqiyatli amalga oshirildi.'})
@@ -2414,7 +2829,7 @@ def material_transaction_delete(request, pk):
             transaction.delete()
             
             messages.success(request, "✅ Tranzaksiya muvaffaqiyatli o'chirildi.")
-            return redirect('material_transaction_list')
+            return redirect('material_list')
             
         except Exception as e:
             messages.error(request, f"❌ Xatolik: {str(e)}")
