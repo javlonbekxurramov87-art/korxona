@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material chiqarish | Omborxona</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); min-height: 100vh; padding: 24px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { background: white; border-radius: 24px; padding: 24px 32px; margin-bottom: 24px; border: 1px solid #bbf7d0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #166534 0%, #15803d 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; }
+        .header h1 i { background: none; -webkit-text-fill-color: #16a34a; margin-right: 12px; }
+        .header p { color: #4b5563; margin-top: 8px; font-size: 14px; }
+        .card { background: white; border-radius: 24px; border: 1px solid #bbf7d0; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+        .card-header { padding: 24px 32px; border-bottom: 1px solid #dcfce7; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); }
+        .card-header h2 { font-size: 20px; font-weight: 700; color: #14532d; display: flex; align-items: center; gap: 10px; }
+        .card-body { padding: 32px; }
+        .form-group { margin-bottom: 24px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #374151; font-size: 14px; }
+        .form-control { width: 100%; padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 14px; transition: all 0.2s; background: white; }
+        .form-control:focus { outline: none; border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1); }
+        .form-control:disabled { background: #f9fafb; color: #6b7280; cursor: not-allowed; }
+        
+        .info-box { background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #86efac; border-radius: 16px; padding: 20px; margin-bottom: 24px; display: none; }
+        .info-box-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #bbf7d0; }
+        .info-box-item:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; color: #166534; }
+        .info-value { font-weight: 700; color: #0f172a; }
+        
+        .btn-success { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 600; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; }
+        .btn-secondary { background: white; color: #4b5563; border: 1.5px solid #e2e8f0; padding: 12px 24px; border-radius: 12px; text-decoration: none; display: block; text-align: center; margin-top: 12px; font-weight: 600; }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2); }
+        
+        .required { color: #ef4444; }
+        .helper-text { font-size: 12px; color: #166534; margin-top: 6px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-barcode"></i> Materialni chiqarish</h1>
+        <p><i class="fas fa-magic"></i> Skanerlanganda ma'lumotlar avtomatik to'ldiriladi</p>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-box-open"></i> Chiqarish formasi</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="output-form">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="material_search"><i class="fas fa-search"></i> Material (Skanerlang yoki tanlang) <span class="required">*</span></label>
+                    <input type="text" id="material_search" list="material-list" class="form-control" placeholder="Material nomi yoki QR-kod linki..." required autocomplete="off">
+                    <input type="hidden" name="material_id" id="material_id_hidden">
+                    
+                    <datalist id="material-list">
+                        {% for m in materials %}
+                        <option data-id="{{ m.id }}" 
+                                data-qty="{{ m.quantity }}" 
+                                data-unit="{{ m.unit|upper }}" 
+                                data-cat="{{ m.category.name|default:'Kategoriyasiz' }}" 
+                                value="{{ m.name }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div id="info-box" class="info-box">
+                    <div class="info-box-item">
+                        <span class="info-label">Kategoriya:</span>
+                        <span class="info-value" id="disp-cat">-</span>
+                    </div>
+                    <div class="info-box-item">
+                        <span class="info-label">Joriy qoldiq:</span>
+                        <span class="info-value" id="disp-qty">0.000</span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="quantity"><i class="fas fa-minus-circle"></i> Miqdor <span class="required">*</span></label>
+                        <input type="number" id="quantity" name="quantity" step="0.001" class="form-control" required placeholder="0.000">
+                        <div class="helper-text" id="max-helper">Omborda yetarli emas</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="output_unit"><i class="fas fa-ruler"></i> Birlik</label>
+                        <select id="output_unit" name="output_unit" class="form-control">
+                            <option value="">Birlikni tanlang</option>
+                            <option value="SON">SON/TA</option>
+                            <option value="KG">KG</option>
+                            <option value="M2">M²</option>
+                            <option value="METR">METR</option>
+                            <option value="LITR">LITR</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="recipient"><i class="fas fa-user-check"></i> Kim qabul qildi? <span class="required">*</span></label>
+                    <input type="text" id="recipient" name="recipient" class="form-control" required placeholder="Xodim ismi yoki bo'lim">
+                </div>
+
+                <div class="form-group">
+                    <label for="reason"><i class="fas fa-pen"></i> Qo'shimcha izoh</label>
+                    <textarea id="reason" name="reason" class="form-control" rows="2" placeholder="Ixtiyoriy izoh..."></textarea>
+                </div>
+
+                <button type="submit" class="btn-success">
+                    <i class="fas fa-check-circle"></i> Chiqarishni tasdiqlash
+                </button>
+                <a href="{% url 'warehouse_dashboard' %}" class="btn-secondary">Dashboardga qaytish</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const searchInput = document.getElementById('material_search');
+    const idHidden = document.getElementById('material_id_hidden');
+    const infoBox = document.getElementById('info-box');
+    const dispQty = document.getElementById('disp-qty');
+    const dispCat = document.getElementById('disp-cat');
+    const maxHelper = document.getElementById('max-helper');
+    const quantityInput = document.getElementById('quantity');
+    const unitSelect = document.getElementById('output_unit');
+
+    // 1. ASOSIY TANLASH VA LINKNI TEKSHIRISH MANTIG'I
+    function handleSelection() {
+        let val = searchInput.value.trim();
+
+        // AGAR SKANER LINK YOZAYOTGAN BO'LSA (http://...id=7)
+        if (val.includes('material_id=')) {
+            try {
+                const urlObj = new URL(val);
+                const idFromLink = urlObj.searchParams.get('material_id');
+                if (idFromLink) {
+                    selectById(idFromLink);
+                    return; // Linkni qayta ishlash tugadi
+                }
+            } catch (e) {
+                console.log("Link formatida xato");
+            }
+        }
+
+        // AGAR ODDIY NOM YOZILSA
+        const options = document.getElementById('material-list').options;
+        let found = false;
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === val) {
+                fillData(options[i]);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            infoBox.style.display = 'none';
+            idHidden.value = '';
+        }
+    }
+
+    // ID bo'yicha materialni topish (Skaner linki uchun)
+    function selectById(id) {
+        const options = document.getElementById('material-list').options;
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].getAttribute('data-id') === id) {
+                searchInput.value = options[i].value; // Linkni nomga almashtiramiz
+                fillData(options[i]);
+                quantityInput.focus(); // Kursorni miqdorga olib o'tamiz
+                break;
+            }
+        }
+    }
+
+    // Ma'lumotlarni formaga to'ldirish
+    function fillData(optionElement) {
+        const id = optionElement.getAttribute('data-id');
+        const qty = parseFloat(optionElement.getAttribute('data-qty'));
+        const unit = optionElement.getAttribute('data-unit');
+        const cat = optionElement.getAttribute('data-cat');
+
+        idHidden.value = id;
+        dispQty.innerText = `${qty.toFixed(3)} ${unit}`;
+        dispCat.innerText = cat;
+        maxHelper.innerText = `Omborda: ${qty.toFixed(3)} ${unit}`;
+        quantityInput.max = qty;
+
+        // Birlikni tanlash
+        for(let j=0; j<unitSelect.options.length; j++) {
+            if(unitSelect.options[j].value === unit) {
+                unitSelect.selectedIndex = j;
+                break;
+            }
+        }
+        infoBox.style.display = 'block';
+    }
+
+    // Skaner har bir harfni yozganda ishlaydi
+    searchInput.addEventListener('input', handleSelection);
+
+    // URL orqali (telefonda) ochilganda
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const mId = urlParams.get('material_id');
+        if (mId) selectById(mId);
+    });
+</script>
+</body>
+</html>

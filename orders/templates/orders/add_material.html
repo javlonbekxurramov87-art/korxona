@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yangi material qo'shish</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #111827;
+        }
+        .header p {
+            margin: 5px 0 0;
+            color: #6b7280;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+        .form-group label i {
+            margin-right: 8px;
+            color: #4f46e5;
+        }
+        .form-group input, 
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+        }
+        .form-group input:focus, 
+        .form-group select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .btn-submit {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            width: 100%;
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-submit:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+        .btn-back {
+            text-decoration: none;
+            background: #6b7280;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: 0.3s;
+            display: inline-block;
+        }
+        .btn-back:hover {
+            background: #4b5563;
+        }
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .alert-info {
+            background: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+        }
+        .alert-info i {
+            font-size: 20px;
+        }
+        hr {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #e5e7eb;
+        }
+        .helper-text {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1><i class="fas fa-plus-circle"></i> Yangi material qo'shish</h1>
+            <p>Omborxona tizimiga yangi material yoki mahsulot qo'shing</p>
+        </div>
+        <a href="{% url 'warehouse_dashboard' %}" class="btn-back">
+            <i class="fas fa-arrow-left"></i> Orqaga
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <div>
+                <strong>Ma'lumot:</strong> Agar material bazada mavjud bo'lsa, uning miqdori avtomatik ravishda qo'shiladi.
+                Yangi kategoriya kiritishingiz mumkin.
+            </div>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="name">
+                    <i class="fas fa-cube"></i> Material nomi <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="text" 
+                       id="name" 
+                       name="name" 
+                       required 
+                       placeholder="Masalan: Elektrod, Sement, Armatura..."
+                       autocomplete="off">
+                <div class="helper-text">Materialning to'liq nomini kiriting</div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="category_name">
+                        <i class="fas fa-tag"></i> Kategoriya
+                    </label>
+                    <input type="text" 
+                           id="category_name" 
+                           name="category_name" 
+                           list="category-list"
+                           placeholder="Yangi kategoriya yoki mavjudini tanlang"
+                           autocomplete="off">
+                    <datalist id="category-list">
+                        {% for category in categories %}
+                            <option value="{{ category.name }}">
+                        {% endfor %}
+                    </datalist>
+                    <div class="helper-text">Mavjud kategoriyani tanlang yoki yangisini yozing</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="unit">
+                        <i class="fas fa-ruler"></i> O'lchov birligi <span style="color: #ef4444;">*</span>
+                    </label>
+                    <select id="unit" name="unit" required>
+                        <option value="">Tanlang...</option>
+                        <option value="kg">Kilogramm (kg)</option>
+                        <option value="dona">Dona (dona)</option>
+                        <option value="litr">Litr (l)</option>
+                        <option value="metr">Metr (m)</option>
+                        <option value="tonna">Tonna (t)</option>
+                        <option value="qop">Qop</option>
+                        <option value="ruyon">Ruyon</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="quantity">
+                        <i class="fas fa-chart-line"></i> Miqdor <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="number" 
+                           id="quantity" 
+                           name="quantity" 
+                           step="0.001" 
+                           required 
+                           placeholder="0.000"
+                           value="0">
+                    <div class="helper-text">Musbat son kiriting (masalan: 10.5)</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="min_stock">
+                        <i class="fas fa-exclamation-triangle"></i> Minimal zaxira darajasi
+                    </label>
+                    <input type="number" 
+                           id="min_stock" 
+                           name="min_stock" 
+                           step="0.001" 
+                           placeholder="0"
+                           value="0">
+                    <div class="helper-text">Bu qiymatdan pastga tushganda ogohlantirish chiqadi</div>
+                </div>
+            </div>
+
+            <hr>
+
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-save"></i> Materialni saqlash
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Avtomatik raqam formatlash va tekshirish
+    document.getElementById('quantity').addEventListener('change', function() {
+        if (this.value < 0) {
+            this.value = 0;
+            alert('Miqdor manfiy bo\'lishi mumkin emas!');
+        }
+    });
+    
+    document.getElementById('min_stock').addEventListener('change', function() {
+        if (this.value < 0) {
+            this.value = 0;
+            alert('Minimal zaxira manfiy bo\'lishi mumkin emas!');
+        }
+    });
+    
+    // Material nomini avtomatik capitalize qilish
+    document.getElementById('name').addEventListener('blur', function() {
+        if (this.value) {
+            this.value = this.value.trim().replace(/\b\w/g, l => l.toUpperCase());
+        }
+    });
+    
+    // Kategoriya nomini avtomatik capitalize qilish
+    document.getElementById('category_name').addEventListener('blur', function() {
+        if (this.value) {
+            this.value = this.value.trim().replace(/\b\w/g, l => l.toUpperCase());
+        }
+    });
+</script>
+
+</body>
+</html>

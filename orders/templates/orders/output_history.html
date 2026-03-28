@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chiqarish Tarixi | Omborxona</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); 
+            min-height: 100vh; 
+            padding: 24px; 
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        
+        .header-section {
+            background: white;
+            border-radius: 20px;
+            padding: 24px 32px;
+            margin-bottom: 24px;
+            border: 1px solid #bbf7d0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-title h1 {
+            font-size: 24px;
+            color: #14532d;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-back {
+            text-decoration: none;
+            background: white;
+            color: #15803d;
+            border: 1.5px solid #16a34a;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-back:hover { 
+            background: #16a34a; 
+            color: white;
+            transform: translateX(-5px);
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            border: 1px solid #bbf7d0;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        
+        th {
+            background: #f8fafc;
+            padding: 18px 20px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        tr:hover { background: #f9fef9; }
+
+        .date-badge {
+            display: inline-block;
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .time-text {
+            display: block;
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .badge-qty {
+            background: #fef9e8;
+            color: #92400e;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            border: 1px solid #fef3c7;
+        }
+
+        .user-tag { 
+            background: #f0fdf4;
+            color: #166534;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #dcfce7;
+        }
+        
+        .empty-state {
+            padding: 80px;
+            text-align: center;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-section">
+        <div class="header-title">
+            <h1><i class="fas fa-history" style="color: #16a34a;"></i> Chiqarish Tarixi</h1>
+        </div>
+        <a href="{% url 'warehouse_dashboard' %}" class="btn-back">
+            <i class="fas fa-arrow-left"></i> Dashboardga qaytish
+        </a>
+        <a href="{% url 'export_outputs_excel' %}" class="btn-back" style="background: #16a34a; color: white; border: none;">
+            <i class="fas fa-file-excel"></i> Excelga yuklash
+        </a>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th><i class="far fa-calendar-alt"></i> Sana va Vaqt</th>
+                    <th><i class="fas fa-cube"></i> Material</th>
+                    <th><i class="fas fa-balance-scale"></i> Miqdor</th>
+                    <th><i class="fas fa-info-circle"></i> Tafsilotlar (Kimga / Sabab)</th>
+                    <th><i class="fas fa-user-shield"></i> Mas'ul Admin</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for output in outputs %}
+                <tr>
+                    <td style="white-space: nowrap;">
+                        <div class="date-badge">
+                            <strong>{{ output.created_at|date:"d.m.Y" }}</strong>
+                            <span class="time-text"><i class="far fa-clock"></i> {{ output.created_at|date:"H:i" }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #0f172a; font-size: 15px;">{{ output.material.name }}</div>
+                        <div style="font-size: 12px; color: #16a34a; font-weight: 500;">
+                            <i class="fas fa-tag"></i> {{ output.material.category.name|default:"Kategoriyasiz" }}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge-qty">
+                            {{ output.quantity|floatformat:3 }} {{ output.material.unit|upper }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="max-width: 350px;">
+                            <p style="color: #334155; line-height: 1.4;">{{ output.reason|default:"Tafsilotlar yo'q" }}</p>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="user-tag">
+                            <i class="fas fa-user-check"></i> {{ output.user.username }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="empty-state">
+                            <i class="fas fa-clipboard-list fa-4x" style="margin-bottom: 20px; opacity: 0.2; color: #16a34a;"></i>
+                            <h3>Hali yozuvlar mavjud emas</h3>
+                            <p>Ombordan material chiqarilganda, barcha tarix shu yerda ko'rinadi.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>
