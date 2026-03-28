@@ -14,10 +14,18 @@ urlpatterns = [
 
     # Asosiy Boshqaruv
     path('', views.order_list, name='order_list'),
-    
+    path('warehouse/add/', views.add_material, name='add_material'),
+    path('material/<int:material_id>/edit/', views.edit_material, name='edit_material'),
+    path('material/<int:material_id>/delete/', views.delete_material, name='delete_material'),
+    # Eski: path('material/<int:material_id>/output/', views.material_output, name='material_output'),
+# Yangi (ID-siz):
+    path('material/output/', views.material_output, name='material_output'),
+    path('outputs/history/', views.output_history, name='output_history'), 
     # Buyurtma Operatsiyalari
     path('create/', views.order_create, name='order_create'),
     path('edit/<int:pk>/', views.order_edit, name='order_edit'),
+    path('outputs/export/excel/', views.export_outputs_excel, name='export_outputs_excel'),
+    path('inventory/export/excel/', views.export_inventory_excel, name='export_inventory_excel'),
     path('delete/<int:pk>/', views.order_delete, name='order_delete'),
 
     # Bosqichlar
