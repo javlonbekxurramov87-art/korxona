@@ -5,7 +5,11 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from decimal import Decimal
 from django.utils import timezone
-
+import qrcode
+from PIL import Image
+from io import BytesIO
+from django.core.files import File  # MANA SHU QATORNI QO'SHING
+from django.urls import reverse
 User = get_user_model() 
 
 # =======================================================================
@@ -93,6 +97,32 @@ class Material(models.Model):
         default=Decimal('0.000'), 
         verbose_name="Ombordagi joriy qoldiq"
     )
+    qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new or not self.qr_code:
+            # FAQAT TOZA URL (Hech qanday "Material:" so'zisiz)
+            # Telefoningiz IP-manzilini yozsangiz (masalan 192.168...) telefonda ham ochiladi
+            base_url = "http://127.0.0.1:8000" 
+            full_url = f"{base_url}/orders/material/output/?material_id={self.id}"
+
+            qr = qrcode.QRCode(version=1, box_size=10, border=1)
+            qr.add_data(full_url) # Faqat link
+            qr.make(fit=True)
+
+            qr_image = qr.make_image(fill_color="black", back_color="white")
+            
+            buffer = BytesIO()
+            qr_image.save(buffer, format='PNG')
+            self.qr_code.save(f'qr-{self.id}.png', File(buffer), save=False)
+            
+            Material.objects.filter(pk=self.pk).update(qr_code=self.qr_code)
+    @property
+    def current_stock(self):
+        return self.quantity
+
     price_per_unit = models.DecimalField(
         max_digits=15, 
         decimal_places=2, 
@@ -190,6 +220,61 @@ class Order(models.Model):
         ('10', '10 sm'),
         ('15', '15 sm')
     ]
+    def calculate_materials(self):
+        """
+        Buyurtma uchun ombordagi materiallar hisobini qaytaradi.
+        Hozirgi hisob-kitob order.panel_kvadrat asosida oddiy formulaga o‘tkazilgan.
+        """
+        from decimal import Decimal
+
+        kvadrat = self.panel_kvadrat or Decimal('0')
+        if kvadrat == 0:
+            return {}
+
+        return {
+            'foam_volume': (kvadrat * Decimal('0.20')).quantize(Decimal('0.001')),
+            'sheets_area': (kvadrat * Decimal('0.50')).quantize(Decimal('0.001')),
+        }
+
+    def decrement_stock(self):
+        """
+        Buyurtma uchun kerakli materiallarni ombordan ayirish.
+        Bu funksiya Order modeliga tegishli bo'lishi kerak.
+        """
+        requirements = self.calculate_materials()
+        if not requirements:
+            return False
+
+        import decimal
+
+        foam = Material.objects.filter(name__icontains='siryo').first()
+        if foam and requirements.get('foam_volume') is not None:
+            val = decimal.Decimal(str(requirements['foam_volume']))
+            foam.quantity -= val
+            foam.save()
+            MaterialTransaction.objects.create(
+                material=foam,
+                transaction_type='OUT',
+                quantity_change=val,
+                order=self,
+                notes=f"Order #{self.order_number} uchun sarflandi"
+            )
+
+        sheet = Material.objects.filter(name__icontains='list').first()
+        if sheet and requirements.get('sheets_area') is not None:
+            val = decimal.Decimal(str(requirements['sheets_area']))
+            sheet.quantity -= val
+            sheet.save()
+            MaterialTransaction.objects.create(
+                material=sheet,
+                transaction_type='OUT',
+                quantity_change=val,
+                order=self,
+                notes=f"Order #{self.order_number} uchun sarflandi"
+            )
+
+        return True
+
     @property
     def remaining_amount(self):
         """
@@ -524,3 +609,21 @@ class OrderItem(models.Model):
     area = models.FloatField(default=0)
     price = models.FloatField(default=0)
     total_sum = models.FloatField(default=0)
+from django.db import models
+from django.contrib.auth.models import User
+
+class MaterialOutput(models.Model):
+    """Material chiqarish modeli"""
+    material = models.ForeignKey(Material, on_delete=models.CASCADE, related_name='outputs')
+    quantity = models.DecimalField(max_digits=10, decimal_places=3)
+    reason = models.TextField(blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Material chiqarish"
+        verbose_name_plural = "Material chiqarishlar"
+    
+    def __str__(self):
+        return f"{self.material.name} - {self.quantity} {self.material.unit} ({self.created_at.strftime('%d.%m.%Y')})"
