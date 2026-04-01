@@ -235,6 +235,53 @@ class Order(models.Model):
             'foam_volume': (kvadrat * Decimal('0.20')).quantize(Decimal('0.001')),
             'sheets_area': (kvadrat * Decimal('0.50')).quantize(Decimal('0.001')),
         }
+    def get_detailed_calculation(self):
+        """
+        Buyurtma uchun aniq sarf-xarajat kalkulyatsiyasi
+        """
+        # Ma'lumotlarni olish
+        # panel_kvadrat orqali bo'yini hisoblab olamiz (Eni doim 0.96m deb olingan)
+        eni = Decimal('0.96') # 960 mm
+        kvadratura = Decimal(str(self.panel_kvadrat))
+        boyi_metr = kvadratura / eni
+        boyi_mm = boyi_metr * 1000
+        qalinlik = Decimal(str(self.panel_thickness or 10))
+
+        # 1. LIST HISOBI (2 tomonga)
+        list_sarfi = kvadratura * 2
+
+        # 2. SIRYO HISOBI
+        # Formula: (Boyi(mm) * Eni(mm) * Qalinlik * 0.42) / 2.1
+        # Eslatma: 2.1 bu zichlik koeffitsienti bo'lishi mumkin
+        siryo_sarfi = (boyi_mm * 960 * qalinlik * Decimal('0.42')) / Decimal('2100') 
+        # (2.1 kg/m3 formatga moslash uchun 2100 ga bo'ldik)
+
+        # 3. ZAMOK HISOBI
+        # Eni bo'yicha doim 4 ta (boshida 2, oxirida 2)
+        eni_zamok = 4
+        
+        # Bo'yi bo'yicha: boshidan 70sm, oxiridan 70sm tashlab, har 960mm da 1 tadan
+        # Avval chegaralarni ayiramiz: jami boyi(mm) - 1400mm
+        ishchi_boyi = boyi_mm - 1400
+        if ishchi_boyi > 0:
+            boyi_zamok_soni = (math.floor(ishchi_boyi / 960) + 1) * 2 # 2 tomoni uchun
+        else:
+            boyi_zamok_soni = 0
+            
+        jami_zamok = eni_zamok + boyi_zamok_soni
+
+        # 4. STAKANCHIK HISOBI
+        # Har bir zamok uchun bittadan yoki siz aytgandek har 8 taga 1 ta? 
+        # Odatda har zamokda bitta bo'ladi:
+        stakanchik = jami_zamok 
+
+        return {
+            'list': round(list_sarfi, 2),
+            'siryo': round(siryo_sarfi, 2),
+            'zamok': jami_zamok,
+            'stakanchik': stakanchik,
+            'boyi_m': round(boyi_metr, 2)
+        }
 
     def decrement_stock(self):
         """
@@ -627,3 +674,42 @@ class MaterialOutput(models.Model):
     
     def __str__(self):
         return f"{self.material.name} - {self.quantity} {self.material.unit} ({self.created_at.strftime('%d.%m.%Y')})"
+
+# orders/models.py ichida
+class OrderHistory(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='history')
+    status = models.CharField(max_length=50)
+    updated_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.order.order_number} - {self.status} ({self.updated_at.strftime('%d.%m.%Y %H:%M')})"
+    
+
+from telegram import Bot
+
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+
+def send_telegram_notification(order: "Order", message: str):
+    """Buyurtma statusi o'zgarganda Telegramga yuboradi."""
+    bot = Bot(token=BOT_TOKEN)
+    try:
+        bot.send_message(chat_id=order.customer_unique_id, text=message)
+    except Exception as e:
+        print(f"Telegramga xabar yuborilmadi: {e}")
+
+# Order modelining save metodida
+def save(self, *args, **kwargs):
+    old_status = None
+    if self.pk:
+        old_status = Order.objects.get(pk=self.pk).status
+
+    super().save(*args, **kwargs)
+
+    # Status o‘zgarganda yuborish
+    if old_status != self.status:
+        msg = (
+            f"Sizning buyurtmangiz №{self.order_number} holati o‘zgardi:\n"
+            f"Yangi status: {self.get_status_display()}"
+        )
+        send_telegram_notification(self, msg)
