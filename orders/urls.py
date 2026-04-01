@@ -41,6 +41,7 @@ urlpatterns = [
     path('export/orders/csv/', views.export_orders_csv, name='export_orders_csv'),
 
     # AUDIT LOG
+    path('orders/calculator/all/', views.order_calculator_list, name='order_calculator_list'),
     path('report/audit/', views.product_audit_log_view, name='product_audit_log_view'),
     path('audit-log/export-csv/', views.export_audit_log_csv, name='export_audit_log_csv'), 
 
