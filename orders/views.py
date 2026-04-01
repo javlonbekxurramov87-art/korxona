@@ -1118,8 +1118,8 @@ from django.contrib import messages
 from .models import GuardPatrol
 
 # Telegram bot sozlamalari
-BOT_TOKEN = '7234567890:ABCdefGHIjklMNOpqrSTUvwxYZ' # O'zingizniki bilan almashtiring
-CHAT_ID = '-100123456789' # Guruh ID sini qo'ying
+BOT_TOKEN = '8559719741:AAGa5BnxXt2rxjC-gKFnzboBiJQgPUY2GzU' # O'zingizniki bilan almashtiring
+CHAT_ID = '-1002338157363' # Guruh ID sini qo'ying
 import json
 import requests
 from datetime import datetime
@@ -1129,7 +1129,7 @@ from django.contrib import messages
 from .models import GuardPatrol
 
 # Sozlamalarni o'zgaruvchilarga chiqaramiz
-BOT_TOKEN = "8593760936:AAGAeS-Dj9OHcRnJPcyu1o1pkW3ow0W7dDk"
+BOT_TOKEN = "8559719741:AAGa5BnxXt2rxjC-gKFnzboBiJQgPUY2GzU"
 CHAT_ID = "-1003274223599"
 
 import json
@@ -1142,8 +1142,8 @@ from django.contrib.auth.decorators import login_required
 from .models import GuardPatrol
 
 # --- TELEGRAM SOZLAMALARI ---
-BOT_TOKEN = "8593760936:AAGAeS-Dj9OHcRnJPcyu1o1pkW3ow0W7dDk"
-CHAT_ID = "-1003274223599"
+BOT_TOKEN = "8559719741:AAGa5BnxXt2rxjC-gKFnzboBiJQgPUY2GzU"
+CHAT_ID = "-1002338157363"
 
 import json
 import requests
@@ -1355,8 +1355,8 @@ from .forms import OrderForm
 import requests
 
 # TELEGRAM CONFIG
-TELEGRAM_BOT_TOKEN = "8593760936:AAGAeS-Dj9OHcRnJPcyu1o1pkW3ow0W7dDk"
-TELEGRAM_GROUP_ID = "-1003274223599"
+TELEGRAM_BOT_TOKEN = "8559719741:AAGa5BnxXt2rxjC-gKFnzboBiJQgPUY2GzU"
+TELEGRAM_GROUP_ID = "-1002338157363"
 
 def is_in_group(user, group_name):
     return user.groups.filter(name=group_name).exists()
@@ -2055,7 +2055,8 @@ def order_complete(request, pk):
         messages.warning(request, "Buyurtma Bajarildi deb belgilanishi uchun u avval 'Tayyor' bo'lishi kerak.")
         
     return redirect('order_list')
-
+from django.contrib.admin.models import LogEntry, ADDITION
+from django.contrib.contenttypes.models import ContentType
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser or is_in_group(u, 'Glavniy Admin'), login_url='/login/')
@@ -2072,12 +2073,11 @@ def order_create(request):
             order.created_by = request.user
             order.status = 'KIRITILDI' 
             
-            # Formadagi worker_type modelga o'tadi (LIST, ESHIK yoki LIST_ESHIK)
             order.save()
             form.save_m2m() # 🔴 assigned_workers shu yerda saqlanadi
 
-            # Log yozish
-            LogEntry.objects.log_action(
+            # ✅ LOG YOZISH (To'g'rilangan variant)
+            LogEntry.objects.create(
                 user_id=request.user.id,
                 content_type_id=ContentType.objects.get_for_model(order).pk,
                 object_id=order.pk,
@@ -2100,8 +2100,7 @@ def order_create(request):
             except Group.DoesNotExist:
                 pass
 
-            # 🔴 Notification 2: Biriktirilgan ustalarga (Universal usta ham shu yerda)
-            # save_m2m() dan keyin chaqirish kerak!
+            # 🔴 Notification 2: Biriktirilgan ustalarga
             workers = order.assigned_workers.all()
             if workers.exists():
                 for worker in workers:
@@ -3622,3 +3621,93 @@ def save_order_ajax(request):
             return JsonResponse({"status": "success"})
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny # Mini App uchun vaqtincha
+from .models import Order
+
+class MyOrdersAPIView(APIView):
+    # Dastlab tekshirish oson bo'lishi uchun AllowAny qilamiz
+    # Keyinchalik xavfsizlikni kuchaytiramiz
+    permission_classes = [AllowAny] 
+
+    def get(self, request):
+        # Bot orqali keladigan unique_id (Masalan: 656)
+        customer_id = request.query_params.get('customer_id') 
+        
+        if not customer_id:
+            return Response({"error": "ID ko'rsatilmadi"}, status=400)
+            
+        orders = Order.objects.filter(customer_unique_id=customer_id).order_by('-created_at')
+        
+        data = [
+            {
+                "order_number": o.order_number,
+                "product_name": o.product_name or "Panel/Eshik",
+                "status": o.get_status_display(),
+                "total_price": float(o.total_price),
+                "remaining": float(o.remaining_amount),
+                "created_at": o.created_at.strftime('%d.%m.%Y %H:%M'),
+            }
+            for o in orders
+        ]
+        return Response(data)
+
+import math  # <--- Mana shu qatorni qo'shing
+import math
+from decimal import Decimal
+import math
+from decimal import Decimal
+
+import math
+from decimal import Decimal, ROUND_HALF_UP
+import math
+from decimal import Decimal, ROUND_HALF_UP
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def order_calculator_list(request):
+    orders = Order.objects.exclude(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR'])
+    calculated_data = []
+
+    for order in orders:
+        try:
+            # 1. Kvadratura va Qalinlikni olish
+            kvadrat = Decimal(str(order.panel_kvadrat or 0))
+            raw_thickness = str(order.panel_thickness or "10").replace('sm', '').strip()
+            qalinlik_sm = Decimal(raw_thickness) if raw_thickness.isdigit() else Decimal('10')
+            
+            if kvadrat > 0:
+                # --- 2. SIRYO HISOBI (1 m2 uchun 19.2 kg mantiqi) ---
+                # Formula: Kvadratura * 19.2 * (Qalinlik / 10)
+                # Agar kvadrat 1.0 bo'lsa: 1.0 * 19.2 * (10/10) = 19.2 chiqadi
+                siryo_kg = kvadrat * Decimal('19.2') * (qalinlik_sm / Decimal('10'))
+
+                # --- 3. ZAMOK HISOBI (1 m2 uchun 6 ta) ---
+                jami_zamok = kvadrat * Decimal('6')
+
+                # --- 4. STAKANCHIK HISOBI (1 m2 uchun 8 ta) ---
+                jami_stakanchik = kvadrat * Decimal('8')
+
+                # --- 5. LIST (2 tomonlama) ---
+                list_m2 = kvadrat * 2
+
+                # --- 6. UZUNLIK (L) ---
+                # Shunchaki vizual ma'lumot uchun kvadratni o'zini ko'rsatamiz 
+                # yoki 0.96 ga bo'lib haqiqiy uzunlikni qoldiramiz
+                boyi_m = kvadrat / Decimal('0.96')
+
+                calculated_data.append({
+                    'order': order,
+                    'boyi': boyi_m.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+                    'list': list_m2.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+                    'siryo': siryo_kg.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+                    'zamok': int(jami_zamok.quantize(Decimal('1'), rounding=ROUND_HALF_UP)),
+                    'stakanchik': int(jami_stakanchik.quantize(Decimal('1'), rounding=ROUND_HALF_UP)),
+                })
+        except Exception as e:
+            print(f"Xato: {e}")
+            continue
+
+    return render(request, 'orders/calculator.html', {'data': calculated_data})
