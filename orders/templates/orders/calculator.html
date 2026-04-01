@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Ishlab chiqarish kalkulyatsiyasi | Advanced Panel</title>
+    <!-- Bootstrap 5 + Font Awesome + Google Fonts (Plus Jakarta Sans) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: #f0f4f9;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* modern scroll */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #eef2f6;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #bac8d9;
+            border-radius: 10px;
+        }
+
+        /* card & table polish */
+        .card-hover-effect {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover-effect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.12) !important;
+        }
+
+        .stat-badge {
+            background: rgba(59, 130, 246, 0.12);
+            backdrop-filter: blur(2px);
+            border-radius: 40px;
+            padding: 0.35rem 1rem;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .dim-box-modern {
+            background: linear-gradient(135deg, #ffffff 0%, #f9fbfe 100%);
+            border: 1px solid #e9edf2;
+            border-radius: 1rem;
+            padding: 6px 12px;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .kv-val-large {
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: -0.2px;
+            color: #0f172a;
+        }
+        .len-val-sm {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #3b82f6;
+            background: rgba(59,130,246,0.08);
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+
+        /* table row interactive */
+        .order-row {
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            border-left: 3px solid transparent;
+        }
+        .order-row:hover {
+            background-color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            border-left-color: #3b82f6;
+            transform: scale(1.001);
+        }
+
+        .badge-custom {
+            font-weight: 600;
+            padding: 0.4rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            letter-spacing: -0.2px;
+            background: rgba(0,0,0,0.04);
+            color: #1e293b;
+        }
+
+        .material-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            border-radius: 40px;
+            padding: 4px 14px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border: 1px solid #eef2f6;
+        }
+
+        .footer-note {
+            font-size: 0.7rem;
+            color: #5b6e8c;
+        }
+
+        @media (max-width: 768px) {
+            .custom-calc-table thead th {
+                font-size: 9px;
+                padding: 14px 8px;
+            }
+            .custom-calc-table tbody td {
+                padding: 12px 8px;
+            }
+            .dim-box-modern {
+                min-width: 70px;
+                padding: 4px 8px;
+            }
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .card {
+                border: 1px solid #ddd !important;
+                box-shadow: none !important;
+            }
+            body {
+                background: white;
+            }
+            .order-row {
+                break-inside: avoid;
+            }
+        }
+
+        /* modal enhancement */
+        .modal-glass {
+            backdrop-filter: blur(6px);
+        }
+        .value-bubble {
+            transition: 0.2s;
+        }
+    </style>
+</head>
+<body>
+
+<!-- MAIN CONTEXT: Django template block -->
+{% extends 'orders/base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-5" style="background: #f0f4f9; min-height: 100vh;">
+    <!-- header section with modern stats -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 no-print gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <a href="{% url 'order_list' %}" class="btn btn-light bg-white shadow-sm border-0 rounded-3 px-3 py-2 d-flex align-items-center gap-2">
+                <i class="fas fa-arrow-left text-primary fw-bold"></i>
+                <span class="d-none d-sm-inline fw-semibold">Orqaga</span>
+            </a>
+            <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h1 class="display-6 fw-bold text-dark mb-0" style="font-size: 1.7rem;">
+                        <i class="fas fa-chalkboard-user text-primary me-2"></i>Kalkulyatsiya
+                    </h1>
+                    <div class="stat-badge">
+                        <i class="far fa-clipboard me-1"></i> {{ data|length }} ta buyurtma
+                    </div>
+                </div>
+                <p class="text-secondary-emphasis mt-1 mb-0 small fw-medium">
+                    <i class="fas fa-cubes me-1"></i> Xomashyo hisobi | ishlab chiqarish uchun aniq me'yorlar
+                </p>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print();" class="btn btn-outline-secondary bg-white shadow-sm rounded-3 px-4">
+                <i class="fas fa-print me-2"></i> Chop etish
+            </button>
+            <a href="{% url 'order_list' %}" class="btn btn-primary shadow-sm px-4 rounded-3">
+                <i class="fas fa-plus-circle me-2"></i> Buyurtmalar
+            </a>
+        </div>
+    </div>
+
+    <!-- summary cards (dynamic total) quick glance -->
+    <div class="row g-3 mb-4 no-print">
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted text-uppercase small fw-bold">Jami List</span>
+                        <h3 class="fw-bold mb-0 mt-1" id="totalListDisplay">0</h3>
+                        <small class="text-success">m²</small>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-tablets text-primary fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted text-uppercase small fw-bold">Siryo (kg)</span>
+                        <h3 class="fw-bold mb-0 mt-1" id="totalSiryoDisplay">0</h3>
+                        <small class="text-success">kg</small>
+                    </div>
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-flask text-success fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted text-uppercase small fw-bold">Zamok (dona)</span>
+                        <h3 class="fw-bold mb-0 mt-1" id="totalZamokDisplay">0</h3>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-lock text-warning fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <span class="text-muted text-uppercase small fw-bold">Stakanchik</span>
+                        <h3 class="fw-bold mb-0 mt-1" id="totalStakanDisplay">0</h3>
+                    </div>
+                    <div class="bg-danger bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-cup-straw text-danger fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- main data table -->
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden card-hover-effect">
+        <div class="table-responsive" style="border-radius: 1rem;">
+            <table class="table table-hover align-middle mb-0 custom-calc-table" style="min-width: 720px;">
+                <thead class="bg-light">
+                    <tr style="border-bottom: 1px solid #e9edf2;">
+                        <th class="ps-4" style="width: 12%;"><i class="fas fa-hashtag me-1 text-primary"></i> № Buyurtma</th>
+                        <th style="width: 22%;"><i class="fas fa-building me-1 text-primary"></i> Mijoz & Mahsulot</th>
+                        <th class="text-center" style="width: 18%;"><i class="fas fa-ruler-combined me-1"></i> Kvadratura / Boʻyi</th>
+                        <th class="text-center" style="width: 12%;"><i class="fas fa-chart-line me-1"></i> List (m²)</th>
+                        <th class="text-center" style="width: 12%;"><i class="fas fa-droplet me-1"></i> Siryo (kg)</th>
+                        <th class="text-center" style="width: 12%;"><i class="fas fa-door-closed me-1"></i> Zamok</th>
+                        <th class="text-center pe-4" style="width: 12%;"><i class="fas fa-mug-hot me-1"></i> Stakanchik</th>
+                    </tr>
+                </thead>
+                <tbody id="calculationTableBody">
+                    {% for item in data %}
+                    <tr class="order-row" 
+                        onclick="showOrderDetails(this)" 
+                        style="cursor: pointer; background-color: {% cycle '#ffffff' '#fefefe' %};"
+                        data-order="{{ item.order.order_number }}"
+                        data-customer="{{ item.order.customer_name }}"
+                        data-product="{{ item.order.product_name|default:'Panel' }}"
+                        data-kvadrat="{{ item.order.panel_kvadrat }}"
+                        data-boyi="{{ item.boyi }}"
+                        data-list="{{ item.list }}"
+                        data-siryo="{{ item.siryo }}"
+                        data-zamok="{{ item.zamok }}"
+                        data-stakanchik="{{ item.stakanchik }}"
+                        data-thickness="{{ item.order.panel_thickness|default:'10' }}">
+                        
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="order-dot" style="width: 10px; height: 10px; background: #3b82f6; border-radius: 50%; box-shadow: 0 0 0 3px rgba(59,130,246,0.2);"></div>
+                                <span class="fw-extrabold text-dark fs-6">#{{ item.order.order_number }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold text-truncate" style="max-width: 200px;">{{ item.order.customer_name }}</span>
+                                <span class="text-muted small">{{ item.order.product_name|default:"Standart panel"|truncatechars:28 }}</span>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div class="dim-box-modern d-inline-block text-center">
+                                <div class="kv-val-large">{{ item.order.panel_kvadrat|floatformat:1 }} <small class="text-secondary">m²</small></div>
+                                <div class="len-val-sm mt-1"><i class="fas fa-arrow-right me-1"></i> Uzunlik: {{ item.boyi|floatformat:1 }} m</div>
+                            </div>
+                        </td>
+                        <td class="text-center fw-bold text-primary fs-6">{{ item.list|floatformat:2 }}</td>
+                        <td class="text-center fw-bold text-success fs-6">{{ item.siryo|floatformat:1 }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-3 py-2 fw-semibold" style="background:#fff3e0; color:#b85c00;">
+                                <i class="fas fa-key me-1"></i> {{ item.zamok }}
+                            </span>
+                        </td>
+                        <td class="text-center pe-4">
+                            <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill px-3 py-2 fw-semibold" style="background:#ffe8e8; color:#b91c1c;">
+                                <i class="fas fa-wine-bottle me-1"></i> {{ item.stakanchik }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted bg-white">
+                            <i class="fas fa-inbox fa-2x mb-3 opacity-50"></i><br>
+                            Hozircha faol buyurtmalar mavjud emas.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white border-0 py-3 px-4 no-print d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="footer-note">
+                <i class="fas fa-info-circle me-1"></i> Har bir buyurtma uchun sarf normalari: List (m²) = Kvadratura + texnologik qo'shimcha | Siryo kg = 1 m² uchun 0.85 kg (standart)
+            </div>
+            <div class="text-muted small">
+                <i class="far fa-calendar-alt"></i> Hisobot: <span id="currentDateSpan"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Modal with modern look -->
+<div class="modal fade" id="orderCalcModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content border-0 shadow-xxl rounded-4 overflow-hidden" style="border-radius: 28px;">
+            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-primary bg-opacity-15 p-2 rounded-circle">
+                        <i class="fas fa-calculator text-primary"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold">Mahsulot kalkulyatsiyasi</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 pt-2">
+                <div class="text-center mb-3">
+                    <div class="bg-gradient-primary d-inline-block p-3 rounded-4 shadow-sm" style="background: linear-gradient(145deg, #f0f7ff, #ffffff);">
+                        <i class="fas fa-receipt fa-2x text-primary"></i>
+                    </div>
+                    <h2 class="fw-extrabold mt-2 mb-0" id="m-order-num" style="font-size: 1.7rem;">#ORD-XXX</h2>
+                    <p class="text-secondary-emphasis fw-medium mt-1" id="m-customer">Mijoz</p>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="p-3 rounded-4 bg-light bg-opacity-50 border">
+                            <span class="small text-uppercase text-secondary fw-semibold">Mahsulot</span>
+                            <div class="fw-bold text-dark mt-1" id="m-product">Panel</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded-4 bg-light bg-opacity-50 border">
+                            <span class="small text-uppercase text-secondary fw-semibold">Qalinlik (sm)</span>
+                            <div class="fw-bold text-dark mt-1"><span id="m-thickness">10</span> mm</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold mb-0"><i class="fas fa-clipboard-list me-2 text-primary"></i>Xomashyo sarfi</h6>
+                    </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-6">
+                            <div class="card bg-white border-0 shadow-sm rounded-4 p-3 text-center h-100">
+                                <i class="fas fa-chart-simple text-primary mb-2 fs-4"></i>
+                                <div class="display-6 fw-bold text-primary" id="m-list">0</div>
+                                <small class="text-secondary">List (m²)</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card bg-white border-0 shadow-sm rounded-4 p-3 text-center h-100">
+                                <i class="fas fa-tint text-success mb-2 fs-4"></i>
+                                <div class="display-6 fw-bold text-success" id="m-siryo">0</div>
+                                <small class="text-secondary">Siryo (kg)</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card bg-white border-0 shadow-sm rounded-4 p-3 text-center h-100">
+                                <i class="fas fa-door-open text-warning mb-2 fs-4"></i>
+                                <div class="display-6 fw-bold text-warning" id="m-zamok">0</div>
+                                <small class="text-secondary">Zamok (dona)</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card bg-white border-0 shadow-sm rounded-4 p-3 text-center h-100">
+                                <i class="fas fa-flask text-danger mb-2 fs-4"></i>
+                                <div class="display-6 fw-bold text-danger" id="m-stakanchik">0</div>
+                                <small class="text-secondary">Stakanchik (dona)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button type="button" class="btn btn-dark w-100 py-3 rounded-3 fw-bold" data-bs-dismiss="modal">
+                    <i class="fas fa-check-circle me-2"></i> Tushunarli
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Totals aggregator (dynamic sum from template data)
+    function updateTotals() {
+        let totalList = 0, totalSiryo = 0, totalZamok = 0, totalStakan = 0;
+        const rows = document.querySelectorAll('#calculationTableBody tr.order-row');
+        rows.forEach(row => {
+            const listVal = parseFloat(row.dataset.list) || 0;
+            const siryoVal = parseFloat(row.dataset.siryo) || 0;
+            const zamokVal = parseInt(row.dataset.zamok) || 0;
+            const stakanVal = parseInt(row.dataset.stakanchik) || 0;
+            totalList += listVal;
+            totalSiryo += siryoVal;
+            totalZamok += zamokVal;
+            totalStakan += stakanVal;
+        });
+        document.getElementById('totalListDisplay').innerText = totalList.toFixed(2);
+        document.getElementById('totalSiryoDisplay').innerText = totalSiryo.toFixed(1);
+        document.getElementById('totalZamokDisplay').innerText = totalZamok;
+        document.getElementById('totalStakanDisplay').innerText = totalStakan;
+    }
+
+    // modal show function with data attributes
+    window.showOrderDetails = function(rowElement) {
+        const d = rowElement.dataset;
+        document.getElementById('m-order-num').innerText = '#' + (d.order || '---');
+        document.getElementById('m-customer').innerText = d.customer || 'Mijoz';
+        document.getElementById('m-product').innerText = d.product || 'Panel';
+        let thicknessVal = d.thickness || '10';
+        document.getElementById('m-thickness').innerText = thicknessVal;
+        // format numbers
+        let listNum = parseFloat(d.list).toFixed(2);
+        let siryoNum = parseFloat(d.siryo).toFixed(1);
+        document.getElementById('m-list').innerText = listNum;
+        document.getElementById('m-siryo').innerText = siryoNum;
+        document.getElementById('m-zamok').innerText = d.zamok || '0';
+        document.getElementById('m-stakanchik').innerText = d.stakanchik || '0';
+
+        // Additional: Optional subtle animation or vibration? just open modal.
+        const modalEl = document.getElementById('orderCalcModal');
+        const modalInstance = new bootstrap.Modal(modalEl);
+        modalInstance.show();
+    }
+
+    // set current date on footer
+    function setCurrentDate() {
+        const today = new Date();
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        const formatted = today.toLocaleDateString('uz-UZ', options);
+        const spanDate = document.getElementById('currentDateSpan');
+        if (spanDate) spanDate.innerText = formatted;
+    }
+
+    // ensure totals on load + optional recalculation if any dynamic content (no need extra)
+    document.addEventListener('DOMContentLoaded', function() {
+        updateTotals();
+        setCurrentDate();
+
+        // enhance table rows with keyboard accessibility
+        const rows = document.querySelectorAll('.order-row');
+        rows.forEach(row => {
+            row.setAttribute('tabindex', '0');
+            row.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    showOrderDetails(this);
+                }
+            });
+        });
+        
+        // tooltip for more info (optional)
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+    });
+    
+    // re-run totals after any partial DOM updates (in case of filter) but not needed for static django
+    // additional print styling notice
+    window.matchMedia('print').addListener(function(mql) {
+        if (mql.matches) {
+            // optional pre-print actions
+        }
+    });
+</script>
+
+<style>
+    /* extra fine-tuning */
+    .bg-gradient-primary {
+        background: linear-gradient(120deg, #eef4ff, #ffffff);
+    }
+    .fw-extrabold {
+        font-weight: 800;
+    }
+    .shadow-xxl {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .custom-calc-table thead th {
+        background: #f8fafd;
+        font-size: 0.7rem;
+        letter-spacing: 0.03em;
+        font-weight: 700;
+        color: #2c3e66;
+        padding: 1rem 0.8rem;
+    }
+    .custom-calc-table tbody td {
+        padding: 1rem 0.8rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #eff3f8;
+    }
+    .order-dot {
+        transition: all 0.2s;
+    }
+    .btn-light:active {
+        transform: scale(0.97);
+    }
+    .badge {
+        font-weight: 600;
+        letter-spacing: -0.2px;
+    }
+    .card-footer {
+        font-size: 0.75rem;
+    }
+    @media print {
+        .badge, .order-dot {
+            border: none !important;
+        }
+        .card {
+            border: 1px solid #ccc !important;
+        }
+        .dim-box-modern {
+            background: white;
+            border: 1px solid #aaa;
+        }
+    }
+    tr.order-row:active {
+        background: #f5f9ff !important;
+    }
+    /* new totals card animation */
+    .row.g-3 .card-body {
+        transition: 0.2s;
+    }
+</style>
+{% endblock %}
