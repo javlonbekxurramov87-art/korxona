@@ -1240,7 +1240,7 @@ def guard_patrol_view(request):
         ("05:00", "05:20"),
         ("12:00", "12:20"),  # ⚠️ sizda 12:30-12:20 xato edi
         ("14:00", "14:20"),
-        ("17:30", "18:20"),
+        ("18:00", "18:20"),
         ("22:00", "22:20"),
     ]
 
@@ -3665,49 +3665,82 @@ import math
 from decimal import Decimal, ROUND_HALF_UP
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from decimal import Decimal, ROUND_HALF_UP
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from .models import Order
+from decimal import Decimal, ROUND_HALF_UP
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from .models import Order
+from decimal import Decimal, ROUND_HALF_UP
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from .models import Order
+from decimal import Decimal, ROUND_HALF_UP
+from django.shortcuts import render
+from django.db.models import Sum
+from .models import Order
 
-@login_required
 def order_calculator_list(request):
-    orders = Order.objects.exclude(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR'])
+    # Faqat asosiy panellarni olamiz (parent buyurtmalar)
+    orders = Order.objects.filter(parent_order__isnull=True).order_by('-id')
+    
+    # Qalinlik bo'yicha koeffitsientlar lug'ati
+    SIRYO_COEFFICIENTS = {
+        '5': Decimal('2'),
+        '8': Decimal('3'),
+        '10': Decimal('4'),
+        '15': Decimal('6'),
+    }
+
     calculated_data = []
+    total_kvadrat_all = Decimal('0')
+    total_siryo_all = Decimal('0')
+    total_zamok_all = 0
+    total_stakanchik_all = 0
 
     for order in orders:
-        try:
-            # 1. Kvadratura va Qalinlikni olish
-            kvadrat = Decimal(str(order.panel_kvadrat or 0))
-            raw_thickness = str(order.panel_thickness or "10").replace('sm', '').strip()
-            qalinlik_sm = Decimal(raw_thickness) if raw_thickness.isdigit() else Decimal('10')
-            
-            if kvadrat > 0:
-                # --- 2. SIRYO HISOBI (1 m2 uchun 19.2 kg mantiqi) ---
-                # Formula: Kvadratura * 19.2 * (Qalinlik / 10)
-                # Agar kvadrat 1.0 bo'lsa: 1.0 * 19.2 * (10/10) = 19.2 chiqadi
-                siryo_kg = kvadrat * Decimal('19.2') * (qalinlik_sm / Decimal('10'))
+        kv = Decimal(str(order.panel_kvadrat or 0))
+        # Qalinlikni string ko'rinishida olamiz (masalan: "10")
+        thickness = str(order.panel_thickness or "10").strip()
+        
+        # Siryo hisobi: agar lug'atda qalinlik bo'lsa o'shani, bo'lmasa 10cm koeffitsientini oladi
+        coeff = SIRYO_COEFFICIENTS.get(thickness, Decimal('4'))
+        siryo_val = kv * coeff
+        
+        # Boshqa hisoblar
+        list_val = kv * Decimal('2') # Har bir qatorda toza kvadrat * 2
+        zamok_val = int((kv * Decimal('6')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+        stakan_val = int((kv * Decimal('8')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+        boyi_val = kv / Decimal('0.96') if kv > 0 else 0
 
-                # --- 3. ZAMOK HISOBI (1 m2 uchun 6 ta) ---
-                jami_zamok = kvadrat * Decimal('6')
+        calculated_data.append({
+            'order': order,
+            'thickness': thickness,
+            'siryo': siryo_val,
+            'list': list_val,
+            'zamok': zamok_val,
+            'stakanchik': stakan_val,
+            'boyi': boyi_val,
+        })
 
-                # --- 4. STAKANCHIK HISOBI (1 m2 uchun 8 ta) ---
-                jami_stakanchik = kvadrat * Decimal('8')
+        # Jami summalar uchun yig'ib boramiz
+        total_kvadrat_all += kv
+        total_siryo_all += siryo_val
+        total_zamok_all += zamok_val
+        total_stakanchik_all += stakan_val
 
-                # --- 5. LIST (2 tomonlama) ---
-                list_m2 = kvadrat * 2
+    # JAMI LIST: (Jami Kvadrat * 2) + 10 metr zapas
+    total_list_final = (total_kvadrat_all * Decimal('2')) + Decimal('10') if total_kvadrat_all > 0 else 0
 
-                # --- 6. UZUNLIK (L) ---
-                # Shunchaki vizual ma'lumot uchun kvadratni o'zini ko'rsatamiz 
-                # yoki 0.96 ga bo'lib haqiqiy uzunlikni qoldiramiz
-                boyi_m = kvadrat / Decimal('0.96')
-
-                calculated_data.append({
-                    'order': order,
-                    'boyi': boyi_m.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
-                    'list': list_m2.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
-                    'siryo': siryo_kg.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
-                    'zamok': int(jami_zamok.quantize(Decimal('1'), rounding=ROUND_HALF_UP)),
-                    'stakanchik': int(jami_stakanchik.quantize(Decimal('1'), rounding=ROUND_HALF_UP)),
-                })
-        except Exception as e:
-            print(f"Xato: {e}")
-            continue
-
-    return render(request, 'orders/calculator.html', {'data': calculated_data})
+    context = {
+        'data': calculated_data,
+        'total_kvadrat_all': total_kvadrat_all,
+        'total_list_all': total_list_final,
+        'total_siryo_all': total_siryo_all,
+        'total_zamok_all': total_zamok_all,
+        'total_stakanchik_all': total_stakanchik_all,
+    }
+    
+    return render(request, 'orders/calculator.html', context)
