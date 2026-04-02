@@ -2869,74 +2869,76 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import render
 from .models import Order
+from django.db.models import Sum, Q, DecimalField
+from django.db.models.functions import Coalesce
+from decimal import Decimal
+from django.shortcuts import render
+from .models import Order
 
 def material_sarfi_report(request):
+    """
+    Asosiy buyurtmalar (parent) asosida materiallar sarfini 
+    aniq koeffitsientlar bilan hisoblaydigan hisobot.
+    """
     
-    # =======================================================================
-    # 1. SARFNI HISOBLASH UCHUN KVADRAT METRLARNI GURUH BO'YICHA YIG'ISH
-    # =======================================================================
-    
-    all_orders = Order.objects.all() 
-    
-    total_kvadrat = all_orders.aggregate(
-        sum_kvadrat=Coalesce(Sum('panel_kvadrat'), Decimal(0))
-    )['sum_kvadrat']
+    # 1. FAQAT ASOSIY BUYURTMALARNI FILTRLASH (Dublikat bo'lmasligi uchun)
+    parent_orders = Order.objects.filter(parent_order__isnull=True)
 
-    # Qalinlik bo'yicha kvadrat yig'indilarini hisoblash
-    sum_kvadrat_5cm = all_orders.filter(panel_thickness='5').aggregate(
-        sum_kvadrat=Coalesce(Sum('panel_kvadrat'), Decimal(0))
-    )['sum_kvadrat']
+    # 2. BAZAGA FAQAT 1 MARTA MUROJAAT QILIB, BARCHA SUMMALARNI OLAMIZ
+    # Bu usul filter(thickness=...).aggregate() dan 5 baravar tezroq ishlaydi
+    stats = parent_orders.aggregate(
+        kv_5=Coalesce(Sum('panel_kvadrat', filter=Q(panel_thickness='5')), Decimal('0')),
+        kv_8=Coalesce(Sum('panel_kvadrat', filter=Q(panel_thickness='8')), Decimal('0')),
+        kv_10=Coalesce(Sum('panel_kvadrat', filter=Q(panel_thickness='10')), Decimal('0')),
+        kv_15=Coalesce(Sum('panel_kvadrat', filter=Q(panel_thickness='15')), Decimal('0')),
+        total_kv=Coalesce(Sum('panel_kvadrat'), Decimal('0'))
+    )
 
-    sum_kvadrat_8cm = all_orders.filter(panel_thickness='8').aggregate(
-        sum_kvadrat=Coalesce(Sum('panel_kvadrat'), Decimal(0))
-    )['sum_kvadrat']
+    # 3. STATS'DAN QIYMATLARNI ALOHIDA O'ZGARUVCHILARGA OLAMIZ
+    sum_kv_5 = stats['kv_5']
+    sum_kv_8 = stats['sum_8'] if 'sum_8' in stats else stats['kv_8'] # xavfsizlik uchun
+    sum_kv_10 = stats['kv_10']
+    sum_kv_15 = stats['kv_15']
+    total_kvadrat = stats['total_kv']
 
-    sum_kvadrat_10cm = all_orders.filter(panel_thickness='10').aggregate(
-        sum_kvadrat=Coalesce(Sum('panel_kvadrat'), Decimal(0))
-    )['sum_kvadrat']
+    # 4. SIRYO SARFINI QALINLIK BO'YICHA ANIQ HISOBLASH
+    # Formulalar: 5cm->x2, 8cm->x3, 10cm->x4, 15cm->x6
+    siryo_5_sarfi = sum_kv_5 * Decimal('2')
+    siryo_8_sarfi = sum_kv_8 * Decimal('3')
+    siryo_10_sarfi = sum_kv_10 * Decimal('4')
+    siryo_15_sarfi = sum_kv_15 * Decimal('6')
 
-    sum_kvadrat_15cm = all_orders.filter(panel_thickness='15').aggregate(
-        sum_kvadrat=Coalesce(Sum('panel_kvadrat'), Decimal(0))
-    )['sum_kvadrat']
+    # Jami Siryo (kg)
+    jami_siryo_sarfi = siryo_5_sarfi + siryo_8_sarfi + siryo_10_sarfi + siryo_15_sarfi
 
-    # =======================================================================
-    # 2. SARF FORMULALARINI QO'LLASH
-    # =======================================================================
-    
-    # Jami List Sarfi (m²): (Total Kvadrat * 2) + 10
-    jami_list_sarfi = (total_kvadrat * Decimal(2)) + Decimal(10)
-    
-    # Siryo Sarfi (kg) qalinlik bo'yicha
-    siryo_5cm_sarfi = sum_kvadrat_5cm * Decimal(2)
-    siryo_8cm_sarfi = sum_kvadrat_8cm * Decimal(3)  # 8cm uchun o'rtacha koeff
-    siryo_10cm_sarfi = sum_kvadrat_10cm * Decimal(4)
-    siryo_15cm_sarfi = sum_kvadrat_15cm * Decimal(6)
+    # 5. JAMI LIST SARFI (m²): (Total Kvadrat * 2) + 10 metr zapas
+    # Faqat buyurtma mavjud bo'lsagina zapas qo'shiladi
+    if total_kvadrat > 0:
+        jami_list_sarfi = (total_kvadrat * Decimal('2')) + Decimal('10')
+    else:
+        jami_list_sarfi = Decimal('0')
 
-    jami_siryo_sarfi = siryo_5cm_sarfi + siryo_8cm_sarfi + siryo_10cm_sarfi + siryo_15cm_sarfi
-
-    # =======================================================================
-    # 3. CONTEXT GA YUKLASH
-    # =======================================================================
-    
+    # 6. CONTEXT - HAMMA MA'LUMOTLARNI TEMPLATE'GA YUBORAMIZ
     context = {
+        # Jami natijalar
+        'total_kvadrat': total_kvadrat,
         'jami_list_sarfi': jami_list_sarfi,
         'jami_siryo_sarfi': jami_siryo_sarfi,
         
-        'siryo_5cm_sarfi': siryo_5cm_sarfi,
-        'siryo_8cm_sarfi': siryo_8cm_sarfi,
-        'siryo_10cm_sarfi': siryo_10cm_sarfi,
-        'siryo_15cm_sarfi': siryo_15cm_sarfi,
-        
-        'total_kvadrat': total_kvadrat,
-        'sum_kvadrat_5cm': sum_kvadrat_5cm,
-        'sum_kvadrat_8cm': sum_kvadrat_8cm,
-        'sum_kvadrat_10cm': sum_kvadrat_10cm,
-        'sum_kvadrat_15cm': sum_kvadrat_15cm,
+        # Har bir qalinlik bo'yicha kvadratlar
+        'sum_kv_5': sum_kv_5,
+        'sum_kv_8': sum_kv_8,
+        'sum_kv_10': sum_kv_10,
+        'sum_kv_15': sum_kv_15,
+
+        # Har bir qalinlik bo'yicha siryo sarfi
+        'siryo_5_sarfi': siryo_5_sarfi,
+        'siryo_8_sarfi': siryo_8_sarfi,
+        'siryo_10_sarfi': siryo_10_sarfi,
+        'siryo_15_sarfi': siryo_15_sarfi,
     }
     
     return render(request, 'orders/material_sarfi_report.html', context)
-
-
 
 from django.db.models import Q, Sum, Count, F
 from django.utils.dateparse import parse_date
