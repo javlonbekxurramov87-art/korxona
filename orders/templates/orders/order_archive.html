@@ -1,642 +1,1231 @@
 {% extends "orders/base.html" %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <!-- Header Section -->
-    <div class="archive-header d-flex justify-content-between align-items-center mb-5">
-        <div>
-            <h1 class="h3 font-weight-bold text-dark mb-2">
-                <i class="fas fa-archive text-primary me-2"></i>Batafsil Arxiv
-            </h1>
-            <p class="text-muted mb-0">Tugatilgan buyurtmalar tarixi</p>
+<div class="archive-container">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container-fluid px-4 px-lg-5">
+            <div class="hero-content">
+                <div class="hero-icon">
+                    <i class="fas fa-archive"></i>
+                </div>
+                <div class="hero-text">
+                    <h1 class="hero-title">
+                        {% if is_worker %}Mening Arxivim{% else %}Arxiv Markazi{% endif %}
+                    </h1>
+                    <p class="hero-subtitle">
+                        {% if is_worker %}
+                            Siz muvaffaqiyatli yakunlagan <span class="highlight">{{ main_orders.count }}</span> ta buyurtma
+                        {% else %}
+                            Tizimdagi barcha yakunlangan buyurtmalar arxivi
+                        {% endif %}
+                    </p>
+                </div>
+                <a href="{% url 'order_list' %}" class="back-button">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Orqaga</span>
+                </a>
+            </div>
         </div>
-        <a href="{% url 'order_list' %}" class="btn btn-light btn-lg px-4 shadow-sm d-flex align-items-center">
-            <i class="fas fa-arrow-left me-2"></i> Orqaga
-        </a>
     </div>
 
-    <!-- Search & Filters -->
-    <div class="card search-card border-0 shadow-lg mb-5">
-        <div class="card-body p-4">
-            <form method="GET" class="row g-3">
-                <div class="col-md-10">
-                    <div class="input-group input-group-lg">
-                        <span class="input-group-text bg-white border-end-0">
-                            <i class="fas fa-search text-muted"></i>
-                        </span>
-                        <input type="text" name="q" class="form-control border-start-0 ps-0" 
-                               placeholder="Buyurtma ID, mijoz ismi, panel turi yoki o'lcham bo'yicha qidiruv..." 
+    <div class="container-fluid px-4 px-lg-5">
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-card">
+                <form method="GET" class="search-form">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" name="q" class="search-input" 
+                               placeholder="Buyurtma raqami, mijoz nomi yoki mahsulot bo'yicha qidirish..." 
                                value="{{ search_query }}">
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <button class="btn btn-primary btn-lg w-100 shadow-sm d-flex align-items-center justify-content-center" 
-                            type="submit">
-                        <i class="fas fa-search me-2"></i> Qidirish
-                    </button>
-                </div>
-            </form>
-            
-           
-        </div>
-    </div>
-
-    <!-- Tab Navigation -->
-    <div class="archive-tabs mb-5">
-        <div class="d-flex border-bottom">
-            <button class="tab-btn active flex-grow-1 py-3" data-tab="parent-content">
-                <div class="d-flex flex-column align-items-center">
-                    <span class="h5 mb-1">Asosiy Buyurtmalar</span>
-                    <span class="badge bg-primary rounded-pill px-3">{{ main_orders.count }}</span>
-                </div>
-            </button>
-            <button class="tab-btn flex-grow-1 py-3" data-tab="child-content">
-                <div class="d-flex flex-column align-items-center">
-                    <span class="h5 mb-1">Ichki Detallar</span>
-                    <span class="badge bg-success rounded-pill px-3">{{ child_orders.count }}</span>
-                </div>
-            </button>
-        </div>
-    </div>
-
-    <!-- Main Orders Tab Content -->
-    <div class="tab-content" id="parent-content" style="display: block;">
-        {% if main_orders %}
-        <div class="row g-4">
-            {% for order in main_orders %}
-            <div class="col-xxl-4 col-xl-6 col-lg-6 mb-4">
-                <div class="archive-card card border-0 shadow-sm h-100">
-                    <!-- Card Header -->
-                    <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center py-3 border-0 rounded-top">
-                        <div class="d-flex align-items-center">
-                            <span class="order-id bg-white text-dark px-3 py-1 rounded-pill fw-bold">#{{ order.id }}</span>
-                            <div class="ms-3">
-                                <div class="small">Buyurtma raqami</div>
-                                <strong>{{ order.order_number }}</strong>
-                            </div>
-                        </div>
-                        <span class="status-badge badge {% if order.status == 'Tugatildi' %}bg-success{% else %}bg-warning{% endif %} px-3 py-2">
-                            {{ order.status }}
-                        </span>
-                    </div>
-                    
-                    <!-- Card Body -->
-                    <div class="card-body p-4">
-                        <!-- Customer Info -->
-                        <div class="customer-section mb-4">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="customer-icon bg-light-primary rounded-circle p-3 me-3">
-                                    <i class="fas fa-user text-primary fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h5 class="mb-1 fw-bold">{{ order.customer_name }}</h5>
-                                    <p class="text-muted mb-0 small">Mijoz</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Product Details -->
-                        <div class="product-card bg-light rounded-3 p-4 mb-4">
-                            <h6 class="fw-bold text-dark mb-3 border-bottom pb-2 d-flex align-items-center">
-                                <i class="fas fa-cube me-2 text-primary"></i>
-                                {{ order.product_name }}
-                            </h6>
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <div class="spec-item">
-                                        <span class="text-muted small">Balandligi</span>
-                                        <div class="fw-bold">{{ order.balandligi|default:"-" }} cm</div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="spec-item">
-                                        <span class="text-muted small">Eni</span>
-                                        <div class="fw-bold">{{ order.eni|default:"-" }} cm</div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="spec-item">
-                                        <span class="text-muted small">Qalinligi</span>
-                                        <div class="fw-bold">{{ order.panel_thickness|default:"-" }} mm</div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="spec-item">
-                                        <span class="text-muted small">Kvadrat</span>
-                                        <div class="fw-bold text-primary">{{ order.panel_kvadrat|default:"0" }} m²</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Payment Info -->
-                        <div class="payment-card bg-light-success rounded-3 p-4 mb-4">
-                            <div class="row align-items-center">
-                                <div class="col-8">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-money-bill-wave text-success fa-lg me-3"></i>
-                                        <div>
-                                            <div class="text-muted small">Umumiy narx</div>
-                                            <h4 class="fw-bold text-success mb-0">{{ order.total_price }} usd</h4>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-4 text-end">
-                                    <div class="text-muted small">Avans</div>
-                                    <div class="fw-bold">{{ order.prepayment }} usd</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Additional Details -->
-                        <div class="details-grid mb-4">
-                            <div class="row g-3">
-                                <div class="col-6">
-                                    <div class="detail-item">
-                                        <i class="fas fa-door-open text-primary me-2"></i>
-                                        <span class="small">{{ order.eshik_turi|default:"-" }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="detail-item">
-                                        <i class="fas fa-compass text-primary me-2"></i>
-                                        <span class="small">{{ order.eshik_yonalishi|default:"-" }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="detail-item">
-                                        <i class="fas fa-lock text-primary me-2"></i>
-                                        <span class="small">Zamok: {% if order.zamokli_eshik %}Ha{% else %}Yo'q{% endif %}</span>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="detail-item">
-                                        <i class="fas fa-calendar-alt text-primary me-2"></i>
-                                        <span class="small">{{ order.deadline|date:"d.m.Y" }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Timeline -->
-                        <div class="timeline-section border-top pt-4">
-                            <div class="row text-center">
-                                <div class="col-4">
-                                    <div class="timeline-item">
-                                        <div class="timeline-icon bg-light-primary rounded-circle p-2 mb-2 mx-auto">
-                                            <i class="fas fa-plus text-primary"></i>
-                                        </div>
-                                        <div class="small text-muted">Yaratildi</div>
-                                        <div class="fw-bold">{{ order.created_at|date:"d.m.Y" }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="timeline-item position-relative">
-                                        <div class="timeline-line position-absolute"></div>
-                                        <div class="timeline-icon bg-light-warning rounded-circle p-2 mb-2 mx-auto">
-                                            <i class="fas fa-cogs text-warning"></i>
-                                        </div>
-                                        <div class="small text-muted">Ishlandi</div>
-                                        <div class="fw-bold">{{ order.created_at|date:"d.m.Y" }}</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="timeline-item">
-                                        <div class="timeline-icon bg-light-success rounded-circle p-2 mb-2 mx-auto">
-                                            <i class="fas fa-check text-success"></i>
-                                        </div>
-                                        <div class="small text-muted">Tugatildi</div>
-                                        <div class="fw-bold text-success">{{ order.worker_finished_at|date:"d.m.Y" }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Card Footer -->
-                    <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center py-3">
-                        <div>
-                            {% if order.pdf_file %}
-                            <a href="{{ order.pdf_file.url }}" class="btn btn-outline-danger btn-sm px-4" target="_blank">
-                                <i class="fas fa-file-pdf me-2"></i>PDF ko'rish
-                            </a>
-                            {% else %}
-                            <span class="text-muted small">
-                                <i class="fas fa-file me-1"></i> PDF fayl mavjud emas
-                            </span>
-                            {% endif %}
-                        </div>
-                        <button class="btn btn-outline-primary btn-sm px-4 view-details-btn" data-order-id="{{ order.id }}">
-                            <i class="fas fa-eye me-2"></i>Batafsil
+                        <button type="submit" class="search-btn">
+                            <i class="fas fa-search"></i>
+                            <span>Qidirish</span>
                         </button>
                     </div>
+                </form>
+                {% if search_query %}
+                <div class="search-clear">
+                    <a href="?">
+                        <i class="fas fa-times"></i> Filtrlarni tozalash
+                    </a>
                 </div>
+                {% endif %}
             </div>
-            {% endfor %}
         </div>
-        {% else %}
-        <!-- Empty State -->
-        <div class="empty-state text-center py-5 my-5">
-            <div class="empty-icon bg-light rounded-circle p-5 d-inline-block mb-4">
-                <i class="fas fa-archive fa-3x text-muted"></i>
+
+        <!-- Tab Navigation (faqat admin va menejerlar uchun) -->
+        {% if not is_worker %}
+        <div class="tabs-wrapper">
+            <div class="tabs-container">
+                <button class="tab-btn active" data-tab="parent">
+                    <i class="fas fa-layer-group"></i>
+                    <span>Asosiy Buyurtmalar</span>
+                    <span class="tab-count">{{ main_orders.count }}</span>
+                </button>
+                <button class="tab-btn" data-tab="child">
+                    <i class="fas fa-th-large"></i>
+                    <span>Ichki Detallar</span>
+                    <span class="tab-count">{{ child_orders.count }}</span>
+                </button>
             </div>
-            <h4 class="fw-bold text-dark mb-3">Arxivda ma'lumot topilmadi</h4>
-            <p class="text-muted mb-4">Siz qidirgan so'z bo'yicha hech narsa topilmadi yoki arxiv bo'sh</p>
-            <a href="?" class="btn btn-primary px-5">
-                <i class="fas fa-redo me-2"></i>Filtrlarni tozalash
-            </a>
         </div>
         {% endif %}
-    </div>
 
-    <!-- Child Orders Tab Content -->
-    <div class="tab-content" id="child-content" style="display: none;">
-        {% if child_orders %}
-        <div class="row g-4">
-            {% for child in child_orders %}
-            <div class="col-xxl-3 col-xl-4 col-lg-6 mb-4">
-                <div class="child-card card border-0 shadow-sm h-100">
-                    <div class="card-body p-4">
-                        <!-- Header -->
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <span class="badge bg-info rounded-pill px-3 py-2 fw-bold">#{{ child.id }}</span>
-                                <div class="small text-muted mt-1">Ichki detallar</div>
+        <!-- Main Orders Content -->
+        <div class="tab-panel active" id="parent-panel">
+            {% if main_orders %}
+            <div class="orders-grid">
+                {% for order in main_orders %}
+                <div class="order-card">
+                    <div class="card-header">
+                        <div class="order-badge">
+                            <i class="fas fa-hashtag"></i>
+                            <span>{{ order.order_number }}</span>
+                        </div>
+                        <div class="status-badge {{ order.status|lower }}">
+                            <i class="fas fa-check-circle"></i>
+                            <span>{{ order.get_status_display }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <!-- Customer Info -->
+                        <div class="customer-info">
+                            <div class="customer-avatar">
+                                {{ order.customer_name|slice:":1"|upper }}
                             </div>
-                            <div class="text-end">
-                                <span class="badge bg-light text-dark border px-3 py-2">
-                                    <i class="fas fa-link me-1"></i> #{{ child.parent_order_id }}
-                                </span>
+                            <div class="customer-details">
+                                <h3 class="customer-name">{{ order.customer_name }}</h3>
+                                <p class="customer-id">
+                                    <i class="fas fa-id-card"></i> ID: {{ order.customer_unique_id }}
+                                </p>
                             </div>
                         </div>
 
                         <!-- Product Info -->
-                        <h6 class="fw-bold text-dark mb-3">{{ child.product_name }}</h6>
-                        
-                        <!-- Status -->
-                        <div class="status-indicator mb-4">
-                            <div class="d-flex align-items-center">
-                                <div class="status-dot bg-success rounded-circle me-2"></div>
-                                <span class="fw-bold text-success">{{ child.status }}</span>
+                        <div class="product-info">
+                            <div class="info-row">
+                                <span class="info-label">
+                                    <i class="fas fa-box"></i> Mahsulot
+                                </span>
+                                <span class="info-value">{{ order.product_name|default:"-" }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">
+                                    <i class="fas fa-chart-line"></i> Kvadrat
+                                </span>
+                                <span class="info-value highlight">{{ order.panel_kvadrat|default:"0" }} m²</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">
+                                    <i class="fas fa-door-open"></i> Eshik turi
+                                </span>
+                                <span class="info-value">{{ order.eshik_turi|default:"-" }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">
+                                    <i class="fas fa-arrow-right"></i> Yo'nalish
+                                </span>
+                                <span class="info-value">{{ order.eshik_yonalishi|default:"-" }}</span>
                             </div>
                         </div>
 
-                        <!-- Worker Comment -->
-                        <div class="comment-card bg-light rounded-3 p-3 mb-4">
-                            <div class="d-flex align-items-start">
-                                <i class="fas fa-comment-dots text-primary mt-1 me-2"></i>
+                        <!-- Dimensions -->
+                        <div class="dimensions">
+                            <div class="dimension-item">
+                                <i class="fas fa-arrow-up"></i>
                                 <div>
-                                    <div class="small text-muted mb-1">Usta izohi</div>
-                                    <p class="mb-0">{{ child.worker_comment|default:"Izoh yo'q" }}</p>
+                                    <span class="dim-label">Balandligi</span>
+                                    <span class="dim-value">{{ order.balandligi|default:"-" }} sm</span>
+                                </div>
+                            </div>
+                            <div class="dimension-item">
+                                <i class="fas fa-arrow-right"></i>
+                                <div>
+                                    <span class="dim-label">Eni</span>
+                                    <span class="dim-value">{{ order.eni|default:"-" }} sm</span>
+                                </div>
+                            </div>
+                            <div class="dimension-item">
+                                <i class="fas fa-cube"></i>
+                                <div>
+                                    <span class="dim-label">Qalinligi</span>
+                                    <span class="dim-value">{{ order.panel_thickness|default:"0" }} mm</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Completion Info -->
-                        <div class="completion-info border-top pt-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="small text-muted">Tugatilgan vaqt</div>
-                                    <div class="fw-bold">{{ child.worker_finished_at|date:"d.m.Y" }}</div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="small text-muted">Soat</div>
-                                    <div class="fw-bold">{{ child.worker_finished_at|date:"H:i" }}</div>
-                                </div>
+                        <!-- Payment Summary (faqat admin va menejerlar uchun) -->
+                        {% if not is_worker %}
+                        <div class="payment-info">
+                            <div class="payment-row">
+                                <span>Umumiy summa</span>
+                                <strong>{{ order.total_price|floatformat:0 }} USD</strong>
                             </div>
+                            <div class="payment-row">
+                                <span>Avans to'lov</span>
+                                <strong class="text-success">{{ order.prepayment|floatformat:0 }} USD</strong>
+                            </div>
+                            {% if order.remaining_amount > 0 %}
+                            <div class="payment-row debt">
+                                <span>Qoldiq qarz</span>
+                                <strong class="text-danger">{{ order.remaining_amount|floatformat:0 }} USD</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Assigned Workers -->
+                        {% if order.assigned_workers.all %}
+                        <div class="workers-list">
+                            <i class="fas fa-users"></i>
+                            <span>Ustalar:</span>
+                            {% for worker in order.assigned_workers.all %}
+                            <span class="worker-tag">
+                                <i class="fas fa-user-check"></i>
+                                {{ worker.user.get_full_name|default:worker.user.username }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-footer">
+                        <div class="footer-actions">
+                            {% if order.pdf_file %}
+                            <a href="{{ order.pdf_file.url }}" class="btn-pdf" target="_blank">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'order_detail' order.pk %}" class="btn-detail">
+                                <i class="fas fa-eye"></i> Batafsil
+                            </a>
+                        </div>
+                        <div class="completion-date">
+                            <i class="far fa-calendar-check"></i>
+                            Tugatilgan: 
+{% if order.worker_finished_at %}
+    {{ order.worker_finished_at|date:"d.m.Y H:i" }}
+{% else %}
+    {{ order.created_at|date:"d.m.Y H:i" }}
+{% endif %}
                         </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+
+            <!-- Pagination -->
+            {% if main_orders.has_other_pages %}
+            <div class="pagination-wrapper">
+                <div class="pagination-container">
+                    {% if main_orders.has_previous %}
+                    <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% endif %}
+                    
+                    {% for i in main_orders.paginator.page_range %}
+                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
+                       class="page-link {% if main_orders.number == i %}active{% endif %}">
+                        {{ i }}
+                    </a>
+                    {% endfor %}
+                    
+                    {% if main_orders.has_next %}
+                    <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <!-- Empty State -->
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-archive"></i>
+                </div>
+                <h3>Arxiv bo'sh</h3>
+                <p>
+                    {% if is_worker %}
+                        Siz hali hech qanday buyurtmani tugatmagan ko'rinasiz.
+                    {% else %}
+                        Hozircha arxivlangan buyurtmalar mavjud emas.
+                    {% endif %}
+                </p>
+                <a href="{% url 'order_list' %}" class="empty-btn">
+                    <i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish
+                </a>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="empty-state text-center py-5 my-5">
-            <div class="empty-icon bg-light rounded-circle p-5 d-inline-block mb-4">
-                <i class="fas fa-cogs fa-3x text-muted"></i>
+
+        <!-- Child Orders Content (faqat admin va menejerlar uchun) -->
+        {% if not is_worker %}
+        <div class="tab-panel" id="child-panel">
+            {% if child_orders %}
+            <div class="child-grid">
+                {% for child in child_orders %}
+                <div class="child-card">
+                    <div class="child-header">
+                        <span class="child-badge">
+                            <i class="fas fa-hashtag"></i> {{ child.id }}
+                        </span>
+                        <span class="parent-link">
+                            <i class="fas fa-link"></i> Asosiy #{{ child.parent_order_id }}
+                        </span>
+                    </div>
+                    
+                    <h4 class="child-title">
+                        <i class="fas fa-cube"></i>
+                        {{ child.product_name|default:"Mahsulot" }}
+                    </h4>
+                    
+                    <div class="child-specs">
+                        <div class="spec">
+                            <span>Qalinligi</span>
+                            <strong>{{ child.panel_thickness|default:"-" }} mm</strong>
+                        </div>
+                        <div class="spec">
+                            <span>Kvadrat</span>
+                            <strong>{{ child.panel_kvadrat|default:"0" }} m²</strong>
+                        </div>
+                    </div>
+
+                    {% if child.worker_comment %}
+                    <div class="child-comment">
+                        <i class="fas fa-comment-dots"></i>
+                        <p>{{ child.worker_comment|truncatechars:60 }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if child.assigned_workers.all %}
+                    <div class="child-workers">
+                        {% for worker in child.assigned_workers.all %}
+                        <span class="worker-badge">
+                            <i class="fas fa-user"></i>
+                            {{ worker.user.get_full_name|default:worker.user.username }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="child-footer">
+                        <div class="completion-time">
+                            <i class="far fa-clock"></i>
+                            {{ child.worker_finished_at|date:"d.m.Y H:i"|default:child.updated_at|date:"d.m.Y H:i" }}
+                        </div>
+                        <div class="status-dot"></div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
-            <h4 class="fw-bold text-dark mb-3">Ichki detallar topilmadi</h4>
-            <p class="text-muted mb-4">Tugatilgan ichki detallar arxivi bo'sh</p>
+
+            <!-- Pagination for child orders -->
+            {% if child_orders.has_other_pages %}
+            <div class="pagination-wrapper">
+                <div class="pagination-container">
+                    {% if child_orders.has_previous %}
+                    <a href="?page={{ child_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% endif %}
+                    
+                    {% for i in child_orders.paginator.page_range %}
+                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
+                       class="page-link {% if child_orders.number == i %}active{% endif %}">
+                        {{ i }}
+                    </a>
+                    {% endfor %}
+                    
+                    {% if child_orders.has_next %}
+                    <a href="?page={{ child_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <h3>Ichki detallar topilmadi</h3>
+                <p>Tugatilgan ichki detallar arxivi bo'sh</p>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
     </div>
-
-    <!-- Pagination -->
-    {% if main_orders.has_other_pages or child_orders.has_other_pages %}
-    <nav class="mt-5">
-        <ul class="pagination justify-content-center">
-            {% if main_orders.has_previous %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
-                    <i class="fas fa-chevron-left"></i>
-                </a>
-            </li>
-            {% endif %}
-            
-            {% for i in main_orders.paginator.page_range %}
-            <li class="page-item {% if main_orders.number == i %}active{% endif %}">
-                <a class="page-link" href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ i }}</a>
-            </li>
-            {% endfor %}
-            
-            {% if main_orders.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 
 <style>
-    :root {
-        --primary-color: #4361ee;
-        --secondary-color: #3a0ca3;
-        --success-color: #4cc9f0;
-        --light-primary: #e9ecef;
-        --light-success: #d1f7ff;
-        --border-radius: 16px;
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
 
-    /* Header Styles */
-    .archive-header {
-        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-        padding: 2rem;
-        border-radius: var(--border-radius);
-        border-left: 5px solid var(--primary-color);
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #eef2f5 100%);
     }
 
-    /* Search Card */
-    .search-card {
-        border-radius: var(--border-radius);
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-        border: 1px solid #e0e7ff;
+    .archive-container {
+        min-height: 100vh;
+        padding: 2rem 0;
     }
 
-    /* Tab Navigation */
-    .tab-btn {
-        background: none;
-        border: none;
-        transition: all 0.3s ease;
-        cursor: pointer;
+    /* Hero Section */
+    .hero-section {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        border-radius: 0 0 3rem 3rem;
+        margin-bottom: 2rem;
         position: relative;
-        color: #6c757d;
+        overflow: hidden;
     }
 
-    .tab-btn.active {
-        color: var(--primary-color);
-    }
-
-    .tab-btn.active::after {
+    .hero-section::before {
         content: '';
         position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
         bottom: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: var(--primary-color);
-        border-radius: 2px 2px 0 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.05)" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path></svg>') no-repeat bottom;
+        background-size: cover;
+        opacity: 0.1;
     }
 
-    .tab-btn:hover:not(.active) {
-        background-color: #f8f9ff;
-        color: var(--secondary-color);
-    }
-
-    /* Archive Card */
-    .archive-card {
-        border-radius: var(--border-radius);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow: hidden;
-        border: 1px solid #e9ecef;
-    }
-
-    .archive-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 40px rgba(67, 97, 238, 0.15) !important;
-        border-color: var(--primary-color);
-    }
-
-    .archive-card .card-header {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    }
-
-    /* Child Card */
-    .child-card {
-        border-radius: var(--border-radius);
-        border: 1px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-
-    .child-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
-        border-color: var(--success-color);
-    }
-
-    /* Spec Items */
-    .spec-item {
-        padding: 0.5rem;
-        background: white;
-        border-radius: 10px;
-        border: 1px solid #f1f3f4;
-    }
-
-    /* Timeline */
-    .timeline-section {
-        position: relative;
-    }
-
-    .timeline-line {
-        position: absolute;
-        top: 50%;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, #dee2e6 50%, transparent 50%);
-        background-size: 20px 2px;
-        transform: translateY(-50%);
-        z-index: 0;
-    }
-
-    .timeline-item {
+    .hero-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2.5rem 0;
         position: relative;
         z-index: 1;
+        flex-wrap: wrap;
+        gap: 1rem;
     }
 
-    .timeline-icon {
-        width: 50px;
-        height: 50px;
+    .hero-icon {
+        width: 70px;
+        height: 70px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 2rem;
+        color: white;
+        backdrop-filter: blur(10px);
     }
 
-    /* Empty State */
-    .empty-state {
-        max-width: 600px;
+    .hero-text {
+        flex: 1;
+        margin-left: 1rem;
+    }
+
+    .hero-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 0.25rem;
+    }
+
+    .hero-subtitle {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.95rem;
+    }
+
+    .hero-subtitle .highlight {
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        display: inline-block;
+    }
+
+    .back-button {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.7rem 1.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50px;
+        color: white;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .back-button:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateX(-3px);
+        color: white;
+    }
+
+    /* Search Section */
+    .search-section {
+        margin-bottom: 2rem;
+    }
+
+    .search-card {
+        background: white;
+        border-radius: 1.5rem;
+        padding: 1.25rem;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-form {
+        width: 100%;
+    }
+
+    .search-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1.25rem;
+        color: #0d9488;
+        font-size: 1.1rem;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 1rem 1rem 1rem 3rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 1rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #f8fafc;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #0d9488;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    }
+
+    .search-btn {
+        position: absolute;
+        right: 0.5rem;
+        padding: 0.6rem 1.5rem;
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        border: none;
+        border-radius: 0.75rem;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .search-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
+    }
+
+    .search-clear {
+        text-align: center;
+        margin-top: 1rem;
+    }
+
+    .search-clear a {
+        color: #0d9488;
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+    }
+
+    .search-clear a:hover {
+        color: #0f766e;
+    }
+
+    /* Tabs */
+    .tabs-wrapper {
+        margin-bottom: 2rem;
+    }
+
+    .tabs-container {
+        display: flex;
+        gap: 1rem;
+        background: white;
+        padding: 0.5rem;
+        border-radius: 60px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        max-width: 500px;
         margin: 0 auto;
     }
 
-    .empty-icon {
-        width: 150px;
-        height: 150px;
+    .tab-btn {
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 0.5rem;
+        padding: 0.8rem 1.5rem;
+        background: transparent;
+        border: none;
+        border-radius: 50px;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.3s ease;
     }
 
-    /* Detail Items */
-    .detail-item {
-        display: flex;
-        align-items: center;
-        padding: 0.5rem;
+    .tab-btn i {
+        font-size: 1rem;
+    }
+
+    .tab-btn .tab-count {
+        background: #e2e8f0;
+        padding: 0.2rem 0.5rem;
+        border-radius: 30px;
+        font-size: 0.75rem;
+        color: #475569;
+    }
+
+    .tab-btn.active {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        color: white;
+        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
+    }
+
+    .tab-btn.active .tab-count {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+
+    /* Tab Panels */
+    .tab-panel {
+        display: none;
+        animation: fadeIn 0.4s ease;
+    }
+
+    .tab-panel.active {
+        display: block;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Orders Grid */
+    .orders-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .order-card {
         background: white;
-        border-radius: 8px;
-        border: 1px solid #f1f3f4;
+        border-radius: 1.5rem;
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
     }
 
-    /* Payment Card */
-    .payment-card {
-        border-left: 4px solid #4cc9f0;
+    .order-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 25px 45px rgba(13, 148, 136, 0.15);
     }
 
-    .product-card {
-        border-left: 4px solid var(--primary-color);
+    .card-header {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        padding: 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
-    /* Comment Card */
-    .comment-card {
-        border-left: 4px solid #7209b7;
-    }
-
-    /* Status Badge */
-    .status-badge {
+    .order-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        color: white;
+        font-weight: 600;
         font-size: 0.85rem;
-        letter-spacing: 0.5px;
     }
 
-    /* Order ID */
-    .order-id {
-        font-size: 1.1rem;
-        letter-spacing: 1px;
+    .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: white;
     }
 
-    /* Customer Icon */
-    .customer-icon {
-        width: 60px;
-        height: 60px;
+    .status-badge.bajarildi, .status-badge.tayyor {
+        background: #10b981;
+    }
+
+    .status-badge.usta_tugatdi {
+        background: #f59e0b;
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    /* Customer Info */
+    .customer-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .customer-avatar {
+        width: 55px;
+        height: 55px;
+        background: linear-gradient(135deg, #ccfbf1 0%, #f0fdfa 100%);
+        border-radius: 18px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0d9488;
     }
 
-    /* Status Dot */
+    .customer-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+    }
+
+    .customer-id {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    /* Product Info */
+    .product-info {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+
+    .info-label {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .info-label i {
+        width: 18px;
+        margin-right: 0.3rem;
+    }
+
+    .info-value {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .info-value.highlight {
+        color: #0d9488;
+    }
+
+    /* Dimensions */
+    .dimensions {
+        display: flex;
+        gap: 1rem;
+        background: #f8fafc;
+        padding: 1rem;
+        border-radius: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .dimension-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.3rem;
+    }
+
+    .dimension-item i {
+        font-size: 1rem;
+        color: #0d9488;
+    }
+
+    .dim-label {
+        font-size: 0.65rem;
+        color: #64748b;
+        display: block;
+    }
+
+    .dim-value {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    /* Payment Info */
+    .payment-info {
+        background: #f8fafc;
+        padding: 1rem;
+        border-radius: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .payment-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0;
+    }
+
+    .payment-row.debt {
+        border-top: 1px solid #e2e8f0;
+        margin-top: 0.3rem;
+        padding-top: 0.6rem;
+    }
+
+    /* Workers List */
+    .workers-list {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .worker-tag {
+        background: #e2e8f0;
+        padding: 0.25rem 0.6rem;
+        border-radius: 30px;
+        font-size: 0.7rem;
+        color: #475569;
+    }
+
+    .worker-tag i {
+        font-size: 0.65rem;
+        margin-right: 0.2rem;
+    }
+
+    /* Card Footer */
+    .card-footer {
+        padding: 1rem 1.5rem 1.5rem;
+        background: white;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .footer-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .btn-pdf, .btn-detail {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.6rem;
+        border-radius: 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-pdf {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .btn-pdf:hover {
+        background: #fee2e2;
+        transform: translateY(-2px);
+    }
+
+    .btn-detail {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        color: white;
+    }
+
+    .btn-detail:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
+    }
+
+    .completion-date {
+        text-align: center;
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    .completion-date i {
+        margin-right: 0.3rem;
+    }
+
+    /* Child Cards */
+    .child-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .child-card {
+        background: white;
+        border-radius: 1.25rem;
+        padding: 1.25rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .child-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(13, 148, 136, 0.12);
+        border-left: 3px solid #0d9488;
+    }
+
+    .child-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .child-badge {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        padding: 0.3rem 0.8rem;
+        border-radius: 50px;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .parent-link {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
+    .child-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .child-specs {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .spec {
+        flex: 1;
+        background: #f8fafc;
+        padding: 0.5rem;
+        border-radius: 0.75rem;
+        text-align: center;
+    }
+
+    .spec span {
+        font-size: 0.65rem;
+        color: #64748b;
+        display: block;
+    }
+
+    .spec strong {
+        font-size: 0.85rem;
+        color: #0d9488;
+    }
+
+    .child-comment {
+        background: #f0fdfa;
+        padding: 0.75rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .child-comment i {
+        color: #0d9488;
+        font-size: 0.8rem;
+    }
+
+    .child-comment p {
+        font-size: 0.75rem;
+        color: #475569;
+        margin: 0;
+    }
+
+    .child-workers {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .worker-badge {
+        background: #e2e8f0;
+        padding: 0.2rem 0.6rem;
+        border-radius: 30px;
+        font-size: 0.7rem;
+        color: #475569;
+    }
+
+    .child-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .completion-time {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
     .status-dot {
         width: 10px;
         height: 10px;
+        background: #10b981;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
         animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-        0% { opacity: 1; }
-        50% { opacity: 0.5; }
-        100% { opacity: 1; }
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
-    /* Responsive Adjustments */
+    /* Pagination */
+    .pagination-wrapper {
+        margin-top: 2.5rem;
+        display: flex;
+        justify-content: center;
+    }
+
+    .pagination-container {
+        display: flex;
+        gap: 0.5rem;
+        background: white;
+        padding: 0.5rem;
+        border-radius: 60px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .page-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 40px;
+        height: 40px;
+        padding: 0 0.75rem;
+        background: transparent;
+        border-radius: 40px;
+        color: #475569;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .page-link:hover {
+        background: #f1f5f9;
+        color: #0d9488;
+    }
+
+    .page-link.active {
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        color: white;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+
+    .empty-icon {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #ccfbf1 0%, #f0fdfa 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+    }
+
+    .empty-icon i {
+        font-size: 3rem;
+        color: #0d9488;
+    }
+
+    .empty-state h3 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: #64748b;
+        margin-bottom: 1.5rem;
+    }
+
+    .empty-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 2rem;
+        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+        border-radius: 50px;
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .empty-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(13, 148, 136, 0.3);
+        color: white;
+    }
+
+    /* Responsive */
     @media (max-width: 768px) {
-        .archive-header {
+        .hero-content {
             flex-direction: column;
             text-align: center;
-            gap: 1rem;
         }
-        
-        .tab-btn {
-            padding: 1rem 0.5rem;
+
+        .hero-text {
+            margin-left: 0;
         }
-        
-        .timeline-line {
+
+        .hero-icon {
+            margin: 0 auto;
+        }
+
+        .search-wrapper {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .search-icon {
             display: none;
+        }
+
+        .search-input {
+            padding: 1rem;
+        }
+
+        .search-btn {
+            position: static;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .tabs-container {
+            flex-direction: column;
+            border-radius: 1rem;
+            gap: 0.5rem;
+        }
+
+        .orders-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .product-info {
+            grid-template-columns: 1fr;
+        }
+
+        .dimensions {
+            flex-direction: column;
+        }
+
+        .footer-actions {
+            flex-direction: column;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .hero-title {
+            font-size: 1.4rem;
+        }
+
+        .card-header {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .customer-info {
+            flex-direction: column;
+            text-align: center;
         }
     }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Tab Switching
+        // Tab switching
         const tabBtns = document.querySelectorAll('.tab-btn');
-        const tabContents = document.querySelectorAll('.tab-content');
+        const tabPanels = document.querySelectorAll('.tab-panel');
         
         tabBtns.forEach(btn => {
             btn.addEventListener('click', function() {
-                // Remove active class from all tabs
-                tabBtns.forEach(b => b.classList.remove('active'));
-                tabContents.forEach(c => c.style.display = 'none');
-                
-                // Add active class to clicked tab
-                this.classList.add('active');
-                
-                // Show corresponding content
                 const tabId = this.getAttribute('data-tab');
-                document.getElementById(tabId).style.display = 'block';
-            });
-        });
-
-        // View Details Button
-        const viewDetailsBtns = document.querySelectorAll('.view-details-btn');
-        viewDetailsBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const orderId = this.getAttribute('data-order-id');
-                // Add your modal or page navigation logic here
-                alert(`Buyurtma #${orderId} batafsil ma'lumotlari ochiladi`);
-            });
-        });
-
-        // Search input focus effect
-        const searchInput = document.querySelector('input[name="q"]');
-        if (searchInput) {
-            searchInput.addEventListener('focus', function() {
-                this.parentElement.parentElement.style.boxShadow = '0 0 0 3px rgba(67, 97, 238, 0.2)';
-            });
-            
-            searchInput.addEventListener('blur', function() {
-                this.parentElement.parentElement.style.boxShadow = 'none';
-            });
-        }
-
-        // Card hover effects
-        const cards = document.querySelectorAll('.archive-card, .child-card');
-        cards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                const header = this.querySelector('.card-header');
-                if (header) {
-                    header.style.background = 'linear-gradient(135deg, #3a0ca3 0%, #4361ee 100%)';
-                }
-            });
-            
-            card.addEventListener('mouseleave', function() {
-                const header = this.querySelector('.card-header');
-                if (header) {
-                    header.style.background = 'linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)';
-                }
-            });
-        });
-
-        // Quick filter functionality
-        const quickFilters = document.querySelectorAll('.badge.bg-light');
-        quickFilters.forEach(filter => {
-            filter.addEventListener('click', function(e) {
-                e.preventDefault();
-                quickFilters.forEach(f => f.classList.remove('bg-primary', 'text-white'));
-                this.classList.add('bg-primary', 'text-white');
                 
-                // Add your filter logic here
-                const filterText = this.textContent.trim();
-                alert(`"${filterText}" bo'yicha filtr qo'llaniladi`);
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabPanels.forEach(p => p.classList.remove('active'));
+                
+                this.classList.add('active');
+                document.getElementById(`${tabId}-panel`).classList.add('active');
+            });
+        });
+
+        // Card hover effect for child cards
+        const childCards = document.querySelectorAll('.child-card');
+        childCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
             });
         });
     });
