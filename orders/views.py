@@ -215,7 +215,6 @@ class CustomLoginView(LoginView):
 # ----------------------------------------------------------------------
 # ASOSIY SAHIFA / RO'YXAT
 # ----------------------------------------------------------------------
-
 @login_required 
 def order_list(request):
     
@@ -228,27 +227,32 @@ def order_list(request):
 
     # Filtr parametri
     filter_type = request.GET.get('filter', 'all')  # all, completed, in_progress, overdue
-    # 1. Avval barcha faol (bitmagan) buyurtmalarni bazaviy filtrlab olamiz
-    base_qs = Order.objects.exclude(status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR'])
-
-    # 2. Arxivdagilar sonini alohida hisoblaymiz
+    
+    # 1. HAMMA BUYURTMALAR (arxivdagilar ham)
+    all_orders_qs = Order.objects.all()
+    
+    # 2. Arxivdagilar sonini hisoblash uchun (agar kerak bo'lsa)
     archived_count = Order.objects.filter(
         status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
     ).count()
+    
+    # 3. ASOSIY QUERYSET - HAMMA BUYURTMALAR (arxivdagilar bilan birga)
+    base_qs = Order.objects.all()  # Hech narsani exclude qilmaymiz
+    
     # ASOSIY BUYURTMALAR (parent_order=None)
     main_orders = base_qs.filter(parent_order__isnull=True).order_by('-created_at')
     
     # CHILD BUYURTMALAR - PANEL va UGUL
     all_child_orders = base_qs.filter(parent_order__isnull=False).order_by('-created_at')
     
-    # Panel child orderlar (product_name ichida "panel" so'zi borlar)
+    # Panel child orderlar
     panel_child_orders = all_child_orders.filter(
         Q(product_name__icontains='panel') | 
         Q(product_name__icontains='панель') |
         Q(product_name__icontains='панел')
     )
     
-    # Ugul child orderlar (product_name ichida "ugul" so'zi borlar)
+    # Ugul child orderlar
     ugul_child_orders = all_child_orders.filter(
         Q(product_name__icontains='ugul') | 
         Q(product_name__icontains='угол') |
@@ -265,33 +269,34 @@ def order_list(request):
         Q(product_name__icontains='уголь')
     )
     
-    # Hammasini vaqt bo'yicha ko'rsatadi (asosiy va child birlashtirilgan)
+    # Hammasini vaqt bo'yicha ko'rsatadi
     orders = base_qs.all().order_by('-created_at')
     customers_count = Order.objects.values('customer_unique_id').distinct().count()
+    
     # Filtrlash
     now = timezone.now()
     if filter_type == 'completed':
         # Tayyor buyurtmalar
-        main_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        panel_child_orders = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        ugul_child_orders = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        other_child_orders = other_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        orders = orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
+        main_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
+        panel_child_orders = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
+        ugul_child_orders = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
+        other_child_orders = other_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
+        orders = orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
     elif filter_type == 'in_progress':
         # Jarayondagi buyurtmalar - FAQAT MUDDATI O'TMAGANLAR
-        main_orders = main_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
+        main_orders = main_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        panel_child_orders = panel_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
+        panel_child_orders = panel_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        ugul_child_orders = ugul_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
+        ugul_child_orders = ugul_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        other_child_orders = other_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
+        other_child_orders = other_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        orders = orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
+        orders = orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
     elif filter_type == 'overdue':
@@ -299,27 +304,27 @@ def order_list(request):
         main_orders = main_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
         )
         panel_child_orders = panel_child_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
         )
         ugul_child_orders = ugul_child_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
         )
         other_child_orders = other_child_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
         )
         orders = orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
         )
     
     # Filterlash mantigi
@@ -390,12 +395,12 @@ def order_list(request):
     user_notifications = Notification.objects.filter(user=request.user, is_read=False)[:5]
     
     # STATISTIKA
-    total_orders = main_orders.count()  # Faqat asosiy buyurtmalar
-    completed_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
+    total_orders = main_orders.count()  # Barcha asosiy buyurtmalar (arxivdagilar bilan)
+    completed_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI']).count()
     
-    # Jarayondagi buyurtmalar soni - FAQAT MUDDATI O'TMAGANLAR
+    # Jarayondagi buyurtmalar soni
     in_progress_orders = main_orders.exclude(
-        status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']
+        status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']
     ).filter(
         Q(deadline__isnull=True) | Q(deadline__gte=now)
     ).count()
@@ -404,7 +409,7 @@ def order_list(request):
     overdue_orders_count = main_orders.filter(
         deadline__lt=now
     ).exclude(
-        status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
+        status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
     ).count()
     
     # Child orderlar statistikasi
@@ -413,26 +418,21 @@ def order_list(request):
     ugul_child_count = ugul_child_orders.count()
     other_child_count = other_child_orders.count()
     
-    panel_completed = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
-    ugul_completed = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
-    unpaid_orders = Order.objects.none() # Bo'sh queryset
+    panel_completed = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI']).count()
+    ugul_completed = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI']).count()
+    
+    unpaid_orders = Order.objects.none()
     total_unpaid_amount = 0
     unpaid_orders_count = 0
 
-
     if is_glavniy_admin or is_manager_or_confirmer:
-    
         unpaid_orders = Order.objects.filter(
             parent_order__isnull=True,
             total_price__gt=F('prepayment')
         ).exclude(status='BEKOR_QILINDI')
+        unpaid_orders_count = unpaid_orders.count()
+        total_unpaid_amount = sum(order.remaining_amount for order in unpaid_orders)
     
-    unpaid_orders_count = unpaid_orders.count()
-    total_unpaid_amount = sum(order.remaining_amount for order in unpaid_orders)
-    
-    unpaid_orders_count = unpaid_orders.count()
-    # Har birining remaining_amount'ini qo'shib chiqamiz
-    total_unpaid_amount = sum(order.remaining_amount for order in unpaid_orders)
     can_view_orders = any([
         is_glavniy_admin, 
         is_production_boss, 
@@ -441,10 +441,8 @@ def order_list(request):
         is_observer
     ])
 
-
-    
     context = {
-        'archived_count': archived_count, # Shuni qo'shing
+        'archived_count': archived_count,
         'orders': orders,
         'unpaid_orders_count': unpaid_orders_count,
         'total_unpaid_amount': total_unpaid_amount,
