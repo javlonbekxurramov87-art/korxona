@@ -1,3 +1,5 @@
+from email.mime import image
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import Group 
@@ -1393,8 +1395,11 @@ from django.utils import timezone
 from .models import Order
 from .forms import OrderForm
 import requests
+from django.utils import timezone
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.contenttypes.models import ContentType
 
-# TELEGRAM CONFIG
+# TELEGRAM CONFIG (Siz so'ragandek shu yerda qoldi)
 TELEGRAM_BOT_TOKEN = "8559719741:AAGa5BnxXt2rxjC-gKFnzboBiJQgPUY2GzU"
 TELEGRAM_GROUP_ID = "-1002338157363"
 
@@ -1405,19 +1410,18 @@ def is_in_group(user, group_name):
 def order_detail(request, pk):
     order = get_object_or_404(Order, pk=pk)
 
-    # Ruxsatlarni tekshirish
+    # 1. Ruxsatlarni aniqlash (O'zgarishsiz)
     is_glavniy_admin = request.user.is_superuser or is_in_group(request.user, 'Glavniy Admin')
     is_manager = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
     is_production_boss = is_in_group(request.user, "Ishlab Chiqarish Boshlig'i")
     is_worker = is_in_group(request.user, 'Usta') 
-    is_observer = is_in_group(request.user, 'Kuzatuvchi')
+    is_observer_user = is_in_group(request.user, 'Kuzatuvchi')
 
-    # Kuzatuvchi uchun readonly
-    if is_observer:
-        context = {'order': order, 'readonly': True}
-        return render(request, 'orders/order_detail.html', context)
+    # Kuzatuvchi uchun faqat ko'rish rejimi
+    if is_observer_user:
+        return render(request, 'orders/order_detail.html', {'order': order, 'readonly': True})
 
-    # Usta tayinlanganligini tekshirish
+    # 2. Usta ruxsatini tekshirish
     is_assigned_worker = False
     if is_worker:
         try:
@@ -1426,69 +1430,104 @@ def order_detail(request, pk):
         except Exception:
             is_assigned_worker = False
 
-    if is_worker and not is_assigned_worker and not is_production_boss:
-        messages.error(request, "Siz faqat o'zingizga tayinlangan buyurtma tafsilotlarini ko'rishingiz mumkin.")
+    if is_worker and not is_assigned_worker and not is_production_boss and not is_glavniy_admin:
+        messages.error(request, "Siz faqat o'zingizga tayinlangan buyurtmalarni ko'rishingiz mumkin.")
         return redirect('order_list')
 
-    # Admin/Manager/Boss uchun OrderForm
+    # 3. Formani boshqarish (Admin/Manager uchun)
     order_form = None
     if is_glavniy_admin or is_manager or is_production_boss:
-        order_form = OrderForm(request.POST or None, instance=order)
+        order_form = OrderForm(request.POST or None, request.FILES or None, instance=order)
         if request.method == 'POST' and 'upload_type' not in request.POST:
             if order_form.is_valid():
                 order_form.save()
-                messages.success(request, "Buyurtma ma'lumotlari muvaffaqiyatli yangilandi.")
+                messages.success(request, "Buyurtma muvaffaqiyatli yangilandi.")
                 return redirect('order_detail', pk=order.pk)
-            else:
-                messages.error(request, "Buyurtma ma'lumotlarini saqlashda xatolik yuz berdi.")
 
-    # POST: start / finish rasm yuborish (Telegramga)
-    if request.method == 'POST' and is_assigned_worker:
-        upload_type = request.POST.get('upload_type')  # start_image / finish_image
+    # 4. POST: Rasm yuklash va Telegram (TO'G'RILANGAN QISM)
+    # Ruxsat: Agar usta biriktirilgan bo'lsa YOKI admin/boshliq bo'lsa rasm yuklay oladi
+    can_upload = is_assigned_worker or is_glavniy_admin or is_production_boss
+
+    if request.method == 'POST' and 'upload_type' in request.POST and can_upload:
+        upload_type = request.POST.get('upload_type')
         image = request.FILES.get(upload_type)
 
         if image and upload_type in ['start_image', 'finish_image']:
+            # Emojilarsiz xavfsiz matn
+            status_text = "ISH BOSHLANDI" if upload_type == 'start_image' else "ISH YAKUNLANDI"
+            debt = order.total_price - order.prepayment
+            payment_info = "Toliq tolangan" if debt <= 0 else f"Qarz: {debt} USD"
+            customer_name = order.customer.name if hasattr(order, 'customer') and order.customer else "Nomalum"
+
             caption = (
-                f"🧾 BUYURTMA: #{order.id}\n"
-                f"👷 Usta: @{request.user.username}\n"
-                f"📌 Holat: {'Boshlash' if upload_type=='start_image' else 'Tugatish'}\n"
-                f"🕒 Vaqt: {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+                f"{status_text}\n"
+                f"-------------------------------\n"
+                f"Buyurtma: #{order.id}\n"
+                f"Mijoz: {order.customer_unique_id} / {customer_name}\n"
+                f"Mahsulot: {order.product_name or 'Aniqlanmagan'}\n"
+                f"Olcham: {order.panel_thickness or '0'} sm | {order.panel_kvadrat or '0'} m2\n"
+                f"Jami: {order.total_price} USD\n"
+                f"Holat: {payment_info}\n"
+                f"-------------------------------\n"
+                f"Masul: {request.user.get_full_name() or request.user.username}\n"
+                f"Vaqt: {timezone.now().strftime('%d.%m.%Y %H:%M')}"
             )
 
-            # Telegramga yuborish
             try:
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
-                requests.post(url, data={"chat_id": TELEGRAM_GROUP_ID, "caption": caption}, files={"photo": image})
+                # Telegramga yuborish
+                response = requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
+                    data={
+                        "chat_id": TELEGRAM_GROUP_ID,
+                        "caption": caption
+                    },
+                    files={"photo": image},
+                    timeout=20
+                )
+
+                if response.status_code == 200:
+                    # Telegramga muvaffaqiyatli ketgandagina bazani yangilaymiz
+                    if upload_type == 'start_image':
+                        order.start_image = image
+                        order.start_confirmed = True
+                        order.started_by = request.user
+                        order.work_started_at = timezone.now()
+                        order.status = 'USTA_QABUL_QILDI'
+                    else:
+                        order.finish_image = image
+                        order.finish_confirmed = True
+                        order.finished_by = request.user
+                        order.work_finished_at = timezone.now()
+                        order.status = 'USTA_TUGATDI'
+
+                    order.save()
+
+                    LogEntry.objects.create(
+                        user_id=request.user.id,
+                        content_type_id=ContentType.objects.get_for_model(order).pk,
+                        object_id=order.pk,
+                        object_repr=str(order),
+                        action_flag=CHANGE,
+                        change_message=f"Telegramga hisobot yuborildi: {status_text}"
+                    )
+                    messages.success(request, "Hisobot Telegramga yuborildi va saqlandi.")
+                else:
+                    messages.error(request, f"Telegram bot rad etdi: {response.text}")
+
             except Exception as e:
-                messages.error(request, f"Telegramga yuborishda xatolik: {str(e)}")
-                return redirect('order_detail', pk=order.pk)
-
-            # Ma'lumotlarni saqlash
-            if upload_type == 'start_image':
-                order.start_image = image
-                order.start_confirmed = True
-                order.started_by = request.user
-                order.work_started_at = timezone.now()
-                order.status = 'USTA_QABUL_QILDI'
-            else:
-                order.finish_image = image
-                order.finish_confirmed = True
-                order.finished_by = request.user
-                order.work_finished_at = timezone.now()
-                order.status = 'USTA_TUGATDI'
-
-            order.save()
-            messages.success(request, f"{'Boshlash' if upload_type=='start_image' else 'Tugatish'} rasmi Telegramga yuborildi.")
+                messages.error(request, f"Aloqa xatoligi: {str(e)}")
+            
+            return redirect('order_detail', pk=order.pk)
         else:
-            messages.error(request, "Rasm yuklanmadi yoki noto‘g‘ri action.")
-        return redirect('order_detail', pk=order.pk)
+            messages.error(request, "Rasm tanlanmagan!")
 
-    # GET so‘rov
+    # 5. Sahifani yuklash uchun context
     context = {
         'order': order,
         'order_form': order_form,
         'is_worker': is_worker,
         'is_assigned_worker': is_assigned_worker,
+        'is_privileged': is_glavniy_admin or is_manager or is_production_boss,
     }
     return render(request, 'orders/order_detail.html', context)
 
@@ -1878,25 +1917,34 @@ def order_edit(request, pk):
     return render(request, 'orders/order_edit.html', {'form': form, 'is_edit': True})
 
 
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.contenttypes.models import ContentType
+
 @login_required
 def order_confirm(request, pk):
     """2-Bosqich: Buyurtmani tasdiqlash."""
-    # Kuzatuvchi tekshiruvi
+    
+    # 1. Kuzatuvchi tekshiruvi
     if is_observer(request.user):
         messages.error(request, "Kuzatuvchi rejimida bu amalni bajarish mumkin emas.")
         return redirect('order_list')
         
     order = get_object_or_404(Order, pk=pk)
     
-    if not is_in_group(request.user, 'Menejer/Tasdiqlovchi'): 
+    # 2. Ruxsatlarni tekshirish (Admin yoki Menejer bo'lishi shart)
+    is_privileged = request.user.is_superuser or is_in_group(request.user, 'Menejer/Tasdiqlovchi')
+    
+    if not is_privileged: 
         messages.error(request, "Sizda bu buyurtmani tasdiqlash uchun ruxsat yo'q.")
         return redirect('order_list')
 
+    # 3. Statusni yangilash
     if order.status == 'KIRITILDI':
         order.status = 'TASDIQLANDI'
         order.save()
         
-        LogEntry.objects.log_action(
+        # LogEntry xatosini tuzatish (log_action o'rniga create)
+        LogEntry.objects.create(
             user_id=request.user.id,
             content_type_id=ContentType.objects.get_for_model(order).pk,
             object_id=order.pk,
@@ -1907,6 +1955,8 @@ def order_confirm(request, pk):
         
         messages.success(request, f"Buyurtma №{order.order_number} Tasdiqlandi.")
         
+        # 4. Bildirishnomalar yuborish
+        # Buyurtma yaratuvchisiga
         if order.created_by:
             Notification.objects.create(
                 user=order.created_by,
@@ -1914,6 +1964,7 @@ def order_confirm(request, pk):
                 message=f"Siz kiritgan buyurtma №{order.order_number} Muvaffaqiyatli Tasdiqlandi."
             )
         
+        # Ishlab chiqarish boshlig'iga
         try:
             boss_group = Group.objects.get(name="Ishlab Chiqarish Boshlig'i")
             for boss in boss_group.user_set.all():
@@ -1923,8 +1974,9 @@ def order_confirm(request, pk):
                     message=f"Yangi buyurtma №{order.order_number} Tasdiqlandi. Ishlab chiqarishni boshlashingiz mumkin."
                 )
         except Group.DoesNotExist:
-            messages.warning(request, "Ishlab Chiqarish Boshlig'i guruhi topilmadi.")
+            pass # Xabar berish shart emas bo'lsa
 
+        # Tayinlangan ustalarga
         if order.assigned_workers.exists():
             for worker in order.assigned_workers.all():
                 Notification.objects.create(
@@ -1937,7 +1989,6 @@ def order_confirm(request, pk):
         messages.warning(request, "Bu buyurtma allaqachon tasdiqlangan yoki boshqa bosqichda.")
         
     return redirect('order_list')
-
 @login_required
 def order_reject(request, pk):
     """Buyurtmani Rad Etish."""
@@ -1987,25 +2038,34 @@ def order_reject(request, pk):
         
     return redirect('order_list')
 
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.contenttypes.models import ContentType
+
 @login_required
 def order_start_production(request, pk):
     """3-Bosqich: Ishlab chiqarishga berish."""
-    # Kuzatuvchi tekshiruvi
+    
+    # 1. Kuzatuvchi tekshiruvi
     if is_observer(request.user):
         messages.error(request, "Kuzatuvchi rejimida bu amalni bajarish mumkin emas.")
         return redirect('order_list')
         
     order = get_object_or_404(Order, pk=pk)
     
-    if not is_in_group(request.user, "Ishlab Chiqarish Boshlig'i"):
+    # 2. Ruxsatlarni tekshirish (Admin yoki Ishlab chiqarish boshlig'i)
+    is_privileged = request.user.is_superuser or is_in_group(request.user, "Ishlab Chiqarish Boshlig'i")
+    
+    if not is_privileged:
         messages.error(request, "Ishlab chiqarishni boshlash uchun ruxsat yo'q.")
         return redirect('order_list')
 
+    # 3. Statusni yangilash
     if order.status == 'TASDIQLANDI':
         order.status = 'ISHDA'
         order.save()
         
-        LogEntry.objects.log_action(
+        # LogEntry.objects.log_action o'rniga standart .create ishlatamiz
+        LogEntry.objects.create(
             user_id=request.user.id,
             content_type_id=ContentType.objects.get_for_model(order).pk,
             object_id=order.pk,
@@ -2016,6 +2076,7 @@ def order_start_production(request, pk):
         
         messages.info(request, f"Buyurtma №{order.order_number} ishlab chiqarishga berildi.")
         
+        # 4. Bildirishnomalar
         if order.assigned_workers.exists():
             for worker in order.assigned_workers.all():
                 Notification.objects.create(
@@ -2028,33 +2089,34 @@ def order_start_production(request, pk):
         messages.warning(request, "Ishlab chiqarishni faqat Tasdiqlangan buyurtmadan boshlash mumkin.")
         
     return redirect('order_list')
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.contenttypes.models import ContentType
+
 @login_required
 def order_finish(request, pk):
     """4-Bosqich: Buyurtmani yakunlash."""
+    # 1. Kuzatuvchi tekshiruvi
     if is_observer(request.user):
         messages.error(request, "Kuzatuvchi rejimida bu amalni bajarish mumkin emas.")
         return redirect('order_list')
         
     order = get_object_or_404(Order, pk=pk)
     
-    if not is_in_group(request.user, "Ishlab Chiqarish Boshlig'i"):
+    # 2. Ruxsatlarni tekshirish (Admin yoki Ishlab chiqarish boshlig'i)
+    is_privileged = request.user.is_superuser or is_in_group(request.user, "Ishlab Chiqarish Boshlig'i")
+    
+    if not is_privileged:
         messages.error(request, "Buyurtmani yakunlash uchun ruxsat yo'q.")
         return redirect('order_list')
 
+    # 3. Statusni yangilash
     if order.status in ['ISHDA', 'USTA_TUGATDI']:
         # DIQQAT: Zanjir ishlashi uchun statusni USTA_TUGATDI qilib saqlash kerak
-        # Agar hozir TAYYOR qilsangiz, modeldagi 'if status == USTA_TUGATDI' sharti ishlamay qoladi.
-        
         order.status = 'USTA_TUGATDI' 
-        order.save() # Shu yerda modeldagi save() ishlaydi va yangi order ochadi
+        order.save() # Modeldagi save() avtomatik yangi buyurtma ochishi mumkin
         
-        # 🔴 Eski create_panel_ugol_orders() metodini o'chirib tashladik!
-        # Chunki hamma ishni yuqoridagi order.save() avtomat bajaradi.
-        
-        if order.worker_type in ['LIST', 'ESHIK', 'LIST_ESHIK']:
-            messages.info(request, "Usta ishini tugatdi. Navbatdagi bosqich (Panel) avtomatik yaratildi.")
-
-        LogEntry.objects.log_action(
+        # LogEntry xatosini tuzatish (log_action -> create)
+        LogEntry.objects.create(
             user_id=request.user.id,
             content_type_id=ContentType.objects.get_for_model(order).pk,
             object_id=order.pk,
@@ -2063,9 +2125,12 @@ def order_finish(request, pk):
             change_message=f"Status o'zgartirildi: {order.get_status_display()}"
         )
         
+        if order.worker_type in ['LIST', 'ESHIK', 'LIST_ESHIK']:
+            messages.info(request, "Usta ishini tugatdi. Navbatdagi bosqich (Panel) avtomatik yaratildi.")
+
         messages.success(request, f"Buyurtma №{order.order_number} yakunlandi.")
         
-        # Notificationlar qismi (o'zgarishsiz qoladi)
+        # 4. Bildirishnomalar
         try:
             manager_group = Group.objects.get(name='Menejer/Tasdiqlovchi') 
             for manager in manager_group.user_set.all():
