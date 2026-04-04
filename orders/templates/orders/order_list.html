@@ -1586,7 +1586,7 @@
                 {% endif %}
 
                 <!-- Admin Panel -->
-              {% if is_glavniy_admin or request.user.username == "Qorovul" %}
+          {% if not is_observer and "omborchi" not in request.user.username|lower %}
     {% if not is_observer and "omborchi" not in request.user.username|lower %}
         <div class="admin-panel">
             <div class="admin-header">
@@ -1675,13 +1675,30 @@
                     </a>
                 {% endif %}
 
+    
+    <a href="{% url 'order_archive' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
+        <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+            <i class="fas fa-archive" style="font-size: 14px;"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Arxivlanganlar</h4>
+            <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8); white-space: nowrap;">
+                {% if is_worker %} ({{ archived_count }}) {% else %} Barcha ({{ archived_count }}) {% endif %}
+            </p>
+        </div>
+    </a>
 
-                <a href="{% url 'order_archive' %}" class="btn btn-secondary">
-    <i class="fas fa-archive"></i> Arxivlanganlar ({{ archived_count }})
-</a>
-<a href="{% url 'order_calculator_list' %}" class="btn btn-primary" style="background: #6366f1; border: none;">
-    <i class="fas fa-calculator-alt me-2"></i> Kalkulyatsiya Paneli
-</a>
+    {% if is_glavniy_admin or is_manager %}
+    <a href="{% url 'order_calculator_list' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
+        <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+            <i class="fas fa-calculator-alt" style="font-size: 14px;"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Kalkulyatsiya</h4>
+            <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8);">Hisob-kitob paneli</p>
+        </div>
+    </a>
+    {% endif %}
 
             </div>
         </div>
@@ -1712,7 +1729,51 @@
                             </div>
                         </div>
                     </div>
+                        <div class="row mb-4">
+    <div class="col-md-8 mx-auto">
+        <form method="GET" action="{% url 'order_list' %}" 
+              class="input-group shadow-sm bg-white p-1" 
+              style="border-radius: 50px; border: 1px solid #e0e0e0;">
+            
+            <input type="hidden" name="filter" value="{{ filter_type }}">
+            
+            <input type="text" name="q" 
+                   class="form-control form-control-lg border-0 ps-4" 
+                   placeholder="Buyurtma ID, mijoz ismi yoki mahsulot..." 
+                   value="{{ search_query|default:'' }}"
+                   style="border-radius: 50px 0 0 50px; font-size: 0.95rem; box-shadow: none;">
+            
+            <div class="input-group-append d-flex align-items-center pe-1">
+                {% if search_query %}
+                    <a href="{% url 'order_list' %}?filter={{ filter_type }}" 
+                       class="btn btn-link text-muted text-decoration-none px-3 me-2" 
+                       style="font-size: 0.9rem;">
+                        <i class="fas fa-times"></i>
+                    </a>
+                {% endif %}
+                
+                <button class="btn px-4 py-2 text-white shadow-sm" 
+                        type="submit" 
+                        style="background-color: #2ecc71; border-radius: 50px; font-weight: 500; transition: all 0.3s;">
+                    <i class="fas fa-search me-2"></i> Qidirish
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
+<style>
+    /* Tugma ustiga borganda rang biroz to'qlashishi uchun */
+    #search-form button:hover {
+        background-color: #27ae60 !important;
+        transform: translateY(-1px);
+    }
+    
+    /* Inputga fokus berganda cheti ko'rinmasligi uchun */
+    .form-control:focus {
+        background-color: transparent;
+    }
+</style>
                     <!-- Filter Tabs -->
                     <div class="filter-tabs-container">
 
