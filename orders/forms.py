@@ -115,7 +115,8 @@ class OrderForm(forms.ModelForm):
         # Majburiy emas deb belgilash
         optional_fields = ['panel_type', 'panel_thickness', 'eshik_turi', 
                            'panel_subtype', 'status', 'parog_turi', 
-                           'eshik_yonalishi', 'balandligi', 'eni', 'prepayment']
+                           'eshik_yonalishi', 'balandligi', 'eni', 'prepayment', 'panel_kvadrat', 'customer_unique_id',
+        'assigned_workers']
         for field in optional_fields:
             if field in self.fields:
                 self.fields[field].required = False
