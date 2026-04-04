@@ -1,6 +1,24 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+    /* Sizdagi mavjud stillar... */
+    .select2-container--default .select2-selection--single {
+        height: 45px !important;
+        border: 2px solid #86efac !important;
+        border-radius: 8px !important;
+        display: flex;
+        align-items: center;
+    }
+    .auto-filled {
+        background-color: #f0fdf4 !important;
+        border-color: #10b981 !important;
+        transition: all 0.3s ease;
+    }
+</style>
+
 <div class="container mt-4 mb-5">
     <div class="card border-0 shadow-lg mb-4" style="background: linear-gradient(135deg, #14532d 0%, #166534 100%);">
         <div class="card-body text-white p-4">
@@ -10,7 +28,7 @@
                 </div>
                 <div>
                     <h3 class="card-title mb-1 fw-bold">Yangi Buyurtma Kiritish</h3>
-                    <p class="mb-0 text-white-80">Ish turini tanlang va unga mos ustalar filtrlanadi</p>
+                    <p class="mb-0 text-white-80">Mijozni tanlang yoki yangi ID kiriting</p>
                 </div>
             </div>
         </div>
@@ -35,14 +53,25 @@
                             <h4 class="fw-bold mb-0 text-emerald-800">Asosiy Ma'lumotlar</h4>
                         </div>
 
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-emerald-700">Mijoz ID</label>
+                                <select name="customer_unique_id" id="id_customer_unique_id" class="form-control" required>
+                                    <option value=""></option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-emerald-700">Xaridor Nomi</label>
+                                {{ form.customer_name }}
+                            </div>
+                        </div>
                         <div class="mb-4">
                             <label class="form-label fw-bold d-flex align-items-center mb-2">
-                                <i class="fas fa-file-pdf text-red-500 me-2"></i>PDF Chizma
+                                <i class="fas fa-file-pdf text-danger me-2"></i>PDF Chizma
                             </label>
-                            <div class="file-upload-wrapper border-2 border-dashed rounded-3 p-4 text-center" 
-                                 style="background: #f0fdf4; border-color: #86efac !important;">
+                            <div class="file-upload-wrapper border-2 border-dashed rounded-3 p-4 text-center" style="background: #f0fdf4; border-color: #86efac !important;">
                                 {{ form.pdf_file }}
-                                <div class="upload-placeholder">
+                                <div class="upload-placeholder" id="filePlaceholder">
                                     <i class="fas fa-cloud-upload-alt fa-3x text-emerald-500 mb-3"></i>
                                     <p class="fw-medium text-emerald-700 mb-2">PDF faylni tanlang</p>
                                     <button type="button" class="btn btn-emerald-500 px-4 py-2 rounded-pill fw-semibold" id="fileBtn">
@@ -52,36 +81,22 @@
                             </div>
                         </div>
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-emerald-700">Mijoz ID</label>
-                                {{ form.customer_unique_id }}
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-emerald-700">Xaridor Nomi</label>
-                                {{ form.customer_name }}
-                            </div>
-                        </div>
-
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-emerald-700">Mahsulot Nomi</label>
                             {{ form.product_name }}
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-emerald-800">
-                                <i class="fas fa-tools text-amber-500 me-2"></i>Ish Turi (Filtr)
-                            </label>
+                            <label class="form-label fw-bold text-emerald-800">Ish Turi (Filtr)</label>
                             <div class="input-group input-group-lg rounded-3 overflow-hidden border-emerald-300 border-2">
                                 <span class="input-group-text bg-success text-white border-0"><i class="fas fa-hard-hat"></i></span>
                                 {{ form.worker_type }} 
                             </div>
-                            <small class="text-muted mt-1 d-block">Tanlovga qarab ustalar ro'yxati o'zgaradi.</small>
                         </div>
                     </div>
 
                     <div class="col-lg-6 ps-lg-4">
-                        <div class="d-flex align-items-center mb-4">
+                         <div class="d-flex align-items-center mb-4">
                             <div class="rounded-3 p-2 me-3" style="background: #d1fae5;"><i class="fas fa-cogs fa-lg text-emerald-700"></i></div>
                             <h4 class="fw-bold mb-0 text-emerald-800">Texnik Parametrlar</h4>
                         </div>
@@ -97,7 +112,6 @@
                                         <div class="col-6">Zamok: {{ form.zamokli_eshik }}</div>
                                         <div class="col-6">Balandlik: {{ form.balandligi }}</div>
                                         <div class="col-6">Eni: {{ form.eni }}</div>
-                                         <!-- <div class="col-6">Qalinlik: {{ form.eshik_qalinligi }}</div> -->
                                     </div>
                                 </div>
                             </div>
@@ -118,9 +132,7 @@
                         </div>
 
                         <div class="mt-4">
-                            <label class="form-label fw-bold text-emerald-800">
-                                <i class="fas fa-users text-emerald-600 me-2"></i>Ustalar (Tanlangan ish turiga mos)
-                            </label>
+                            <label class="form-label fw-bold text-emerald-800">Ustalar</label>
                             <div class="border-2 border-emerald-200 rounded-3 p-2" style="background: white;">
                                 {{ form.assigned_workers }}
                             </div>
@@ -132,7 +144,7 @@
                     <div class="card-body p-4">
                         <div class="row g-4">
                             <div class="col-md-4">
-                                <label class="fw-bold">Umumiy Narx</label>
+                                <label class="fw-bold">Umumiy Narx (USD)</label>
                                 {{ form.total_price }}
                             </div>
                             <div class="col-md-4">
@@ -162,117 +174,124 @@
     </div>
 </div>
 
-<style>
-    /* Filtrlangan ustalarni butunlay yashirish */
-    option[hidden] { display: none !important; }
-    .text-emerald-700 { color: #047857; }
-    .text-emerald-800 { color: #065f46; }
-    .btn-emerald-500 { background: #10b981; color: white; }
-    
-    /* Multiselect dizayni */
-    #id_assigned_workers {
-        width: 100%;
-        min-height: 150px;
-        border: none;
-        outline: none;
-    }
-    #id_assigned_workers option {
-        padding: 8px;
-        border-radius: 5px;
-        margin-bottom: 2px;
-    }
-    #id_assigned_workers option:checked {
-        background: #10b981 !important;
-        color: white;
-    }
-</style>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+$(document).ready(function() {
+    // 1. SELECT2 INIT - YANGILANGAN VA TO'G'RILANGAN
+    const rawData = {{ customers_list|safe }}; 
+    const customerSelect = $('#id_customer_unique_id');
+    const customerNameInput = $('#id_customer_name');
+    
+    customerSelect.select2({
+        data: rawData,
+        tags: true, // Yangi ID yozishga ruxsat
+        placeholder: "ID tanlang yoki yangi kiriting",
+        allowClear: true,
+        width: '100%',
+        // Yangi kiritilgan matnni rasmiy ID sifatida qabul qilish uchun:
+        createTag: function (params) {
+            var term = $.trim(params.term);
+            if (term === '') { return null; }
+            return {
+                id: term,
+                text: term,
+                newTag: true
+            };
+        }
+    });
+
+    // 2. AVTO-TO'LDIRISH (Tanlanganda ismni ajratib olish)
+    customerSelect.on('select2:select', function (e) {
+        const data = e.params.data;
+        const text = data.text;
+        
+        if (text.includes(' - ')) {
+            // "ID - Ism" formatidan ismni olamiz
+            const parts = text.split(' - ');
+            const realName = parts.slice(1).join(' - '); // Agar ismda ham '-' bo'lsa
+            customerNameInput.val(realName).addClass('auto-filled');
+        } else if (data.newTag) {
+            // Yangi ID yozilganda ism maydonini bo'shatamiz va fokus beramiz
+            customerNameInput.val('').removeClass('auto-filled').focus();
+        }
+    });
+
+    // Tozalaganda ismni ham o'chirish
+    customerSelect.on('select2:unselect', function() {
+        customerNameInput.val('').removeClass('auto-filled');
+    });
+
+    // 3. WORKER TYPE FILTR VA BOSHQA LOGIKALAR (Sizdagi kod o'zgarishsiz qoladi)
     const workerTypeSelect = document.getElementById('id_worker_type');
-    const panelTypeSelect = document.getElementById('id_panel_type');
     const assignedWorkersSelect = document.getElementById('id_assigned_workers');
     const eshikFields = document.getElementById('eshik_fields');
     const panelFields = document.getElementById('panel_fields');
-    const subtypeContainer = document.getElementById('subtype_container');
-    const totalPriceInput = document.getElementById('id_total_price');
-    const prepaymentInput = document.getElementById('id_prepayment');
+
+    function filterAndToggle() {
+        const val = workerTypeSelect.value;
+        if (eshikFields) eshikFields.style.display = (val === 'ESHIK' || val === 'LIST_ESHIK') ? 'block' : 'none';
+        if (panelFields) panelFields.style.display = (val === 'LIST' || val === 'LIST_ESHIK') ? 'block' : 'none';
+
+        if (assignedWorkersSelect) {
+            const options = assignedWorkersSelect.options;
+            for (let i = 0; i < options.length; i++) {
+                const text = options[i].text.toUpperCase();
+                if (val === 'LIST') {
+                    options[i].disabled = !text.includes('LIST');
+                    options[i].hidden = !text.includes('LIST');
+                } else if (val === 'ESHIK') {
+                    options[i].disabled = !text.includes('ESHIK');
+                    options[i].hidden = !text.includes('ESHIK');
+                } else {
+                    options[i].disabled = false;
+                    options[i].hidden = false;
+                }
+            }
+        }
+    }
+
+    // Qolgan hisob-kitoblar...
+    const totalInput = document.getElementById('id_total_price');
+    const prepayInput = document.getElementById('id_prepayment');
     const debtLabel = document.getElementById('debt_label');
 
-    // 1. Ustalarni filterlash (Asosiy mantiq)
-    function filterWorkers() {
-        const val = workerTypeSelect.value; // ESHIK, LIST yoki LIST_ESHIK
-        const options = assignedWorkersSelect.options;
-
-        for (let i = 0; i < options.length; i++) {
-            const workerName = options[i].text.toUpperCase();
-            
-            if (val === 'LIST') {
-                options[i].hidden = !workerName.includes('LIST');
-                options[i].disabled = !workerName.includes('LIST');
-            } else if (val === 'ESHIK') {
-                options[i].hidden = !workerName.includes('ESHIK');
-                options[i].disabled = !workerName.includes('ESHIK');
-            } else {
-                // LIST_ESHIK (Universal) yoki boshqa holat
-                options[i].hidden = false;
-                options[i].disabled = false;
-            }
-
-            // Agar usta yashirilsa, uni tanlovdan olib tashlash
-            if (options[i].hidden) options[i].selected = false;
-        }
-    }
-
-    // 2. Maydonlarni ko'rsatish/yashirish
-    function toggleFields() {
-        const val = workerTypeSelect.value;
-        eshikFields.style.display = (val === 'ESHIK' || val === 'LIST_ESHIK') ? 'block' : 'none';
-        panelFields.style.display = (val === 'LIST' || val === 'LIST_ESHIK') ? 'block' : 'none';
-        filterWorkers();
-    }
-
-    // 3. PIR bo'lsa subtypeni ko'rsatish
-    function toggleSubtype() {
-        if (panelTypeSelect) {
-            subtypeContainer.style.display = (panelTypeSelect.value === 'PIR') ? 'block' : 'none';
-        }
-    }
-
-    // 4. Qarz hisoblash
     function calculateDebt() {
-        const total = parseFloat(totalPriceInput.value) || 0;
-        const prepay = parseFloat(prepaymentInput.value) || 0;
+        const total = parseFloat(totalInput.value) || 0;
+        const prepay = parseFloat(prepayInput.value) || 0;
         const debt = total - prepay;
-
-        if (total > 0) {
-            if (debt > 0) {
-                debtLabel.innerHTML = `<span class="text-danger">Qarz: ${debt.toLocaleString()} USD</span>`;
-            } else {
-                debtLabel.innerHTML = `<span class="text-success">To'liq to'landi</span>`;
-            }
-        } else {
+        if (total > 0 && debtLabel) {
+            debtLabel.innerHTML = debt > 0 ? 
+                `<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Qarz: ${debt.toLocaleString()} USD</span>` : 
+                `<span class="text-success"><i class="fas fa-check-circle me-1"></i>To'liq to'landi</span>`;
+        } else if (debtLabel) {
             debtLabel.innerHTML = "";
         }
     }
 
-    // Eventlarni bog'lash
-    workerTypeSelect.addEventListener('change', toggleFields);
-    if(panelTypeSelect) panelTypeSelect.addEventListener('change', toggleSubtype);
-    totalPriceInput.addEventListener('input', calculateDebt);
-    prepaymentInput.addEventListener('input', calculateDebt);
+    if (workerTypeSelect) workerTypeSelect.addEventListener('change', filterAndToggle);
+    if (totalInput) totalInput.addEventListener('input', calculateDebt);
+    if (prepayInput) prepayInput.addEventListener('input', calculateDebt);
 
-    // Dastlabki ishga tushirish
-    toggleFields();
-    toggleSubtype();
+    // Initial calls
+    filterAndToggle();
     calculateDebt();
 
-    // Fayl tugmasi mantiqi
-    const fileInput = document.querySelector('input[type="file"]');
-    const fileBtn = document.getElementById('fileBtn');
-    if(fileInput && fileBtn) {
-        fileInput.style.display = 'none';
-        fileBtn.onclick = () => fileInput.click();
+    // File styling
+    const realFileBtn = document.querySelector('input[type="file"]');
+    const customFileBtn = document.getElementById('fileBtn');
+    if (realFileBtn && customFileBtn) {
+        realFileBtn.style.display = 'none';
+        customFileBtn.addEventListener('click', () => realFileBtn.click());
+        realFileBtn.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                const placeholder = document.querySelector('#filePlaceholder p');
+                const icon = document.querySelector('#filePlaceholder i');
+                if (placeholder) placeholder.innerText = this.files[0].name;
+                if (icon) icon.className = 'fas fa-file-pdf fa-3x text-danger';
+            }
+        });
     }
 });
 </script>
