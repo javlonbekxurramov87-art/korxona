@@ -224,35 +224,41 @@ def order_list(request):
     is_manager_or_confirmer = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
     is_worker = is_in_group(request.user, 'Usta')
     is_observer = is_in_group(request.user, 'Kuzatuvchi')
-
     # Filtr parametri
+    search_query = request.GET.get('q', '')
     filter_type = request.GET.get('filter', 'all')  # all, completed, in_progress, overdue
     
-    # 1. HAMMA BUYURTMALAR (arxivdagilar ham)
-    all_orders_qs = Order.objects.all()
+    now = timezone.now()
     
-    # 2. Arxivdagilar sonini hisoblash uchun (agar kerak bo'lsa)
-    archived_count = Order.objects.filter(
+    # ARXIV BUYURTMALAR (bajarilganlar) - Avval bazaviy querysetni tayyorlaymiz
+    archived_orders_qs = Order.objects.filter(
         status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
-    ).count()
+    )
     
-    # 3. ASOSIY QUERYSET - HAMMA BUYURTMALAR (arxivdagilar bilan birga)
-    base_qs = Order.objects.all()  # Hech narsani exclude qilmaymiz
+    # USTA bo'lsa, faqat o'zining arxiv buyurtmalarini olish
+    if is_worker and not (is_glavniy_admin or is_production_boss or is_manager_or_confirmer or is_observer):
+        archived_orders_qs = archived_orders_qs.filter(
+            assigned_workers__user=request.user
+        ).distinct()
     
-    # ASOSIY BUYURTMALAR (parent_order=None)
+    archived_count = archived_orders_qs.count()
+    
+    # 1. Avval barcha faol (bitmagan) buyurtmalarni bazaviy filtrlab olamiz
+    base_qs = Order.objects.exclude(status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR'])
+
     main_orders = base_qs.filter(parent_order__isnull=True).order_by('-created_at')
     
     # CHILD BUYURTMALAR - PANEL va UGUL
     all_child_orders = base_qs.filter(parent_order__isnull=False).order_by('-created_at')
     
-    # Panel child orderlar
+    # Panel child orderlar (product_name ichida "panel" so'zi borlar)
     panel_child_orders = all_child_orders.filter(
         Q(product_name__icontains='panel') | 
         Q(product_name__icontains='панель') |
         Q(product_name__icontains='панел')
     )
     
-    # Ugul child orderlar
+    # Ugul child orderlar (product_name ichida "ugul" so'zi borlar)
     ugul_child_orders = all_child_orders.filter(
         Q(product_name__icontains='ugul') | 
         Q(product_name__icontains='угол') |
@@ -269,34 +275,48 @@ def order_list(request):
         Q(product_name__icontains='уголь')
     )
     
-    # Hammasini vaqt bo'yicha ko'rsatadi
+    # Hammasini vaqt bo'yicha ko'rsatadi (asosiy va child birlashtirilgan)
     orders = base_qs.all().order_by('-created_at')
+    if search_query:
+        search_filter = (
+            Q(order_number__icontains=search_query) |
+            Q(customer_name__icontains=search_query) |
+            Q(product_name__icontains=search_query) |
+            Q(customer_unique_id__icontains=search_query)
+        )
+        # Barcha asosiy querysetlarni qidiruv bo'yicha filtrlaymiz
+        main_orders = main_orders.filter(search_filter)
+        panel_child_orders = panel_child_orders.filter(search_filter)
+        ugul_child_orders = ugul_child_orders.filter(search_filter)
+        other_child_orders = other_child_orders.filter(search_filter)
+        orders = orders.filter(search_filter)
+    # ASOSIY BUYURTMALAR (parent_order=None)
     customers_count = Order.objects.values('customer_unique_id').distinct().count()
     
     # Filtrlash
     now = timezone.now()
     if filter_type == 'completed':
         # Tayyor buyurtmalar
-        main_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
-        panel_child_orders = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
-        ugul_child_orders = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
-        other_child_orders = other_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
-        orders = orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI'])
+        main_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
+        panel_child_orders = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
+        ugul_child_orders = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
+        other_child_orders = other_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
+        orders = orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
     elif filter_type == 'in_progress':
         # Jarayondagi buyurtmalar - FAQAT MUDDATI O'TMAGANLAR
-        main_orders = main_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
+        main_orders = main_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        panel_child_orders = panel_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
+        panel_child_orders = panel_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        ugul_child_orders = ugul_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
+        ugul_child_orders = ugul_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        other_child_orders = other_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
+        other_child_orders = other_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
-        orders = orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']).filter(
+        orders = orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
             Q(deadline__isnull=True) | Q(deadline__gte=now)
         )
     elif filter_type == 'overdue':
@@ -304,27 +324,27 @@ def order_list(request):
         main_orders = main_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
         )
         panel_child_orders = panel_child_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
         )
         ugul_child_orders = ugul_child_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
         )
         other_child_orders = other_child_orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
         )
         orders = orders.filter(
             deadline__lt=now
         ).exclude(
-            status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
+            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
         )
     
     # Filterlash mantigi
@@ -395,12 +415,12 @@ def order_list(request):
     user_notifications = Notification.objects.filter(user=request.user, is_read=False)[:5]
     
     # STATISTIKA
-    total_orders = main_orders.count()  # Barcha asosiy buyurtmalar (arxivdagilar bilan)
-    completed_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI']).count()
+    total_orders = main_orders.count()  # Faqat asosiy buyurtmalar
+    completed_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
     
-    # Jarayondagi buyurtmalar soni
+    # Jarayondagi buyurtmalar soni - FAQAT MUDDATI O'TMAGANLAR
     in_progress_orders = main_orders.exclude(
-        status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI']
+        status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']
     ).filter(
         Q(deadline__isnull=True) | Q(deadline__gte=now)
     ).count()
@@ -409,7 +429,7 @@ def order_list(request):
     overdue_orders_count = main_orders.filter(
         deadline__lt=now
     ).exclude(
-        status__in=['BAJARILDI', 'USTA_TUGATDI', 'RAD_ETILDI', 'TAYYOR']
+        status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
     ).count()
     
     # Child orderlar statistikasi
@@ -418,10 +438,9 @@ def order_list(request):
     ugul_child_count = ugul_child_orders.count()
     other_child_count = other_child_orders.count()
     
-    panel_completed = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI']).count()
-    ugul_completed = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI', 'USTA_TUGATDI']).count()
-    
-    unpaid_orders = Order.objects.none()
+    panel_completed = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
+    ugul_completed = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
+    unpaid_orders = Order.objects.none() # Bo'sh queryset
     total_unpaid_amount = 0
     unpaid_orders_count = 0
 
@@ -430,8 +449,13 @@ def order_list(request):
             parent_order__isnull=True,
             total_price__gt=F('prepayment')
         ).exclude(status='BEKOR_QILINDI')
-        unpaid_orders_count = unpaid_orders.count()
-        total_unpaid_amount = sum(order.remaining_amount for order in unpaid_orders)
+        
+        # Usta bo'lsa va admin/menejer bo'lmasa, to'lanmagan buyurtmalarni ko'rsatma
+        if is_worker and not is_glavniy_admin and not is_manager_or_confirmer:
+            unpaid_orders = Order.objects.none()
+    
+    unpaid_orders_count = unpaid_orders.count()
+    total_unpaid_amount = sum(order.remaining_amount for order in unpaid_orders)
     
     can_view_orders = any([
         is_glavniy_admin, 
@@ -443,6 +467,7 @@ def order_list(request):
 
     context = {
         'archived_count': archived_count,
+        'archived_orders': archived_orders_qs,  # Qo'shimcha: arxiv buyurtmalarini ham yuboramiz
         'orders': orders,
         'unpaid_orders_count': unpaid_orders_count,
         'total_unpaid_amount': total_unpaid_amount,
@@ -455,6 +480,7 @@ def order_list(request):
         'is_production_boss': is_production_boss,
         'is_worker': is_worker,
         'is_observer': is_observer,
+        'search_query': search_query,
         'notifications': user_notifications, 
         'now': timezone.now(),
         'filter_type': filter_type,
@@ -477,50 +503,66 @@ def order_list(request):
 
 
 from django.db.models import Q
+from django.core.paginator import Paginator
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from .models import Order  # ChildOrder ni bu yerdan olib tashladik
+
+# Agar is_in_group funksiyasi boshqa joyda bo'lsa, uni import qiling yoki shu yerga yozing
+def is_in_group(user, group_name):
+    return user.groups.filter(name=group_name).exists()
 
 @login_required
 def order_archive(request):
+    """Arxivlangan (bajarilgan) buyurtmalar ro'yxati"""
+    
+    # Foydalanuvchi huquqlarini tekshirish
+    is_glavniy_admin = request.user.is_superuser or is_in_group(request.user, 'Glavniy Admin')
+    is_manager = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
+    is_worker = is_in_group(request.user, 'Usta')
+    is_observer = is_in_group(request.user, 'Kuzatuvchi')
+    
+    # Statuslarni bazadagi aniq nomlari bilan moslang (Katta/kichik harfga e'tibor bering)
+    # Siz yuborgan template-da 'Tugatildi' deb tekshirilgan ekan
+    archived_orders = Order.objects.filter(
+        status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR', 'Tugatildi']
+    ).order_by('-created_at') 
+    
+    # Usta bo'lsa, faqat o'zining buyurtmalarini ko'rsat
+    if is_worker and not (is_glavniy_admin or is_manager):
+        archived_orders = archived_orders.filter(
+            assigned_workers__user=request.user
+        ).distinct()
+    
+    # Observer (Kuzatuvchi) bo'lsa va boshqa ruxsati bo'lmasa
+    if is_observer and not (is_glavniy_admin or is_manager or is_worker):
+        archived_orders = archived_orders.none()
+    
+    # Filtrlash (Qidiruv) - Template'da name="q" ishlatilgan
     search_query = request.GET.get('q', '')
-    
-    # Arxiv statuslari
-    archive_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
-    
-    # Asosiy buyurtmalar
-    main_orders = Order.objects.filter(
-        parent_order__isnull=True, 
-        status__in=archive_statuses
-    ).order_by('-created_at')
-    
-    # Ichki buyurtmalar
-    child_orders = Order.objects.filter(
-        parent_order__isnull=False, 
-        status__in=archive_statuses
-    ).order_by('-created_at')
-
-    # Agar qidiruv bo'lsa
     if search_query:
-        main_orders = main_orders.filter(
-            Q(id__icontains=search_query) |
+        archived_orders = archived_orders.filter(
+            Q(order_number__icontains=search_query) |
             Q(customer_name__icontains=search_query) |
             Q(product_name__icontains=search_query)
         )
-        child_orders = child_orders.filter(
-            Q(id__icontains=search_query) |
-            Q(product_name__icontains=search_query)
-        )
-
+    
+    # Pagination
+    paginator = Paginator(archived_orders, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     context = {
-        'main_orders': main_orders,
-        'child_orders': child_orders,
+        'page_obj': page_obj,
+        'archived_count': archived_orders.count(),
         'search_query': search_query,
+        'main_orders': page_obj,  # Sahifadagi buyurtmalarni yuboramiz
+        'child_orders': [],       # Model bo'lmagani uchun bo'sh ro'yxat
+        'is_worker': is_worker,
+        'is_manager': is_manager,
+        'is_glavniy_admin': is_glavniy_admin,
     }
     return render(request, 'orders/order_archive.html', context)
-
-
-
-
-
-
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import DriverTrip, TripPoint
@@ -1703,91 +1745,118 @@ def worker_orders(request, worker_id):
 # ----------------------------------------------------------------------
 # QOLGAN FUNKSIYALAR
 # views.py - order_create funksiyasini yangilang
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
+from .models import Order, Customer, User # Kerakli modellarni import qiling
+from .forms import OrderForm
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from .models import Order, Customer, User
+from .forms import OrderForm
 @login_required
 @user_passes_test(
     lambda u: u.is_superuser or is_in_group(u, 'Glavniy Admin') or is_in_group(u, 'Manager'),
     login_url='/login/'
 )
 def order_create(request):
-    """Buyurtma yaratish - mijoz uchun bir martalik unikal raqam bilan"""
+    """Buyurtma yaratish - Yangi va mavjud IDlar bilan ishlash"""
     
+    # 1. Barcha manbalardan ID va ismlarni olish (Bo'sh joylarni tozalab)
+    db_customers = {str(c.unique_id).strip(): c.name for c in Customer.objects.all()}
+    order_ids = Order.objects.values_list('customer_unique_id', flat=True).distinct()
+    
+    all_unique_ids = set(list(db_customers.keys()) + [str(uid).strip() for uid in order_ids if uid])
+    
+    # Select2 uchun ma'lumotlar ro'yxati
+    customers_data = []
+    for uid in all_unique_ids:
+        name = db_customers.get(uid)
+        display_text = f"{uid} - {name}" if name else f"{uid}"
+        customers_data.append({
+            'id': uid,
+            'text': display_text
+        })
+
     if request.method == 'POST':
         form = OrderForm(request.POST, request.FILES)
         
+        # MUHIM: Select2 dan kelayotgan IDni to'g'ridan-to'g'ri POST'dan olamiz
+        # Chunki form.is_valid() yangi IDni "yaroqsiz" deb topishi mumkin
+        customer_unique_id = request.POST.get('customer_unique_id', '').strip()
+        customer_name = request.POST.get('customer_name', '').strip()
+        customer_phone = request.POST.get('customer_phone', '').strip() or None
+
         if form.is_valid():
             try:
                 order = form.save(commit=False)
                 order.created_by = request.user
                 
-                # CUSTOMER LOGIC
-                customer_unique_id = form.cleaned_data.get('customer_unique_id', '').strip()
-                customer_name = form.cleaned_data.get('customer_name', '').strip()
-                customer_phone = form.cleaned_data.get('customer_phone', '').strip() or None
-
                 if not customer_unique_id:
                     messages.error(request, "❌ Iltimos, mijoz uchun unikal raqam kiriting.")
-                    return render(request, 'orders/order_create.html', {'form': form})
+                else:
+                    # 2. Mijozni bazadan qidirish yoki yangi yaratish
+                    # update_or_create emas, get_or_create ishlatamiz (ism o'zgarmasligi uchun)
+                    customer, created = Customer.objects.get_or_create(
+                        unique_id=customer_unique_id,
+                        defaults={'name': customer_name, 'phone': customer_phone}
+                    )
+                    
+                    # Agar mijoz bazada bo'lsa-yu, lekin ismi yo'q bo'lsa (Noma'lum bo'lsa), yangilash
+                    if not created and customer_name and (not customer.name or customer.name == "Noma'lum mijoz"):
+                        customer.name = customer_name
+                        customer.save()
 
-                customer, created = Customer.objects.get_or_create(
-                    unique_id=customer_unique_id,
-                    defaults={'name': customer_name, 'phone': customer_phone}
-                )
-                order.customer = customer
+                    order.customer = customer
+                    order.customer_unique_id = customer_unique_id
+                    order.status = 'KIRITILDI'
 
-                # Ish turi va holat
-                worker_type = form.cleaned_data.get('worker_type', 'LIST')
-                order.status = 'KIRITILDI'
+                    # 3. Ish turi logikasi (Panel usta tayinlash)
+                    worker_type = form.cleaned_data.get('worker_type', 'LIST')
+                    if worker_type == 'ESHIK':
+                        eshik_turi = form.cleaned_data.get('eshik_turi', '')
+                        zamokli_eshik = form.cleaned_data.get('zamokli_eshik', False)
+                        if eshik_turi and '(' not in str(eshik_turi):
+                            zamok_status = "Zamokli" if zamokli_eshik else "Zamoksiz"
+                            order.eshik_turi = f"{eshik_turi} ({zamok_status})"
 
-                # ✅ ESHIK maxsus saqlash
-                if worker_type == 'ESHIK':
-                    eshik_turi = form.cleaned_data.get('eshik_turi', '')
-                    zamokli_eshik = form.cleaned_data.get('zamokli_eshik', False)
-                    if '(' not in str(eshik_turi):
-                        zamok_status = "Zamokli" if zamokli_eshik else "Zamoksiz"
-                        order.eshik_turi = f"{eshik_turi} ({zamok_status})" if eshik_turi else ""
+                    if worker_type == 'PANEL':
+                        try:
+                            u1 = User.objects.get(username='panel_usta')
+                            u2 = User.objects.get(username='panel_usta2')
+                            last_panel = Order.objects.filter(worker_type='PANEL').order_by('-id').first()
+                            order.assigned_to = u2 if last_panel and last_panel.id % 2 != 0 else u1
+                        except User.DoesNotExist:
+                            pass 
 
-                # ✅ PANEL USTALARINI AVTOMATIK TAQSIMLASH (TOQ/JUFT)
-                if worker_type == 'PANEL':
+                    # 4. Saqlash
+                    order.save()
+                    form.save_m2m()
+                    
+                    # Bildirishnoma yuborish
                     try:
-                        u1 = User.objects.get(username='panel_usta')
-                        u2 = User.objects.get(username='panel_usta2')
-                        
-                        # Oxirgi panel buyurtmasini ID bo'yicha olamiz
-                        last_panel_order = Order.objects.filter(worker_type='PANEL').order_by('-id').first()
-                        
-                        if last_panel_order:
-                            # Agar oxirgi ID toq bo'lsa -> panel_usta2, juft bo'lsa -> panel_usta
-                            if last_panel_order.id % 2 != 0:
-                                order.assigned_to = u2
-                            else:
-                                order.assigned_to = u1
-                        else:
-                            order.assigned_to = u1 # Birinchi marta u1 dan boshlaymiz
-                    except User.DoesNotExist:
-                        pass # Agar userlar topilmasa, assigned_to bo'sh qoladi
+                        from .utils import send_notifications_for_new_order 
+                        send_notifications_for_new_order(order)
+                    except Exception:
+                        pass
 
-                order.needs_manager_approval = form.cleaned_data.get('needs_manager_approval', True)
-                order.panel_thickness = form.cleaned_data.get('panel_thickness')
-                
-                # Saqlash
-                order.save()
-                form.save_m2m()
-                
-                send_notifications_for_new_order(order)
-
-                if worker_type == 'LIST':
-                    messages.info(request, "⚠️ List usta ishni tugatgandan so'ng, Panel va Ugol ustalari uchun avtomatik buyurtmalar yaratiladi.")
-                
-                messages.success(request, f"✅ Buyurtma №{order.order_number} kiritildi! Usta: {order.assigned_to if order.assigned_to else 'Belgilanmagan'}")
-                return redirect('order_list')
+                    messages.success(request, f"✅ Buyurtma №{order.order_number} kiritildi!")
+                    return redirect('order_list')
                 
             except Exception as e:
-                messages.error(request, f"❌ Xatolik: {str(e)}")
-                return render(request, 'orders/order_create.html', {'form': form})
+                messages.error(request, f"❌ Tizim xatoligi: {str(e)}")
     else:
         form = OrderForm()
-    
-    return render(request, 'orders/order_create.html', {'form': form, 'title': 'Yangi Buyurtma Kiritish'})
+
+    context = {
+        'form': form, 
+        'title': 'Yangi Buyurtma Kiritish',
+        'customers_list': customers_data,
+        'existing_customer_ids': list(all_unique_ids)
+    }
+    return render(request, 'orders/order_create.html', context)
 
 @login_required
 def order_edit(request, pk):
@@ -2053,66 +2122,6 @@ def order_complete(request, pk):
         messages.warning(request, "Buyurtma Bajarildi deb belgilanishi uchun u avval 'Tayyor' bo'lishi kerak.")
         
     return redirect('order_list')
-from django.contrib.admin.models import LogEntry, ADDITION
-from django.contrib.contenttypes.models import ContentType
-
-@login_required
-@user_passes_test(lambda u: u.is_superuser or is_in_group(u, 'Glavniy Admin'), login_url='/login/')
-def order_create(request):
-    """1-Bosqich: Buyurtmani yuklash/kiritish."""
-    if is_observer(request.user):
-        messages.error(request, "Kuzatuvchi rejimida bu amalni bajarish mumkin emas.")
-        return redirect('order_list')
-        
-    if request.method == 'POST':
-        form = OrderForm(request.POST, request.FILES)
-        if form.is_valid():
-            order = form.save(commit=False)
-            order.created_by = request.user
-            order.status = 'KIRITILDI' 
-            
-            order.save()
-            form.save_m2m() # 🔴 assigned_workers shu yerda saqlanadi
-
-            # ✅ LOG YOZISH (To'g'rilangan variant)
-            LogEntry.objects.create(
-                user_id=request.user.id,
-                content_type_id=ContentType.objects.get_for_model(order).pk,
-                object_id=order.pk,
-                object_repr=str(order),
-                action_flag=ADDITION,
-                change_message=f"Yangi buyurtma kiritildi: №{order.order_number} (Turi: {order.get_worker_type_display()})"
-            )
-
-            messages.success(request, f"Buyurtma №{order.order_number} kiritildi. Ish turi: {order.get_worker_type_display()}")
-
-            # 🔴 Notification 1: Menejerlarga
-            try:
-                manager_group = Group.objects.get(name='Menejer/Tasdiqlovchi') 
-                for manager in manager_group.user_set.all():
-                    Notification.objects.create(
-                        user=manager,
-                        order=order,
-                        message=f"Yangi buyurtma: №{order.order_number}. Tasdiqlash talab qilinadi."
-                    )
-            except Group.DoesNotExist:
-                pass
-
-            # 🔴 Notification 2: Biriktirilgan ustalarga
-            workers = order.assigned_workers.all()
-            if workers.exists():
-                for worker in workers:
-                    Notification.objects.create(
-                        user=worker.user,
-                        order=order,
-                        message=f"№{order.order_number} buyurtmasi sizga tayinlandi. Rolingiz: {worker.get_role_display()}"
-                    )
-            
-            return redirect('order_list')
-    else:
-        form = OrderForm()
-    
-    return render(request, 'orders/order_create.html', {'form': form})
 @login_required
 @user_passes_test(lambda u: u.is_superuser or is_in_group(u, 'Glavniy Admin'), login_url='/login/')
 def order_delete(request, pk):
