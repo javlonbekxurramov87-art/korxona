@@ -348,7 +348,10 @@ class Order(models.Model):
     
     worker_type = models.CharField(max_length=15, choices=WORKER_TYPE_CHOICES, default='LIST')
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='KIRITILDI')
-    
+    customer_chat_id = models.CharField(max_length=100, blank=True, null=True)
+    car_number = models.CharField(max_length=50, verbose_name="Moshina raqami", blank=True, null=True)
+    trip = models.ForeignKey('DriverTrip', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    trip_number = models.CharField(max_length=100, null=True, blank=True)
     # Eshik parametrlari
     eshik_turi = models.CharField(max_length=255, choices=ESHIK_TURI_CHOICES , blank=True, null=True)
     zamokli_eshik = models.BooleanField(default=False, verbose_name="Zamokli")
@@ -713,3 +716,33 @@ def save(self, *args, **kwargs):
             f"Yangi status: {self.get_status_display()}"
         )
         send_telegram_notification(self, msg)
+
+import requests
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+# Xabar yuborish funksiyasi
+def notify_customer(chat_id, status, customer_name, car_number):
+    token = '7980001420:AAFEHQ2g_E6hkBbe0bT3Ea5WiO0eKIWUUkg'
+    status_uz = {
+        'KIRITILDI': "navbatga qo'yildi ⏳",
+        'ISHDA': "ishlab chiqarishga tushdi 🛠",
+        'USTA_TUGATDI': "usta tomonidan tugatildi va omborga yo'llandi 📦",
+        'TAYYOR': "tayyor bo'ldi va yuklanishni kutmoqda ✅",
+        'BAJARILDI': f"moshinaga ortildi va yo'lga chiqdi 🚚. Moshina raqami: {car_number}"
+    }
+    
+    xabar = f"Hurmatli {customer_name}, buyurtmangiz hozirgina {status_uz.get(status, status)}."
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    requests.post(url, data={'chat_id': chat_id, 'text': xabar})
+
+# Django signali: Har safar "Save" bosilganda ishga tushadi
+@receiver(post_save, sender=Order)
+def order_status_notifier(sender, instance, **kwargs):
+    if instance.customer_chat_id: # Agar mijoz botdan ro'yxatdan o'tgan bo'lsa
+        notify_customer(
+            instance.customer_chat_id, 
+            instance.status, 
+            instance.customer_name, 
+            instance.car_number
+        )
