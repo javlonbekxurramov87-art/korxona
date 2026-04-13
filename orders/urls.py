@@ -27,6 +27,7 @@ urlpatterns = [
     path('outputs/export/excel/', views.export_outputs_excel, name='export_outputs_excel'),
     path('inventory/export/excel/', views.export_inventory_excel, name='export_inventory_excel'),
     path('delete/<int:pk>/', views.order_delete, name='order_delete'),
+    path('import-excel/', views.import_excel_api, name='import_excel_api'),
 
     # Bosqichlar
     path('confirm/<int:pk>/', views.order_confirm, name='order_confirm'),
@@ -39,7 +40,8 @@ urlpatterns = [
     path('report/weekly/', views.weekly_report_view, name='weekly_report_view'),
     path('report/sales/', views.sales_report_view, name='sales_report_view'),
     path('export/orders/csv/', views.export_orders_csv, name='export_orders_csv'),
-
+    path('director-dashboard/', views.director_dashboard, name='director_dashboard'),
+    
     # AUDIT LOG
     path('orders/calculator/all/', views.order_calculator_list, name='order_calculator_list'),
     path('report/audit/', views.product_audit_log_view, name='product_audit_log_view'),
