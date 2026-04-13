@@ -633,12 +633,81 @@ from django.contrib.admin.views.decorators import staff_member_required
 from .models import Order, Material, MaterialTransaction
 
 
+from django.db.models import Count, Sum, F, Q
+from decimal import Decimal
+from django.core.paginator import Paginator
+
 @login_required
 @staff_member_required
 def warehouse_dashboard(request):
-    """Ombordagi barcha materiallar qoldig'i"""
-    materials = Material.objects.all().order_by('quantity')
-    return render(request, 'orders/warehouse_dashboard.html', {'materials': materials})
+    """Ombordagi barcha materiallar qoldig'i - Kategoriyalar bilan"""
+    
+    # 1. Barcha kategoriyalarni olish (materiallar soni va umumiy qoldiq bilan)
+    categories = Category.objects.annotate(
+        material_count=Count('material'),
+        total_quantity=Coalesce(Sum('material__quantity'), Decimal('0'))
+    ).order_by('name')
+    
+    # 2. Tanlangan kategoriya (GET parametridan)
+    selected_category = request.GET.get('category', '')
+    search_query = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+    
+    # 3. Materiallarni olish (select_related bilan optimallashtirilgan)
+    materials = Material.objects.select_related('category').all()
+    
+    # 4. Kategoriya bo'yicha filtr
+    if selected_category:
+        materials = materials.filter(category__name=selected_category)
+    
+    # 5. Qidiruv bo'yicha filtr
+    if search_query:
+        materials = materials.filter(
+            Q(name__icontains=search_query) |
+            Q(category__name__icontains=search_query) |
+            Q(product_name__icontains=search_query)
+        )
+    
+    # 6. Holat bo'yicha filtr (kam qolgan / yetarli)
+    if status_filter == 'danger':
+        materials = materials.filter(quantity__lte=F('min_stock_level'))
+    elif status_filter == 'success':
+        materials = materials.filter(quantity__gt=F('min_stock_level'))
+    
+    # 7. Tartiblash
+    materials = materials.order_by('name')
+    
+    # 8. Pagination (har bir sahifada 20 ta)
+    paginator = Paginator(materials, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 9. Statistik ma'lumotlar
+    total_materials = Material.objects.count()
+    total_quantity = Material.objects.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+    low_stock_count = Material.objects.filter(quantity__lte=F('min_stock_level')).count()
+    
+    context = {
+        # Kategoriyalar
+        'categories': categories,
+        'selected_category': selected_category,
+        'total_categories': categories.count(),
+        
+        # Materiallar
+        'materials': page_obj,
+        'page_obj': page_obj,
+        
+        # Filtrlar
+        'search_query': search_query,
+        'status_filter': status_filter,
+        
+        # Statistikalar
+        'total_materials': total_materials,
+        'total_quantity': total_quantity,
+        'low_stock_count': low_stock_count,
+    }
+    
+    return render(request, 'orders/warehouse_dashboard.html', context)
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -3818,3 +3887,343 @@ def order_calculator_list(request):
     }
     
     return render(request, 'orders/calculator.html', context)
+from django.shortcuts import render
+from django.db.models import Sum, Count, Q, F
+from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal
+from .models import Order, Material, MaterialTransaction
+
+def director_dashboard(request):
+    now = timezone.now()
+    today = now.date()
+    
+    # ======================== 1. ORDER STATISTIKASI ========================
+    total_orders = Order.objects.count()
+    
+    # Tugatilgan orderlar (BAJARILDI, TAYYOR, USTA_TUGATDI)
+    completed_orders = Order.objects.filter(
+        status__in=['BAJARILDI', 'TAYYOR', 'USTA_TUGATDI']
+    ).count()
+    
+    # Jarayondagilar (KIRITILDI, TASDIQLANDI, USTA_QABUL_QILDI, USTA_BOSHLA, ISHDA)
+    in_progress = Order.objects.filter(
+        status__in=['KIRITILDI', 'TASDIQLANDI', 'USTA_QABUL_QILDI', 'USTA_BOSHLA', 'ISHDA']
+    ).count()
+    
+    # Muddati o'tganlar (deadline < hozir va tugatilmagan)
+    overdue_orders = Order.objects.filter(
+        deadline__lt=now
+    ).exclude(
+        status__in=['BAJARILDI', 'TAYYOR', 'USTA_TUGATDI', 'RAD_ETILDI']
+    ).count()
+    
+    # Yangi orderlar (oxirgi 7 kun)
+    week_ago = now - timedelta(days=7)
+    new_orders = Order.objects.filter(created_at__gte=week_ago).count()
+    
+    # Protsentlar
+    completion_rate = round(completed_orders / total_orders * 100, 1) if total_orders else 0
+    overdue_rate = round(overdue_orders / total_orders * 100, 1) if total_orders else 0
+    in_progress_rate = round(in_progress / total_orders * 100, 1) if total_orders else 0
+    
+    # ======================== 2. OMBORXONA HOLATI ========================
+    total_materials = Material.objects.count()
+    
+    # Jami ombor qiymati
+    warehouse_value = Material.objects.aggregate(
+        total=Sum(F('quantity') * F('price_per_unit'))
+    )['total'] or Decimal(0)
+    
+    # Kategoriya bo'yicha (mavjud bo'lsa)
+    try:
+        from .models import Category
+        raw_materials = Material.objects.filter(category__name__icontains='xom').count()
+        semi_finished = Material.objects.filter(category__name__icontains='yarim').count()
+        finished = Material.objects.filter(category__name__icontains='tayyor').count()
+    except:
+        raw_materials = total_materials
+        semi_finished = 0
+        finished = 0
+    
+    # Kam qolgan materiallar
+    low_stock_materials = Material.objects.filter(quantity__lte=F('min_stock_level')).count()
+    
+    # ======================== 3. UMUMIY TUSHUM ========================
+    # Oy boshidan
+    monthly_revenue = Order.objects.filter(
+        created_at__month=now.month,
+        created_at__year=now.year,
+        status__in=['BAJARILDI', 'TAYYOR']
+    ).aggregate(total=Sum('total_price'))['total'] or Decimal(0)
+    
+    # Yil boshidan
+    yearly_revenue = Order.objects.filter(
+        created_at__year=now.year,
+        status__in=['BAJARILDI', 'TAYYOR']
+    ).aggregate(total=Sum('total_price'))['total'] or Decimal(0)
+    
+    # So'nggi 30 kun
+    last_30_days = now - timedelta(days=30)
+    last_30_revenue = Order.objects.filter(
+        created_at__gte=last_30_days,
+        status__in=['BAJARILDI', 'TAYYOR']
+    ).aggregate(total=Sum('total_price'))['total'] or Decimal(0)
+    
+    # ======================== 4. QARZDORLAR ========================
+    debt_orders = Order.objects.filter(
+        total_price__gt=F('prepayment')
+    ).exclude(status__in=['RAD_ETILDI', 'BEKOR_QILINDI'])
+    
+    total_debt = sum(order.total_price - order.prepayment for order in debt_orders)
+    debt_count = debt_orders.count()
+    
+    # ======================== 5. OYLIK GRAFIK ========================
+    monthly_data = []
+    for i in range(5, -1, -1):
+        month_date = now - timedelta(days=30*i)
+        revenue = Order.objects.filter(
+            created_at__month=month_date.month,
+            created_at__year=month_date.year,
+            status__in=['BAJARILDI', 'TAYYOR']
+        ).aggregate(total=Sum('total_price'))['total'] or Decimal(0)
+        monthly_data.append({
+            'month': month_date.strftime('%b'),
+            'revenue': float(revenue) / 1_000_000
+        })
+    
+    # ======================== 6. SO'NGI HARAKATLAR ========================
+    recent_transactions = MaterialTransaction.objects.select_related(
+        'material', 'performed_by'
+    ).order_by('-timestamp')[:10]
+    
+    # ======================== 7. USTALAR STATISTIKASI ========================
+    from .models import Worker
+    workers_count = Worker.objects.count()
+    
+    # ======================== CONTEXT ========================
+    context = {
+        # Order ma'lumotlari
+        'total_orders': total_orders,
+        'overdue_orders': overdue_orders,
+        'in_progress': in_progress,
+        'new_orders': new_orders,
+        'completed_orders': completed_orders,
+        'completion_rate': completion_rate,
+        'overdue_rate': overdue_rate,
+        'in_progress_rate': in_progress_rate,
+        
+        # Ombor ma'lumotlari
+        'total_products': total_materials,
+        'warehouse_value': warehouse_value,
+        'raw_materials': raw_materials,
+        'semi_finished': semi_finished,
+        'finished': finished,
+        'low_stock_materials': low_stock_materials,
+        
+        # Tushum ma'lumotlari
+        'monthly_revenue': monthly_revenue,
+        'yearly_revenue': yearly_revenue,
+        'last_30_revenue': last_30_revenue,
+        'monthly_data': monthly_data,
+        
+        # Qarz ma'lumotlari
+        'total_debt': total_debt,
+        'debt_count': debt_count,
+        
+        # So'nggi harakatlar
+        'recent_transactions': recent_transactions,
+        
+        # Ustalar soni
+        'workers_count': workers_count,
+        
+        # Joriy vaqt
+        'now': now,
+    }
+    
+    return render(request, 'orders/director_dashboard.html', context)
+
+import pandas as pd
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import Material, Category
+import json
+import traceback
+import logging
+
+# Logger yaratish
+logger = logging.getLogger(__name__)
+import pandas as pd
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import Material, Category
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
+
+@login_required
+@csrf_exempt
+def import_excel_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Faqat POST mumkin'}, status=405)
+
+    if 'excel_file' not in request.FILES:
+        return JsonResponse({'success': False, 'message': 'Fayl yuklanmadi'}, status=400)
+
+    try:
+        excel_file = request.FILES['excel_file']
+        
+        # MUHIM: Faylingizda 1-qator sarlavha emas, shuning uchun skiprows=[0] yoki header=1 qilamiz
+        # Sarlavhalar 2-qatorda (Index 1) joylashgan
+        df = pd.read_excel(excel_file, engine='openpyxl', header=1) 
+        
+        # Ustun nomlaridagi bo'sh joylarni tozalash
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        logger.info(f"Topilgan ustunlar: {df.columns.tolist()}")
+
+        # Agar 'Наименование' ustuni bo'lmasa, sarlavha noto'g'ri o'qilgan
+        if 'Наименование' not in df.columns:
+            return JsonResponse({
+                'success': False, 
+                'message': f'Faylda "Наименование" ustuni topilmadi. Mavjud ustunlar: {", ".join(df.columns)}'
+            })
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+
+        for index, row in df.iterrows():
+            try:
+                name = row.get('Наименование')
+                
+                # Bo'sh qatorlarni tashlab ketish
+                if pd.isna(name) or str(name).strip().lower() in ['nan', '']:
+                    continue
+                
+                name = str(name).strip()
+
+                # Miqdorni aniqlash: Excelingizda 'Количество (шт.)' ustuni bor
+                quantity = 0
+                qty_val = row.get('Количество (шт.)')
+                
+                # Agar 'Количество (шт.)' bo'sh bo'lsa, 'Масса (кг)' ni tekshirish
+                if pd.isna(qty_val) or qty_val == '':
+                    qty_val = row.get('Масса (кг)', 0)
+
+                try:
+                    quantity = float(qty_val) if pd.notna(qty_val) else 0
+                except:
+                    quantity = 0
+
+                # Kategoriya aniqlash
+                category_name = detect_category(name)
+                category, _ = Category.objects.get_or_create(name=category_name)
+
+                # O'lchov birligini aniqlash
+                unit = 'dona'
+                if 'Масса (кг)' in row and pd.notna(row['Масса (кг)']) and not pd.notna(row['Количество (шт.)']):
+                    unit = 'kg'
+                elif any(x in name.lower() for x in ['болт', 'винт', 'припой', 'масло']):
+                    unit = 'kg'
+
+                # Materialni saqlash
+                material, created = Material.objects.update_or_create(
+                    name=name,
+                    defaults={
+                        'category': category,
+                        'unit': unit,
+                        'min_stock_level': 0
+                    }
+                )
+                
+                if created:
+                    material.quantity = quantity
+                    created_count += 1
+                else:
+                    material.quantity += quantity
+                    updated_count += 1
+                
+                material.save()
+
+            except Exception as row_e:
+                errors.append(f"Qator {index + 3}: {str(row_e)}")
+
+        return JsonResponse({
+            'success': True,
+            'created': created_count,
+            'updated': updated_count,
+            'errors': errors[:10]
+        })
+
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f"Xato: {str(e)}"}, status=500)
+
+def detect_category(name):
+    """Material nomiga qarab kategoriyani aniqlash"""
+    name_lower = name.lower()
+    
+    if 'трв' in name_lower:
+        return 'ТРВ'
+    elif 'отвод' in name_lower:
+        return 'Отводы'
+    elif 'медная труб' in name_lower:
+        return 'Медные трубы'
+    elif 'фреон' in name_lower:
+        return 'Фреоны'
+    elif 'щит' in name_lower:
+        return 'Щиты'
+    elif 'фильтр' in name_lower:
+        return 'Фильтры'
+    elif 'вибрашланг' in name_lower:
+        return 'Вибрашланги'
+    elif 'магнитный клапан' in name_lower:
+        return 'Магнитные клапаны'
+    elif 'манометр' in name_lower:
+        return 'Манометры'
+    elif 'реле' in name_lower:
+        return 'Реле'
+    elif 'термо' in name_lower and 'контроллер' in name_lower:
+        return 'Термоконтроллеры'
+    elif 'масло' in name_lower:
+        return 'Масла'
+    elif 'конденсатор' in name_lower:
+        return 'Конденсаторы'
+    elif 'глазок' in name_lower:
+        return 'Глазки'
+    elif 'сепаратор' in name_lower or 'жидкостный отделитель' in name_lower:
+        return 'Сепараторы'
+    elif 'вентилятор' in name_lower:
+        return 'Вентиляторы'
+    elif 'болт' in name_lower or 'винт' in name_lower:
+        return 'Крепеж'
+    elif 'припой' in name_lower:
+        return 'Припои'
+    elif 'компрессор' in name_lower:
+        return 'Компрессоры'
+    elif 'заклепка' in name_lower:
+        return 'Заклепки'
+    elif 'скотч' in name_lower:
+        return 'Скотчи'
+    elif 'пена' in name_lower:
+        return 'Пена'
+    elif 'стакан' in name_lower:
+        return 'Стаканы'
+    elif 'стрейч' in name_lower or 'ekoprom' in name_lower:
+        return 'Стрейч-пленка'
+    elif name.startswith('F1') or name.startswith('F5') or name.startswith('F8') or name.startswith('F9'):
+        return 'Дверные комплектующие'
+    elif 'сверло' in name_lower or 'метчик' in name_lower:
+        return 'Инструменты'
+    elif 'игла' in name_lower:
+        return 'Иглы'
+    elif 'штуцер' in name_lower:
+        return 'Штуцеры'
+    elif 'краник' in name_lower:
+        return 'Краники'
+    else:
+        return 'Разное'
