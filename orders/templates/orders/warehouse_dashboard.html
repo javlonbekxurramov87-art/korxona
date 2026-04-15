@@ -104,7 +104,7 @@
             color: #475569;
         }
 
-        /* QR Code */
+        /* QR and Print Styles */
         .qr-thumb {
             width: 45px;
             height: 45px;
@@ -254,6 +254,75 @@
             border-color: #10b981;
             background: #f0fdf4;
         }
+
+        /* PRINT STYLES - XP-365B uchun (58mm termal printer) */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-container, .print-container * {
+                visibility: visible;
+            }
+            .print-container {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+            @page {
+                size: 58mm 100mm;
+                margin: 2mm;
+            }
+            .print-label {
+                page-break-after: avoid;
+                break-inside: avoid;
+            }
+        }
+        
+        /* QR Label for Printing (Vertical Layout) */
+        .print-label {
+            width: 54mm;
+            max-width: 54mm;
+            min-width: 54mm;
+            padding: 3mm;
+            font-family: 'Inter', monospace;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 2px;
+            background: white;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+        .print-label .qr-image {
+            width: 45mm;
+            height: 45mm;
+            margin: 2mm auto;
+            display: block;
+        }
+        .print-label .product-name {
+            font-size: 11px;
+            font-weight: bold;
+            margin: 2mm 0 1mm;
+            word-break: break-word;
+            line-height: 1.3;
+        }
+        .print-label .product-details {
+            font-size: 9px;
+            color: #333;
+            margin: 1mm 0;
+        }
+        .print-label .product-category {
+            font-size: 8px;
+            color: #666;
+            margin-bottom: 1mm;
+        }
+        .print-hr {
+            border-top: 1px dashed #aaa;
+            margin: 2mm 0;
+        }
     </style>
 </head>
 <body>
@@ -266,7 +335,6 @@
                 <p style="margin-top: 8px;"><i class="fas fa-clock"></i> <span id="current-time"></span></p>
             </div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <!-- Excel import tugmasi -->
                 <button onclick="openImportModal()" class="btn" style="background: #10b981; color: white;">
                     <i class="fas fa-file-excel"></i> Excel import
                 </button>
@@ -399,12 +467,12 @@
                         <th>Birlik</th>
                         <th>Minimal limit</th>
                         <th>Holat</th>
-                        <th style="width: 100px; text-align: center;">Amallar</th>
+                        <th style="width: 140px; text-align: center;">Amallar</th>
                     </tr>
                 </thead>
                 <tbody id="material-tbody">
                     {% for m in materials %}
-                    <tr data-name="{{ m.name|lower }}" data-quantity="{{ m.quantity|floatformat:3 }}" data-min="{{ m.min_stock_level|floatformat:1 }}">
+                    <tr data-name="{{ m.name|lower }}" data-quantity="{{ m.quantity|floatformat:3 }}" data-min="{{ m.min_stock_level|floatformat:1 }}" data-id="{{ m.id }}">
                         <td style="text-align: center;">
                             {% if m.qr_code %}
                                 <img src="{{ m.qr_code.url }}" class="qr-thumb" onclick="window.open(this.src)" title="QR kodni skanerlash" style="width: 40px; height: 40px;">
@@ -437,6 +505,10 @@
                                 </button>
                                 <button class="btn btn-danger btn-sm" onclick="deleteMaterial('{{ m.id }}', '{{ m.name|escapejs }}')" title="O'chirish">
                                     <i class="fas fa-trash"></i>
+                                </button>
+                                <!-- PRINT BUTTON -->
+                                <button class="btn btn-warning btn-sm" onclick="printQRCode('{{ m.id }}', '{{ m.name|escapejs }}', '{{ m.category.name|default:''|escapejs }}', '{{ m.qr_code.url|default:'' }}')" title="QR kodni chop etish">
+                                    <i class="fas fa-print"></i>
                                 </button>
                             </div>
                         </td>
@@ -569,7 +641,8 @@
 <script>
     // 1. Vaqt
     function updateTime() {
-        document.getElementById('current-time').textContent = new Date().toLocaleString('uz-UZ');
+        const timeElem = document.getElementById('current-time');
+        if (timeElem) timeElem.textContent = new Date().toLocaleString('uz-UZ');
     }
     setInterval(updateTime, 1000); 
     updateTime();
@@ -593,8 +666,8 @@
             const min = parseFloat(row.dataset.min);
             const isLow = qty <= min;
 
-            totalQty += qty;
-            if(isLow) lowCount++;
+            if (!isNaN(qty)) totalQty += qty;
+            if (isLow) lowCount++;
 
             let show = name.includes(term);
             if (status === 'danger' && !isLow) show = false;
@@ -603,19 +676,14 @@
             row.style.display = show ? '' : 'none';
         });
 
-        // Statistikani yangilash
         const lowStockElem = document.getElementById('low-stock-count');
         const totalQtyElem = document.getElementById('total-quantity');
         if (lowStockElem) lowStockElem.textContent = lowCount;
         if (totalQtyElem) totalQtyElem.textContent = totalQty.toFixed(2);
     }
 
-    if (searchInput) {
-        searchInput.addEventListener('input', filterAndStats);
-    }
-    if (statusFilter) {
-        statusFilter.addEventListener('change', filterAndStats);
-    }
+    if (searchInput) searchInput.addEventListener('input', filterAndStats);
+    if (statusFilter) statusFilter.addEventListener('change', filterAndStats);
     window.onload = filterAndStats;
 
     // 3. O'chirish
@@ -660,20 +728,22 @@
     }
     
     function resetImportForm() {
-        document.getElementById('importForm').reset();
-        document.getElementById('fileLabel').innerHTML = 'Excel faylni tanlang yoki sudrab keltiring';
-        document.getElementById('importProgress').style.display = 'none';
-        document.getElementById('importResult').style.display = 'none';
+        const importForm = document.getElementById('importForm');
+        if (importForm) importForm.reset();
+        const fileLabel = document.getElementById('fileLabel');
+        if (fileLabel) fileLabel.innerHTML = 'Excel faylni tanlang yoki sudrab keltiring';
+        const importProgress = document.getElementById('importProgress');
+        if (importProgress) importProgress.style.display = 'none';
+        const importResult = document.getElementById('importResult');
+        if (importResult) importResult.style.display = 'none';
         const importBtn = document.getElementById('importBtn');
         if (importBtn) importBtn.disabled = false;
     }
     
     function showFileName(input) {
-        if (input.files.length > 0) {
-            document.getElementById('fileLabel').innerHTML = `
-                <i class="fas fa-file-excel" style="color: #10b981;"></i> 
-                ${input.files[0].name}
-            `;
+        const fileLabel = document.getElementById('fileLabel');
+        if (input.files.length > 0 && fileLabel) {
+            fileLabel.innerHTML = `<i class="fas fa-file-excel" style="color: #10b981;"></i> ${input.files[0].name}`;
         }
     }
     
@@ -688,36 +758,38 @@
         
         const formData = new FormData();
         formData.append('excel_file', file);
-        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) formData.append('csrfmiddlewaretoken', csrfToken.value);
         
-        // Progress bar ko'rsatish
         document.getElementById('importProgress').style.display = 'block';
         const importBtn = document.getElementById('importBtn');
         if (importBtn) importBtn.disabled = true;
         document.getElementById('importResult').style.display = 'none';
         
         try {
-            // Progress simulation
             let progress = 0;
             const progressInterval = setInterval(() => {
                 progress += 5;
                 if (progress <= 90) {
-                    document.getElementById('progressBar').style.width = progress + '%';
+                    const progressBar = document.getElementById('progressBar');
+                    if (progressBar) progressBar.style.width = progress + '%';
                 }
             }, 200);
             
-            const response = await fetch('/orders/import-excel/', { // <-- /orders/ QO'SHILDI
+            const response = await fetch('/orders/import-excel/', {
                 method: 'POST',
                 body: formData
             });
             
             clearInterval(progressInterval);
-            document.getElementById('progressBar').style.width = '100%';
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) progressBar.style.width = '100%';
             
             const result = await response.json();
             
             setTimeout(() => {
-                document.getElementById('importProgress').style.display = 'none';
+                const importProgress = document.getElementById('importProgress');
+                if (importProgress) importProgress.style.display = 'none';
                 
                 if (result.success) {
                     showImportResult(`
@@ -728,10 +800,7 @@
                         <strong>${result.updated}</strong> ta mavjud material yangilandi.
                     `, 'success');
                     
-                    // Sahifani yangilash
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
+                    setTimeout(() => location.reload(), 2000);
                 } else {
                     showImportResult(result.message || 'Import qilishda xatolik yuz berdi', 'error');
                     if (importBtn) importBtn.disabled = false;
@@ -739,7 +808,8 @@
             }, 500);
             
         } catch (error) {
-            document.getElementById('importProgress').style.display = 'none';
+            const importProgress = document.getElementById('importProgress');
+            if (importProgress) importProgress.style.display = 'none';
             showImportResult('Server bilan bog\'lanishda xatolik: ' + error.message, 'error');
             if (importBtn) importBtn.disabled = false;
         }
@@ -747,6 +817,7 @@
     
     function showImportResult(message, type) {
         const resultDiv = document.getElementById('importResult');
+        if (!resultDiv) return;
         resultDiv.style.display = 'block';
         
         if (type === 'success') {
@@ -758,8 +829,88 @@
             resultDiv.style.color = '#991b1b';
             resultDiv.style.border = '1px solid #fecaca';
         }
-        
         resultDiv.innerHTML = message;
+    }
+
+    // 6. PRINT QR CODE FUNCTION (XP-365B 58mm printer uchun)
+    function printQRCode(materialId, materialName, categoryName, qrUrl) {
+        // Create print container
+        const printContainer = document.createElement('div');
+        printContainer.className = 'print-container';
+        printContainer.style.position = 'fixed';
+        printContainer.style.top = '0';
+        printContainer.style.left = '0';
+        printContainer.style.width = '100%';
+        printContainer.style.zIndex = '9999';
+        printContainer.style.backgroundColor = 'white';
+        
+        // Create label with vertical layout
+        const label = document.createElement('div');
+        label.className = 'print-label';
+        
+        // Add QR Code Image
+        const qrImg = document.createElement('img');
+        qrImg.className = 'qr-image';
+        // Use absolute URL if needed, fallback to placeholder
+        if (qrUrl && qrUrl !== '') {
+            qrImg.src = qrUrl;
+        } else {
+            // Fallback: if no QR, show text
+            qrImg.alt = 'QR kod mavjud emas';
+            qrImg.style.display = 'none';
+            const noQrText = document.createElement('div');
+            noQrText.innerText = 'QR kod mavjud emas';
+            noQrText.style.padding = '10px';
+            noQrText.style.textAlign = 'center';
+            label.appendChild(noQrText);
+        }
+        if (qrUrl && qrUrl !== '') label.appendChild(qrImg);
+        
+        // Product name (vertical orientation, bold)
+        const nameElem = document.createElement('div');
+        nameElem.className = 'product-name';
+        nameElem.innerText = materialName;
+        label.appendChild(nameElem);
+        
+        // Separator
+        const hr = document.createElement('div');
+        hr.className = 'print-hr';
+        label.appendChild(hr);
+        
+        // Category
+        const catElem = document.createElement('div');
+        catElem.className = 'product-category';
+        catElem.innerText = `Kategoriya: ${categoryName || 'Noma\'lum'}`;
+        label.appendChild(catElem);
+        
+        // Date and timestamp
+        const dateElem = document.createElement('div');
+        dateElem.className = 'product-details';
+        const now = new Date();
+        dateElem.innerText = `Chop etilgan: ${now.toLocaleDateString('uz-UZ')} ${now.toLocaleTimeString('uz-UZ')}`;
+        label.appendChild(dateElem);
+        
+        printContainer.appendChild(label);
+        document.body.appendChild(printContainer);
+        
+        // Ensure image loads before printing
+        const printAndCleanup = () => {
+            window.print();
+            setTimeout(() => {
+                if (printContainer && printContainer.parentNode) {
+                    printContainer.parentNode.removeChild(printContainer);
+                }
+            }, 1000);
+        };
+        
+        if (qrUrl && qrUrl !== '') {
+            qrImg.onload = printAndCleanup;
+            qrImg.onerror = printAndCleanup;
+            // If already loaded
+            if (qrImg.complete) printAndCleanup();
+        } else {
+            printAndCleanup();
+        }
     }
 
     // Drag and drop qo'llab-quvvatlash
@@ -785,8 +936,11 @@
                 
                 const files = e.dataTransfer.files;
                 if (files.length > 0) {
-                    document.getElementById('excelFile').files = files;
-                    showFileName(document.getElementById('excelFile'));
+                    const fileInput = document.getElementById('excelFile');
+                    if (fileInput) {
+                        fileInput.files = files;
+                        showFileName(fileInput);
+                    }
                 }
             });
         }
@@ -797,12 +951,8 @@
         const editModal = document.getElementById('editModal');
         const importModal = document.getElementById('importModal');
         
-        if (event.target === editModal) {
-            closeEditModal();
-        }
-        if (event.target === importModal) {
-            closeImportModal();
-        }
+        if (event.target === editModal) closeEditModal();
+        if (event.target === importModal) closeImportModal();
     }
 </script>
 </body>
