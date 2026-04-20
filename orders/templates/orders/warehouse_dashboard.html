@@ -255,73 +255,103 @@
             background: #f0fdf4;
         }
 
-        /* PRINT STYLES - XP-365B uchun (58mm termal printer) */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            .print-container, .print-container * {
-                visibility: visible;
-            }
-            .print-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                margin: 0;
-                padding: 0;
-                background: white;
-            }
-            @page {
-                size: 58mm 100mm;
-                margin: 2mm;
-            }
-            .print-label {
-                page-break-after: avoid;
-                break-inside: avoid;
-            }
-        }
-        
-        /* QR Label for Printing (Vertical Layout) */
+        /* ================= TO'G'RILANGAN PRINT STYLES - FAQAT 1 SAHIFA ================= */
+      /* ================= TO'G'RILANGAN PRINT STYLES ================= */
+@media print {
+    /* Sahifadagi ortiqcha elementlarni butkul yo'qotish */
+    html, body {
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body * {
+        display: none !important; /* Hamma narsani yashirish */
+    }
+
+    /* Faqat chop etiladigan konteynerni ko'rsatish */
+    .print-container, .print-container * {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    .print-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    @page {
+        size: 58mm auto; /* Balandlikni auto qilish muhim */
+        margin: 0;
+    }
+
+    .print-label {
+        page-break-inside: avoid;
+        page-break-after: avoid;
+        border: none !important;
+    }
+}
+
+        /* Chop etiladigan label - VERTICAL (QR tepada, matn pastda) */
         .print-label {
             width: 54mm;
             max-width: 54mm;
-            min-width: 54mm;
-            padding: 3mm;
+            padding: 4mm 3mm;
             font-family: 'Inter', monospace;
             text-align: center;
-            border: 1px solid #ddd;
-            border-radius: 2px;
             background: white;
             margin: 0 auto;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .print-label .qr-image {
-            width: 45mm;
-            height: 45mm;
+            width: 42mm;
+            height: 42mm;
             margin: 2mm auto;
             display: block;
         }
         .print-label .product-name {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
-            margin: 2mm 0 1mm;
+            margin: 3mm 0 2mm;
             word-break: break-word;
-            line-height: 1.3;
+            line-height: 1.4;
+            text-align: center;
+        }
+        .print-label .product-category {
+            font-size: 9px;
+            color: #555;
+            margin-bottom: 2mm;
         }
         .print-label .product-details {
             font-size: 9px;
             color: #333;
             margin: 1mm 0;
         }
-        .print-label .product-category {
-            font-size: 8px;
-            color: #666;
-            margin-bottom: 1mm;
-        }
         .print-hr {
             border-top: 1px dashed #aaa;
             margin: 2mm 0;
+            width: 90%;
+        }
+        .print-header {
+            font-size: 8px;
+            color: #666;
+            margin-bottom: 2mm;
+            text-transform: uppercase;
+        }
+        .print-footer {
+            font-size: 7px;
+            color: #888;
+            margin-top: 2mm;
+            border-top: 1px dotted #ccc;
+            padding-top: 1.5mm;
         }
     </style>
 </head>
@@ -506,8 +536,7 @@
                                 <button class="btn btn-danger btn-sm" onclick="deleteMaterial('{{ m.id }}', '{{ m.name|escapejs }}')" title="O'chirish">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                                <!-- PRINT BUTTON -->
-                                <button class="btn btn-warning btn-sm" onclick="printQRCode('{{ m.id }}', '{{ m.name|escapejs }}', '{{ m.category.name|default:''|escapejs }}', '{{ m.qr_code.url|default:'' }}')" title="QR kodni chop etish">
+                                <button class="btn btn-warning btn-sm" onclick="printQRCode('{{ m.id }}', '{{ m.name|escapejs }}', '{{ m.category.name|default:''|escapejs }}', '{{ m.qr_code.url|default:'' }}', '{{ m.quantity|floatformat:2 }}', '{{ m.unit|upper }}')" title="QR kodni chop etish">
                                     <i class="fas fa-print"></i>
                                 </button>
                             </div>
@@ -647,7 +676,7 @@
     setInterval(updateTime, 1000); 
     updateTime();
 
-    // 2. Statistika va Filtrlar (faqat frontend filter)
+    // 2. Statistika va Filtrlar
     const searchInput = document.getElementById('search-input');
     const statusFilter = document.getElementById('status-filter');
     const rows = document.querySelectorAll('#material-tbody tr');
@@ -832,87 +861,91 @@
         resultDiv.innerHTML = message;
     }
 
-    // 6. PRINT QR CODE FUNCTION (XP-365B 58mm printer uchun)
-    function printQRCode(materialId, materialName, categoryName, qrUrl) {
-        // Create print container
+    // ================= TO'G'RILANGAN PRINT FUNKSIYASI =================
+    // VERTICAL: QR tepada, matn pastda, FAQAT 1 SAHIFA
+    function printQRCode(materialId, materialName, categoryName, qrUrl, quantity, unit) {
+        // Oldingi print containerlarni tozalash
+        const existingContainer = document.querySelector('.print-container');
+        if (existingContainer) {
+            existingContainer.remove();
+        }
+        
+        // Print container yaratish
         const printContainer = document.createElement('div');
         printContainer.className = 'print-container';
-        printContainer.style.position = 'fixed';
-        printContainer.style.top = '0';
-        printContainer.style.left = '0';
-        printContainer.style.width = '100%';
-        printContainer.style.zIndex = '9999';
-        printContainer.style.backgroundColor = 'white';
         
-        // Create label with vertical layout
+        // Label yaratish
         const label = document.createElement('div');
         label.className = 'print-label';
         
-        // Add QR Code Image
-        const qrImg = document.createElement('img');
-        qrImg.className = 'qr-image';
-        // Use absolute URL if needed, fallback to placeholder
-        if (qrUrl && qrUrl !== '') {
-            qrImg.src = qrUrl;
-        } else {
-            // Fallback: if no QR, show text
-            qrImg.alt = 'QR kod mavjud emas';
-            qrImg.style.display = 'none';
-            const noQrText = document.createElement('div');
-            noQrText.innerText = 'QR kod mavjud emas';
-            noQrText.style.padding = '10px';
-            noQrText.style.textAlign = 'center';
-            label.appendChild(noQrText);
-        }
-        if (qrUrl && qrUrl !== '') label.appendChild(qrImg);
+        // Header (yuqori qism)
+        const header = document.createElement('div');
+        header.className = 'print-header';
+        label.appendChild(header);
         
-        // Product name (vertical orientation, bold)
+        // QR Code (VERTICAL - TEPADA)
+        if (qrUrl && qrUrl !== '') {
+            const qrImg = document.createElement('img');
+            qrImg.className = 'qr-image';
+            qrImg.src = qrUrl;
+            qrImg.alt = 'QR Code';
+            // QR kod yuklanishini kutish
+            qrImg.onload = function() {
+                console.log('QR loaded');
+            };
+            label.appendChild(qrImg);
+        } else {
+            const noQrDiv = document.createElement('div');
+            noQrDiv.style.padding = '15px';
+            noQrDiv.style.textAlign = 'center';
+            noQrDiv.style.background = '#f3f4f6';
+            noQrDiv.style.margin = '5mm 0';
+            noQrDiv.style.borderRadius = '4px';
+            noQrDiv.innerHTML = '📱<br><span style="font-size: 9px;">QR kod mavjud emas</span>';
+            label.appendChild(noQrDiv);
+        }
+        
+        // Ajratuvchi chiziq
+        const hr = document.createElement('div');
+        hr.className = 'print-hr';
+        label.appendChild(hr);
+        
+        // Material nomi (VERTICAL - PASTDA)
         const nameElem = document.createElement('div');
         nameElem.className = 'product-name';
         nameElem.innerText = materialName;
         label.appendChild(nameElem);
         
-        // Separator
-        const hr = document.createElement('div');
-        hr.className = 'print-hr';
-        label.appendChild(hr);
+      
+        // Miqdor va birlik
+        if (quantity && quantity !== '0.00') {
+            const qtyElem = document.createElement('div');
+            qtyElem.className = 'product-details';
+            qtyElem.innerHTML = `📦 Miqdor: ${quantity} ${unit || ''}`;
+            label.appendChild(qtyElem);
+        }
         
-        // Category
-        const catElem = document.createElement('div');
-        catElem.className = 'product-category';
-        catElem.innerText = `Kategoriya: ${categoryName || 'Noma\'lum'}`;
-        label.appendChild(catElem);
-        
-        // Date and timestamp
-        const dateElem = document.createElement('div');
-        dateElem.className = 'product-details';
-        const now = new Date();
-        dateElem.innerText = `Chop etilgan: ${now.toLocaleDateString('uz-UZ')} ${now.toLocaleTimeString('uz-UZ')}`;
-        label.appendChild(dateElem);
+      
+        // Footer
+        const footer = document.createElement('div');
+        footer.className = 'print-footer';
+        label.appendChild(footer);
         
         printContainer.appendChild(label);
         document.body.appendChild(printContainer);
         
-        // Ensure image loads before printing
-        const printAndCleanup = () => {
+        // Print dialogini ochish - faqat 1 sahifa
+        setTimeout(function() {
             window.print();
-            setTimeout(() => {
+            // Printdan keyin container ni tozalash
+            setTimeout(function() {
                 if (printContainer && printContainer.parentNode) {
-                    printContainer.parentNode.removeChild(printContainer);
+                    printContainer.remove();
                 }
             }, 1000);
-        };
-        
-        if (qrUrl && qrUrl !== '') {
-            qrImg.onload = printAndCleanup;
-            qrImg.onerror = printAndCleanup;
-            // If already loaded
-            if (qrImg.complete) printAndCleanup();
-        } else {
-            printAndCleanup();
-        }
+        }, 300);
     }
-
+    
     // Drag and drop qo'llab-quvvatlash
     document.addEventListener('DOMContentLoaded', function() {
         const dropZone = document.querySelector('.import-dropzone');
