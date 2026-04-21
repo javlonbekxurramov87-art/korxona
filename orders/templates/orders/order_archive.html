@@ -1,25 +1,28 @@
 {% extends "orders/base.html" %}
+{% load humanize %}
 
 {% block content %}
 <div class="archive-container">
     <!-- Hero Section -->
     <div class="hero-section">
-        <div class="container-fluid px-4 px-lg-5">
+        <div class="container">
             <div class="hero-content">
-                <div class="hero-icon">
-                    <i class="fas fa-archive"></i>
-                </div>
-                <div class="hero-text">
-                    <h1 class="hero-title">
-                        {% if is_worker %}Mening Arxivim{% else %}Arxiv Markazi{% endif %}
-                    </h1>
-                    <p class="hero-subtitle">
-                        {% if is_worker %}
-                            Siz muvaffaqiyatli yakunlagan <span class="highlight">{{ total_completed }}</span> ta buyurtma
-                        {% else %}
-                            Tizimdagi barcha yakunlangan buyurtmalar arxivi
-                        {% endif %}
-                    </p>
+                <div class="hero-left">
+                    <div class="hero-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="hero-text">
+                        <h1 class="hero-title">
+                            {% if is_worker %}Mening Arxivim{% else %}Arxiv Markazi{% endif %}
+                        </h1>
+                        <p class="hero-subtitle">
+                            {% if is_worker %}
+                                Siz muvaffaqiyatli yakunlagan <span class="highlight">{{ main_orders_count }}</span> ta buyurtma
+                            {% else %}
+                                Tizimdagi barcha yakunlangan buyurtmalar arxivi
+                            {% endif %}
+                        </p>
+                    </div>
                 </div>
                 <a href="{% url 'order_list' %}" class="back-button">
                     <i class="fas fa-arrow-left"></i>
@@ -29,7 +32,7 @@
         </div>
     </div>
 
-    <div class="container-fluid px-4 px-lg-5">
+    <div class="container">
         <!-- Search Section -->
         <div class="search-section">
             <div class="search-card">
@@ -39,13 +42,16 @@
                         <input type="text" name="q" class="search-input" 
                                placeholder="Buyurtma raqami, mijoz nomi yoki mahsulot bo'yicha qidirish..." 
                                value="{{ search_query }}">
+                        {% if worker_filter %}
+                        <input type="hidden" name="worker_type" value="{{ worker_filter }}">
+                        {% endif %}
                         <button type="submit" class="search-btn">
                             <i class="fas fa-search"></i>
                             <span>Qidirish</span>
                         </button>
                     </div>
                 </form>
-                {% if search_query %}
+                {% if search_query or worker_filter %}
                 <div class="search-clear">
                     <a href="?">
                         <i class="fas fa-times"></i> Filtrlarni tozalash
@@ -55,1382 +61,996 @@
             </div>
         </div>
 
-        <!-- Tab Navigation -->
+        <!-- Filter Section -->
         {% if not is_worker %}
-        <div class="tabs-wrapper">
-            <div class="tabs-container">
-                <button class="tab-btn active" data-tab="parent">
-                    <i class="fas fa-layer-group"></i>
-                    <span>Asosiy Buyurtmalar</span>
-                    <span class="tab-count">{{ main_orders.paginator.count }}</span>
-                </button>
-                <button class="tab-btn" data-tab="child">
+        <div class="filter-section">
+            <div class="filter-header">
+                <i class="fas fa-sliders-h"></i>
+                <span>Usta turi bo'yicha filtr</span>
+            </div>
+            <div class="filter-grid">
+                <a href="?{% if search_query %}q={{ search_query }}{% endif %}" 
+                   class="filter-chip {% if not worker_filter %}active{% endif %}">
+                    <i class="fas fa-users"></i>
+                    <span>Barchasi</span>
+                    <span class="chip-count">{{ main_orders_count }}</span>
+                </a>
+                <a href="?worker_type=list{% if search_query %}&q={{ search_query }}{% endif %}" 
+                   class="filter-chip {% if worker_filter == 'list' %}active{% endif %}">
+                    <i class="fas fa-list-ul"></i>
+                    <span>List Usta</span>
+                    <span class="chip-count">{{ worker_stats.list|default:0 }}</span>
+                </a>
+                <a href="?worker_type=panel{% if search_query %}&q={{ search_query }}{% endif %}" 
+                   class="filter-chip {% if worker_filter == 'panel' %}active{% endif %}">
                     <i class="fas fa-th-large"></i>
-                    <span>Ichki Detallar</span>
-                    <span class="tab-count">{{ child_orders.paginator.count }}</span>
-                </button>
+                    <span>Panel Usta</span>
+                    <span class="chip-count">{{ worker_stats.panel|default:0 }}</span>
+                </a>
+                <a href="?worker_type=eshik{% if search_query %}&q={{ search_query }}{% endif %}" 
+                   class="filter-chip {% if worker_filter == 'eshik' %}active{% endif %}">
+                    <i class="fas fa-door-open"></i>
+                    <span>Eshik Ustasi</span>
+                    <span class="chip-count">{{ worker_stats.eshik|default:0 }}</span>
+                </a>
+                <a href="?worker_type=ugol{% if search_query %}&q={{ search_query }}{% endif %}" 
+                   class="filter-chip {% if worker_filter == 'ugol' %}active{% endif %}">
+                    <i class="fas fa-cube"></i>
+                    <span>Ugol Usta</span>
+                    <span class="chip-count">{{ worker_stats.ugol|default:0 }}</span>
+                </a>
             </div>
         </div>
         {% endif %}
 
-        <!-- ============ ADMIN & MANAGER VIEWS ============ -->
-        {% if not is_worker %}
-        
-        <!-- Parent Orders Panel -->
-        <div class="tab-panel active" id="parent-panel">
-            {% if main_orders %}
-            <div class="orders-grid">
-                {% for order in main_orders %}
-                <div class="order-card">
-                    <div class="card-header">
-                        <div class="order-badge">
-                            <i class="fas fa-hashtag"></i>
-                            <span>{{ order.order_number }}</span>
-                        </div>
-                        <div class="status-badge {{ order.status|lower }}">
-                            <i class="fas fa-check-circle"></i>
-                            <span>{{ order.get_status_display }}</span>
-                        </div>
+        <!-- Stats Cards -->
+        {% if is_worker and personal_stats %}
+        <div class="stats-row">
+            <div class="stat-card-mini">
+                <div class="stat-icon-mini green"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-info-mini">
+                    <span class="stat-label-mini">Jami tugatilgan</span>
+                    <span class="stat-value-mini">{{ personal_stats.total }}</span>
+                </div>
+            </div>
+            <div class="stat-card-mini">
+                <div class="stat-icon-mini teal"><i class="fas fa-clipboard-list"></i></div>
+                <div class="stat-info-mini">
+                    <span class="stat-label-mini">BAJARILDI</span>
+                    <span class="stat-value-mini">{{ personal_stats.bajarildi }}</span>
+                </div>
+            </div>
+            <div class="stat-card-mini">
+                <div class="stat-icon-mini orange"><i class="fas fa-tools"></i></div>
+                <div class="stat-info-mini">
+                    <span class="stat-label-mini">USTA_TUGATDI</span>
+                    <span class="stat-value-mini">{{ personal_stats.usta_tugatdi }}</span>
+                </div>
+            </div>
+            <div class="stat-card-mini">
+                <div class="stat-icon-mini blue"><i class="fas fa-check-double"></i></div>
+                <div class="stat-info-mini">
+                    <span class="stat-label-mini">TAYYOR</span>
+                    <span class="stat-value-mini">{{ personal_stats.tayyor }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Orders Grid -->
+        {% if main_orders %}
+        <div class="orders-grid">
+            {% for order in main_orders %}
+            <div class="order-card">
+                <div class="order-card-header">
+                    <div class="order-number">
+                        <i class="fas fa-hashtag"></i>
+                        <span>{{ order.order_number }}</span>
                     </div>
-                    
-                    <div class="card-body">
-                        <!-- Customer Info -->
+                    <div class="order-status status-{{ order.status|lower }}">
+                        <i class="fas {% if order.status == 'BAJARILDI' %}fa-check-circle{% elif order.status == 'USTA_TUGATDI' %}fa-tools{% else %}fa-check-double{% endif %}"></i>
+                        <span>{{ order.get_status_display|default:order.status }}</span>
+                    </div>
+                </div>
+                
+                <div class="order-card-body">
+                    <!-- Customer -->
+                    <div class="customer-row">
+                        <div class="customer-avatar">
+                            {{ order.customer_name|slice:":1"|upper }}
+                        </div>
                         <div class="customer-info">
-                            <div class="customer-avatar">
-                                {{ order.customer_name|slice:":1"|upper }}
-                            </div>
-                            <div class="customer-details">
-                                <h3 class="customer-name">{{ order.customer_name }}</h3>
-                                <p class="customer-id">
-                                    <i class="fas fa-id-card"></i> ID: {{ order.customer_unique_id }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <!-- Product Info -->
-                        <div class="product-info">
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-box"></i> Mahsulot</span>
-                                <span class="info-value">{{ order.product_name|default:"-" }}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-chart-line"></i> Kvadrat</span>
-                                <span class="info-value highlight">{{ order.panel_kvadrat|default:"0" }} m²</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-door-open"></i> Eshik turi</span>
-                                <span class="info-value">{{ order.eshik_turi|default:"-" }}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-arrow-right"></i> Yo'nalish</span>
-                                <span class="info-value">{{ order.eshik_yonalishi|default:"-" }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Dimensions -->
-                        <div class="dimensions">
-                            <div class="dimension-item">
-                                <i class="fas fa-arrow-up"></i>
-                                <div>
-                                    <span class="dim-label">Balandligi</span>
-                                    <span class="dim-value">{{ order.balandligi|default:"-" }} sm</span>
-                                </div>
-                            </div>
-                            <div class="dimension-item">
-                                <i class="fas fa-arrow-right"></i>
-                                <div>
-                                    <span class="dim-label">Eni</span>
-                                    <span class="dim-value">{{ order.eni|default:"-" }} sm</span>
-                                </div>
-                            </div>
-                            <div class="dimension-item">
-                                <i class="fas fa-cube"></i>
-                                <div>
-                                    <span class="dim-label">Qalinligi</span>
-                                    <span class="dim-value">{{ order.panel_thickness|default:"0" }} mm</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Payment Info -->
-                        <div class="payment-info">
-                            <div class="payment-row">
-                                <span>Umumiy summa</span>
-                                <strong>{{ order.total_price|floatformat:0 }} USD</strong>
-                            </div>
-                            <div class="payment-row">
-                                <span>Avans to'lov</span>
-                                <strong class="text-success">{{ order.prepayment|floatformat:0 }} USD</strong>
-                            </div>
-                            {% if order.remaining_amount > 0 %}
-                            <div class="payment-row debt">
-                                <span>Qoldiq qarz</span>
-                                <strong class="text-danger">{{ order.remaining_amount|floatformat:0 }} USD</strong>
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Assigned Workers -->
-                        {% if order.assigned_workers.all %}
-                        <div class="workers-list">
-                            <i class="fas fa-users"></i>
-                            <span>Ustalar:</span>
-                            {% for worker in order.assigned_workers.all %}
-                            <span class="worker-tag">
-                                <i class="fas fa-user-check"></i>
-                                {{ worker.user.get_full_name|default:worker.user.username }}
-                            </span>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="card-footer">
-                        <div class="footer-actions">
-                            {% if order.pdf_file %}
-                            <a href="{{ order.pdf_file.url }}" class="btn-pdf" target="_blank">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </a>
-                            {% endif %}
-                            <a href="{% url 'order_detail' order.pk %}" class="btn-detail">
-                                <i class="fas fa-eye"></i> Batafsil
-                            </a>
-                        </div>
-                        <div class="completion-date">
-                            <i class="far fa-calendar-check"></i>
-                            Tugatilgan: 
-                            {% if order.worker_finished_at %}
-                                {{ order.worker_finished_at|date:"d.m.Y H:i" }}
-                            {% else %}
-                                {{ order.created_at|date:"d.m.Y H:i" }}
-                            {% endif %}
+                            <h4 class="customer-name">{{ order.customer_name|default:"Noma'lum mijoz" }}</h4>
+                            <span class="customer-id"><i class="fas fa-id-card"></i> ID: {{ order.customer_unique_id|default:"-" }}</span>
                         </div>
                     </div>
-                </div>
-                {% endfor %}
-            </div>
 
-            <!-- Pagination for main orders -->
-            {% if main_orders.has_other_pages %}
-            <div class="pagination-wrapper">
-                <div class="pagination-container">
-                    {% if main_orders.has_previous %}
-                    <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                    {% endif %}
-                    
-                    {% for i in main_orders.paginator.page_range %}
-                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
-                       class="page-link {% if main_orders.number == i %}active{% endif %}">
-                        {{ i }}
-                    </a>
-                    {% endfor %}
-                    
-                    {% if main_orders.has_next %}
-                    <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-            
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon"><i class="fas fa-archive"></i></div>
-                <h3>Arxiv bo'sh</h3>
-                <p>Hozircha arxivlangan buyurtmalar mavjud emas.</p>
-                <a href="{% url 'order_list' %}" class="empty-btn"><i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish</a>
-            </div>
-            {% endif %}
-        </div>
+                    <!-- Details Grid -->
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label"><i class="fas fa-box"></i> Mahsulot</span>
+                            <span class="detail-value">{{ order.product_name|default:"-" }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label"><i class="fas fa-chart-line"></i> Kvadrat</span>
+                            <span class="detail-value highlight">{{ order.panel_kvadrat|default:"0" }} m²</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label"><i class="fas fa-door-open"></i> Eshik turi</span>
+                            <span class="detail-value">{{ order.eshik_turi|default:"-" }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label"><i class="fas fa-arrow-right"></i> Yo'nalish</span>
+                            <span class="detail-value">{{ order.eshik_yonalishi|default:"-" }}</span>
+                        </div>
+                    </div>
 
-        <!-- Child Orders Panel -->
-        <div class="tab-panel" id="child-panel">
-            {% if child_orders %}
-            <div class="orders-grid">
-                {% for child in child_orders %}
-                <div class="order-card child-order-card">
-                    <div class="card-header child-header-bg">
-                        <div class="order-badge">
+                    <!-- Dimensions -->
+                    <div class="dimensions-row">
+                        <div class="dimension-chip">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>{{ order.balandligi|default:"-" }} sm</span>
+                            <small>Balandligi</small>
+                        </div>
+                        <div class="dimension-chip">
+                            <i class="fas fa-arrow-right"></i>
+                            <span>{{ order.eni|default:"-" }} sm</span>
+                            <small>Eni</small>
+                        </div>
+                        <div class="dimension-chip">
                             <i class="fas fa-cube"></i>
-                            <span>Child #{{ child.id }}</span>
-                        </div>
-                        <div class="status-badge completed">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Tugatilgan</span>
+                            <span>{{ order.panel_thickness|default:"0" }} mm</span>
+                            <small>Qalinligi</small>
                         </div>
                     </div>
-                    
-                    <div class="card-body">
-                        <div class="parent-reference">
-                            <i class="fas fa-link"></i>
-                            <span>Asosiy buyurtma: </span>
-                            <strong>#{{ child.parent_order.order_number|default:child.parent_order_id }}</strong>
-                            <a href="{% url 'order_detail' child.parent_order.pk %}" class="parent-link-btn">
-                                <i class="fas fa-external-link-alt"></i>
-                            </a>
-                        </div>
 
-                        <div class="product-info">
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-box"></i> Mahsulot</span>
-                                <span class="info-value">{{ child.product_name|default:"-" }}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-chart-line"></i> Kvadrat</span>
-                                <span class="info-value highlight">{{ child.panel_kvadrat|default:"0" }} m²</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label"><i class="fas fa-cube"></i> Qalinligi</span>
-                                <span class="info-value">{{ child.panel_thickness|default:"0" }} mm</span>
-                            </div>
+                    <!-- Payment (admin only) -->
+                    {% if not is_worker %}
+                    <div class="payment-row-mini">
+                        <div class="payment-item">
+                            <span>Umumiy</span>
+                            <strong>{{ order.total_price|floatformat:0|intcomma }} USD</strong>
                         </div>
-
-                        {% if child.worker_comment %}
-                        <div class="worker-comment-box">
-                            <i class="fas fa-comment-dots"></i>
-                            <div>
-                                <span class="comment-label">Usta izohi:</span>
-                                <p>{{ child.worker_comment }}</p>
-                            </div>
+                        <div class="payment-item">
+                            <span>Avans</span>
+                            <strong class="text-green">{{ order.prepayment|floatformat:0|intcomma }} USD</strong>
                         </div>
-                        {% endif %}
-
-                        {% if child.assigned_workers.all %}
-                        <div class="workers-list">
-                            <i class="fas fa-users"></i>
-                            <span>Bajargan ustalar:</span>
-                            {% for worker in child.assigned_workers.all %}
-                            <span class="worker-tag">
-                                <i class="fas fa-user-check"></i>
-                                {{ worker.user.get_full_name|default:worker.user.username }}
-                            </span>
-                            {% endfor %}
+                        {% if order.remaining_amount > 0 %}
+                        <div class="payment-item">
+                            <span>Qarz</span>
+                            <strong class="text-red">{{ order.remaining_amount|floatformat:0|intcomma }} USD</strong>
                         </div>
                         {% endif %}
                     </div>
-                    
-                    <div class="card-footer">
-                        <div class="completion-date">
-                            <i class="far fa-calendar-check"></i>
-                            Tugatilgan: {{ child.worker_finished_at|date:"d.m.Y H:i"|default:child.updated_at|date:"d.m.Y H:i" }}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+                    {% endif %}
 
-            <!-- Pagination for child orders -->
-            {% if child_orders.has_other_pages %}
-            <div class="pagination-wrapper">
-                <div class="pagination-container">
-                    <form method="GET" style="display: flex; gap: 0.5rem;">
-                        <input type="hidden" name="q" value="{{ search_query }}">
-                        {% if child_orders.has_previous %}
-                        <button type="submit" name="child_page" value="{{ child_orders.previous_page_number }}" class="page-link">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        {% endif %}
-                        
-                        {% for i in child_orders.paginator.page_range %}
-                        <button type="submit" name="child_page" value="{{ i }}" 
-                                class="page-link {% if child_orders.number == i %}active{% endif %}">
-                            {{ i }}
-                        </button>
+                    <!-- Workers -->
+                    {% if order.assigned_workers.all %}
+                    <div class="workers-row">
+                        <i class="fas fa-users"></i>
+                        {% for worker in order.assigned_workers.all %}
+                        <span class="worker-chip">
+                            {{ worker.user.get_full_name|default:worker.user.username }}
+                        </span>
                         {% endfor %}
-                        
-                        {% if child_orders.has_next %}
-                        <button type="submit" name="child_page" value="{{ child_orders.next_page_number }}" class="page-link">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="order-card-footer">
+                    <div class="footer-buttons">
+                        {% if order.pdf_file %}
+                        <a href="{{ order.pdf_file.url }}" class="btn-pdf-mini" target="_blank">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </a>
                         {% endif %}
-                    </form>
+                        <a href="{% url 'order_detail' order.pk %}" class="btn-detail-mini">
+                            <i class="fas fa-eye"></i> Batafsil
+                        </a>
+                    </div>
+                    <div class="completion-date-mini">
+                        <i class="far fa-calendar-check"></i>
+                        {{ order.worker_finished_at|date:"d.m.Y H:i"|default:order.created_at|date:"d.m.Y H:i" }}
+                    </div>
                 </div>
             </div>
-            {% endif %}
-            
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon"><i class="fas fa-cogs"></i></div>
-                <h3>Ichki detallar topilmadi</h3>
-                <p>Tugatilgan ichki detallar arxivi bo'sh</p>
-            </div>
-            {% endif %}
+            {% endfor %}
         </div>
 
-        <!-- ============ WORKER VIEW ============ -->
-        {% else %}
-        
-        <!-- All Orders Mixed Panel for Workers -->
-        <div class="tab-panel active" id="all-panel">
-            {% if all_my_orders %}
-            <div class="mixed-orders-grid">
-                {% for item in all_my_orders %}
-                    {% if item.type == 'main' %}
-                    <!-- Main Order Card for Worker -->
-                    <div class="order-card main-order-worker">
-                        <div class="card-header main-header">
-                            <div class="order-badge">
-                                <i class="fas fa-hashtag"></i>
-                                <span>{{ item.data.order_number }}</span>
-                            </div>
-                            <div class="order-type-badge">
-                                <i class="fas fa-layer-group"></i>
-                                <span>Asosiy buyurtma</span>
-                            </div>
-                        </div>
-                        
-                        <div class="card-body">
-                            <div class="customer-info">
-                                <div class="customer-avatar">
-                                    {{ item.data.customer_name|slice:":1"|upper }}
-                                </div>
-                                <div class="customer-details">
-                                    <h3 class="customer-name">{{ item.data.customer_name }}</h3>
-                                    <p class="customer-id">
-                                        <i class="fas fa-id-card"></i> ID: {{ item.data.customer_unique_id }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="product-info">
-                                <div class="info-row">
-                                    <span class="info-label"><i class="fas fa-box"></i> Mahsulot</span>
-                                    <span class="info-value">{{ item.data.product_name|default:"-" }}</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label"><i class="fas fa-chart-line"></i> Kvadrat</span>
-                                    <span class="info-value highlight">{{ item.data.panel_kvadrat|default:"0" }} m²</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label"><i class="fas fa-door-open"></i> Eshik turi</span>
-                                    <span class="info-value">{{ item.data.eshik_turi|default:"-" }}</span>
-                                </div>
-                            </div>
-
-                            <div class="dimensions">
-                                <div class="dimension-item">
-                                    <i class="fas fa-arrow-up"></i>
-                                    <div>
-                                        <span class="dim-label">Balandligi</span>
-                                        <span class="dim-value">{{ item.data.balandligi|default:"-" }} sm</span>
-                                    </div>
-                                </div>
-                                <div class="dimension-item">
-                                    <i class="fas fa-arrow-right"></i>
-                                    <div>
-                                        <span class="dim-label">Eni</span>
-                                        <span class="dim-value">{{ item.data.eni|default:"-" }} sm</span>
-                                    </div>
-                                </div>
-                                <div class="dimension-item">
-                                    <i class="fas fa-cube"></i>
-                                    <div>
-                                        <span class="dim-label">Qalinligi</span>
-                                        <span class="dim-value">{{ item.data.panel_thickness|default:"0" }} mm</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {% if item.data.assigned_workers.all %}
-                            <div class="workers-list">
-                                <i class="fas fa-users"></i>
-                                <span>Ustalar:</span>
-                                {% for worker in item.data.assigned_workers.all %}
-                                <span class="worker-tag">
-                                    <i class="fas fa-user-check"></i>
-                                    {{ worker.user.get_full_name|default:worker.user.username }}
-                                </span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="card-footer">
-                            <div class="footer-actions">
-                                {% if item.data.pdf_file %}
-                                <a href="{{ item.data.pdf_file.url }}" class="btn-pdf" target="_blank">
-                                    <i class="fas fa-file-pdf"></i> PDF
-                                </a>
-                                {% endif %}
-                                <a href="{% url 'order_detail' item.data.pk %}" class="btn-detail">
-                                    <i class="fas fa-eye"></i> Batafsil
-                                </a>
-                            </div>
-                            <div class="completion-date">
-                                <i class="far fa-calendar-check"></i>
-                                Tugatilgan: {{ item.data.worker_finished_at|date:"d.m.Y H:i"|default:item.data.created_at|date:"d.m.Y H:i" }}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {% else %}
-                    <!-- Child Order Card for Worker -->
-                    <div class="order-card child-order-worker">
-                        <div class="card-header child-header">
-                            <div class="order-badge">
-                                <i class="fas fa-cube"></i>
-                                <span>Child #{{ item.data.id }}</span>
-                            </div>
-                            <div class="order-type-badge child-type">
-                                <i class="fas fa-th-large"></i>
-                                <span>Ichki detal</span>
-                            </div>
-                        </div>
-                        
-                        <div class="card-body">
-                            <div class="parent-reference">
-                                <i class="fas fa-link"></i>
-                                <span>Asosiy buyurtma: </span>
-                                <strong>#{{ item.data.parent_order.order_number|default:item.data.parent_order_id }}</strong>
-                                {% if item.data.parent_order %}
-                                <a href="{% url 'order_detail' item.data.parent_order.pk %}" class="parent-link-btn">
-                                    <i class="fas fa-external-link-alt"></i>
-                                </a>
-                                {% endif %}
-                            </div>
-
-                            <div class="product-info">
-                                <div class="info-row">
-                                    <span class="info-label"><i class="fas fa-box"></i> Mahsulot</span>
-                                    <span class="info-value">{{ item.data.product_name|default:"-" }}</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label"><i class="fas fa-chart-line"></i> Kvadrat</span>
-                                    <span class="info-value highlight">{{ item.data.panel_kvadrat|default:"0" }} m²</span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label"><i class="fas fa-cube"></i> Qalinligi</span>
-                                    <span class="info-value">{{ item.data.panel_thickness|default:"0" }} mm</span>
-                                </div>
-                            </div>
-
-                            {% if item.data.worker_comment %}
-                            <div class="worker-comment-box">
-                                <i class="fas fa-comment-dots"></i>
-                                <div>
-                                    <span class="comment-label">Sizning izohingiz:</span>
-                                    <p>{{ item.data.worker_comment }}</p>
-                                </div>
-                            </div>
-                            {% endif %}
-
-                            {% if item.data.assigned_workers.all %}
-                            <div class="workers-list">
-                                <i class="fas fa-users"></i>
-                                <span>Bajargan ustalar:</span>
-                                {% for worker in item.data.assigned_workers.all %}
-                                <span class="worker-tag">
-                                    <i class="fas fa-user-check"></i>
-                                    {{ worker.user.get_full_name|default:worker.user.username }}
-                                </span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="card-footer">
-                            <div class="completion-date">
-                                <i class="far fa-calendar-check"></i>
-                                Siz tugatgan vaqt: {{ item.data.worker_finished_at|date:"d.m.Y H:i"|default:item.data.updated_at|date:"d.m.Y H:i" }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-
-            <!-- Pagination for worker orders -->
-            {% if all_my_orders.has_other_pages %}
-            <div class="pagination-wrapper">
-                <div class="pagination-container">
-                    {% if all_my_orders.has_previous %}
-                    <a href="?page={{ all_my_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                    {% endif %}
-                    
-                    {% for i in all_my_orders.paginator.page_range %}
-                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
-                       class="page-link {% if all_my_orders.number == i %}active{% endif %}">
-                        {{ i }}
-                    </a>
-                    {% endfor %}
-                    
-                    {% if all_my_orders.has_next %}
-                    <a href="?page={{ all_my_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
+        <!-- Pagination -->
+        {% if main_orders.has_other_pages %}
+        <div class="pagination">
+            {% if main_orders.has_previous %}
+            <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}" class="page-btn">
+                <i class="fas fa-chevron-left"></i>
+            </a>
             {% endif %}
             
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon"><i class="fas fa-tasks"></i></div>
-                <h3>Sizning arxivingiz bo'sh</h3>
-                <p>Siz hali hech qanday buyurtmani tugatmagan ko'rinasiz.</p>
-                <a href="{% url 'order_list' %}" class="empty-btn"><i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish</a>
-            </div>
+            {% for i in main_orders.paginator.page_range %}
+                {% if main_orders.number|add:-2 <= i and i <= main_orders.number|add:2 %}
+                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}" 
+                       class="page-btn {% if main_orders.number == i %}active{% endif %}">
+                        {{ i }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+            
+            {% if main_orders.has_next %}
+            <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}" class="page-btn">
+                <i class="fas fa-chevron-right"></i>
+            </a>
             {% endif %}
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <!-- Empty State -->
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-inbox"></i>
+            </div>
+            <h3>Arxiv bo'sh</h3>
+            <p>
+                {% if is_worker %}
+                    Siz hali hech qanday buyurtmani tugatmagan ko'rinasiz.
+                {% else %}
+                    Hozircha arxivlangan buyurtmalar mavjud emas.
+                {% endif %}
+            </p>
+            <a href="{% url 'order_list' %}" class="empty-btn">
+                <i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish
+            </a>
         </div>
         {% endif %}
     </div>
 </div>
 
 <style>
-    /* Reset & Base */
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
+/* BASE */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-    body {
-        background: linear-gradient(135deg, #f5f7fa 0%, #eef2f5 100%);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
+body {
+    background: #f0fdf4;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
 
-    .archive-container {
-        min-height: 100vh;
-        padding: 2rem 0;
-    }
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
 
-    /* Hero Section */
-    .hero-section {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        border-radius: 0 0 3rem 3rem;
-        margin-bottom: 2rem;
-        position: relative;
-        overflow: hidden;
-    }
+/* HERO SECTION */
+.hero-section {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    padding: 2.5rem 0;
+    margin-bottom: 2rem;
+    border-radius: 0 0 2rem 2rem;
+}
 
-    .hero-section::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.05)" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path></svg>') no-repeat bottom;
-        background-size: cover;
-        opacity: 0.1;
-    }
+.hero-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
 
-    .hero-content {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 2.5rem 0;
-        position: relative;
-        z-index: 1;
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
+.hero-left {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
 
-    .hero-icon {
-        width: 70px;
-        height: 70px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2rem;
-        color: white;
-        backdrop-filter: blur(10px);
-    }
+.hero-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+}
 
-    .hero-text {
-        flex: 1;
-        margin-left: 1rem;
-    }
+.hero-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.25rem;
+}
 
-    .hero-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: white;
-        margin-bottom: 0.25rem;
-    }
+.hero-subtitle {
+    color: rgba(255,255,255,0.9);
+    font-size: 0.9rem;
+}
 
-    .hero-subtitle {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 0.95rem;
-    }
+.hero-subtitle .highlight {
+    background: rgba(255,255,255,0.2);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
 
-    .hero-subtitle .highlight {
-        font-weight: 700;
-        background: rgba(255, 255, 255, 0.2);
-        padding: 0.2rem 0.6rem;
-        border-radius: 20px;
-        display: inline-block;
-    }
+.back-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    background: rgba(255,255,255,0.15);
+    border-radius: 40px;
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
 
-    .back-button {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.7rem 1.5rem;
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: 50px;
-        color: white;
-        text-decoration: none;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
-    }
+.back-button:hover {
+    background: rgba(255,255,255,0.25);
+    transform: translateX(-3px);
+    color: white;
+}
 
-    .back-button:hover {
-        background: rgba(255, 255, 255, 0.25);
-        transform: translateX(-3px);
-        color: white;
-    }
+/* SEARCH SECTION */
+.search-section {
+    margin-bottom: 2rem;
+}
 
-    /* Search Section */
-    .search-section {
-        margin-bottom: 2rem;
-    }
+.search-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid #e5e7eb;
+}
 
-    .search-card {
-        background: white;
-        border-radius: 1.5rem;
-        padding: 1.25rem;
-        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.05);
-    }
+.search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
 
-    .search-wrapper {
-        position: relative;
-        display: flex;
-        align-items: center;
-    }
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    color: #10b981;
+    font-size: 1rem;
+}
 
-    .search-icon {
-        position: absolute;
-        left: 1.25rem;
-        color: #0d9488;
-        font-size: 1.1rem;
-    }
+.search-input {
+    width: 100%;
+    padding: 0.85rem 1rem 0.85rem 2.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    font-size: 0.9rem;
+    background: #fafafa;
+    transition: all 0.2s;
+}
 
-    .search-input {
-        width: 100%;
-        padding: 1rem 1rem 1rem 3rem;
-        border: 2px solid #e2e8f0;
-        border-radius: 1rem;
-        font-size: 1rem;
-        transition: all 0.3s ease;
-        background: #f8fafc;
-    }
+.search-input:focus {
+    outline: none;
+    border-color: #10b981;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+}
 
-    .search-input:focus {
-        outline: none;
-        border-color: #0d9488;
-        background: white;
-        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
-    }
+.search-btn {
+    position: absolute;
+    right: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    background: #10b981;
+    border: none;
+    border-radius: 0.6rem;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
 
-    .search-btn {
-        position: absolute;
-        right: 0.5rem;
-        padding: 0.6rem 1.5rem;
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        border: none;
-        border-radius: 0.75rem;
-        color: white;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
+.search-btn:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
 
-    .search-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
-    }
+.search-clear {
+    text-align: center;
+    margin-top: 0.75rem;
+}
 
-    .search-clear {
-        text-align: center;
-        margin-top: 1rem;
-    }
+.search-clear a {
+    color: #10b981;
+    text-decoration: none;
+    font-size: 0.8rem;
+}
 
-    .search-clear a {
-        color: #0d9488;
-        text-decoration: none;
-        font-size: 0.85rem;
-        transition: all 0.3s ease;
-    }
+/* FILTER SECTION */
+.filter-section {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 2rem;
+    border: 1px solid #e5e7eb;
+}
 
-    .search-clear a:hover {
-        color: #0f766e;
-    }
+.filter-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+}
 
-    /* Tabs */
-    .tabs-wrapper {
-        margin-bottom: 2rem;
-    }
+.filter-header i {
+    color: #10b981;
+}
 
-    .tabs-container {
-        display: flex;
-        gap: 1rem;
-        background: white;
-        padding: 0.5rem;
-        border-radius: 60px;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-        max-width: 500px;
-        margin: 0 auto;
-    }
+.filter-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
 
-    .tab-btn {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.8rem 1.5rem;
-        background: transparent;
-        border: none;
-        border-radius: 50px;
-        font-weight: 600;
-        color: #64748b;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
+.filter-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f9fafb;
+    border-radius: 40px;
+    color: #4b5563;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+}
 
-    .tab-btn i {
-        font-size: 1rem;
-    }
+.filter-chip i {
+    font-size: 0.85rem;
+    color: #9ca3af;
+}
 
-    .tab-btn .tab-count {
-        background: #e2e8f0;
-        padding: 0.2rem 0.5rem;
-        border-radius: 30px;
-        font-size: 0.75rem;
-        color: #475569;
-    }
+.filter-chip .chip-count {
+    background: #e5e7eb;
+    padding: 0.15rem 0.5rem;
+    border-radius: 30px;
+    font-size: 0.7rem;
+}
 
-    .tab-btn.active {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        color: white;
-        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
-    }
+.filter-chip:hover {
+    border-color: #10b981;
+    background: #ecfdf5;
+}
 
-    .tab-btn.active .tab-count {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
+.filter-chip.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
 
-    /* Tab Panels */
-    .tab-panel {
-        display: none;
-        animation: fadeIn 0.4s ease;
-    }
+.filter-chip.active i {
+    color: white;
+}
 
-    .tab-panel.active {
-        display: block;
-    }
+.filter-chip.active .chip-count {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
 
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+/* STATS ROW */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
 
-    /* Orders Grid */
-    .orders-grid, .mixed-orders-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-        gap: 1.5rem;
-    }
+.stat-card-mini {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+}
 
-    /* Order Cards */
-    .order-card {
-        background: white;
-        border-radius: 1.5rem;
-        overflow: hidden;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-    }
+.stat-card-mini:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
 
-    .order-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 25px 45px rgba(13, 148, 136, 0.15);
-    }
+.stat-icon-mini {
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
 
-    .card-header {
-        padding: 1.25rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+.stat-icon-mini.green { background: #ecfdf5; color: #10b981; }
+.stat-icon-mini.teal { background: #ecfdf5; color: #14b8a6; }
+.stat-icon-mini.orange { background: #fff7ed; color: #f97316; }
+.stat-icon-mini.blue { background: #eff6ff; color: #3b82f6; }
 
-    .card-header.main-header {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-    }
+.stat-label-mini {
+    font-size: 0.7rem;
+    color: #6b7280;
+    display: block;
+}
 
-    .card-header.child-header-bg {
-        background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
-    }
+.stat-value-mini {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1f2937;
+}
 
-    .card-header.child-header {
-        background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
-    }
+/* ORDERS GRID */
+.orders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.5rem;
+}
 
-    .order-badge {
-        background: rgba(255, 255, 255, 0.2);
-        padding: 0.4rem 1rem;
-        border-radius: 50px;
-        color: white;
-        font-weight: 600;
-        font-size: 0.85rem;
-    }
+/* ORDER CARD */
+.order-card {
+    background: white;
+    border-radius: 1rem;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    transition: all 0.3s;
+}
 
-    .status-badge {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.4rem 1rem;
-        border-radius: 50px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: white;
-    }
+.order-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+    border-color: #d1d5db;
+}
 
-    .status-badge.bajarildi, .status-badge.tayyor, .status-badge.completed {
-        background: #10b981;
-    }
+.order-card-header {
+    padding: 1rem 1.25rem;
+    background: #f9fafb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e5e7eb;
+}
 
-    .status-badge.usta_tugatdi {
-        background: #f59e0b;
-    }
+.order-number {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.9rem;
+}
 
-    .order-type-badge {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.4rem 1rem;
-        border-radius: 50px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
+.order-number i {
+    color: #10b981;
+}
 
-    .order-type-badge.child-type {
-        background: rgba(255, 255, 255, 0.25);
-    }
+.order-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 30px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
 
-    .card-body {
-        padding: 1.5rem;
-    }
+.order-status i {
+    font-size: 0.7rem;
+}
 
-    /* Customer Info */
-    .customer-info {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid #e2e8f0;
-    }
+.status-bajarildi { background: #ecfdf5; color: #059669; }
+.status-usta_tugatdi { background: #fff7ed; color: #ea580c; }
+.status-tayyor { background: #eff6ff; color: #2563eb; }
 
-    .customer-avatar {
-        width: 55px;
-        height: 55px;
-        background: linear-gradient(135deg, #ccfbf1 0%, #f0fdfa 100%);
-        border-radius: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #0d9488;
-    }
+.order-card-body {
+    padding: 1.25rem;
+}
 
-    .customer-name {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 0.25rem;
-    }
+/* Customer Row */
+.customer-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f0fdf4;
+}
 
-    .customer-id {
-        font-size: 0.8rem;
-        color: #64748b;
-    }
+.customer-avatar {
+    width: 45px;
+    height: 45px;
+    background: #ecfdf5;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #10b981;
+}
 
-    /* Product Info */
-    .product-info {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.75rem;
-        margin-bottom: 1rem;
-    }
+.customer-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.2rem;
+}
 
-    .info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 0;
-        border-bottom: 1px dashed #e2e8f0;
-    }
+.customer-id {
+    font-size: 0.7rem;
+    color: #6b7280;
+}
 
-    .info-label {
-        font-size: 0.75rem;
-        color: #64748b;
-    }
+.customer-id i {
+    margin-right: 0.2rem;
+}
 
-    .info-label i {
-        width: 18px;
-        margin-right: 0.3rem;
-    }
+/* Details Grid */
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
 
-    .info-value {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #1e293b;
-    }
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed #e5e7eb;
+}
 
-    .info-value.highlight {
-        color: #0d9488;
-    }
+.detail-label {
+    font-size: 0.7rem;
+    color: #6b7280;
+}
 
-    /* Dimensions */
-    .dimensions {
-        display: flex;
-        gap: 1rem;
-        background: #f8fafc;
-        padding: 1rem;
-        border-radius: 1rem;
-        margin-bottom: 1rem;
-    }
+.detail-label i {
+    margin-right: 0.3rem;
+    width: 16px;
+}
 
-    .dimension-item {
-        flex: 1;
-        display: flex;
+.detail-value {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.detail-value.highlight {
+    color: #10b981;
+    font-weight: 600;
+}
+
+/* Dimensions Row */
+.dimensions-row {
+    display: flex;
+    gap: 0.75rem;
+    background: #f9fafb;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.dimension-chip {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.2rem;
+}
+
+.dimension-chip i {
+    font-size: 0.8rem;
+    color: #10b981;
+}
+
+.dimension-chip span {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.dimension-chip small {
+    font-size: 0.6rem;
+    color: #6b7280;
+}
+
+/* Payment Row */
+.payment-row-mini {
+    display: flex;
+    justify-content: space-between;
+    background: #f9fafb;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.payment-item {
+    text-align: center;
+}
+
+.payment-item span {
+    font-size: 0.65rem;
+    color: #6b7280;
+    display: block;
+}
+
+.payment-item strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.text-green { color: #10b981; }
+.text-red { color: #ef4444; }
+
+/* Workers Row */
+.workers-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    color: #6b7280;
+}
+
+.workers-row i {
+    color: #10b981;
+}
+
+.worker-chip {
+    background: #ecfdf5;
+    padding: 0.2rem 0.6rem;
+    border-radius: 30px;
+    color: #059669;
+    font-size: 0.7rem;
+}
+
+/* Card Footer */
+.order-card-footer {
+    padding: 1rem 1.25rem;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+}
+
+.footer-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.btn-pdf-mini, .btn-detail-mini {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-pdf-mini {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.btn-pdf-mini:hover {
+    background: #fee2e2;
+}
+
+.btn-detail-mini {
+    background: #10b981;
+    color: white;
+}
+
+.btn-detail-mini:hover {
+    background: #059669;
+}
+
+.completion-date-mini {
+    text-align: center;
+    font-size: 0.65rem;
+    color: #9ca3af;
+}
+
+.completion-date-mini i {
+    margin-right: 0.3rem;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+}
+
+.page-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    height: 38px;
+    padding: 0 0.75rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    color: #4b5563;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.page-btn:hover {
+    border-color: #10b981;
+    color: #10b981;
+}
+
+.page-btn.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+}
+
+.empty-icon {
+    width: 80px;
+    height: 80px;
+    background: #ecfdf5;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+.empty-icon i {
+    font-size: 2rem;
+    color: #10b981;
+}
+
+.empty-state h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+}
+
+.empty-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    background: #10b981;
+    border-radius: 40px;
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.empty-btn:hover {
+    background: #059669;
+}
+
+/* Animations */
+.order-card {
+    animation: fadeInUp 0.3s ease backwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.order-card:nth-child(1) { animation-delay: 0.02s; }
+.order-card:nth-child(2) { animation-delay: 0.04s; }
+.order-card:nth-child(3) { animation-delay: 0.06s; }
+.order-card:nth-child(4) { animation-delay: 0.08s; }
+.order-card:nth-child(5) { animation-delay: 0.1s; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 1rem;
+    }
+    
+    .hero-left {
         flex-direction: column;
-        align-items: center;
         text-align: center;
-        gap: 0.3rem;
     }
-
-    .dimension-item i {
-        font-size: 1rem;
-        color: #0d9488;
-    }
-
-    .dim-label {
-        font-size: 0.65rem;
-        color: #64748b;
-        display: block;
-    }
-
-    .dim-value {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #1e293b;
-    }
-
-    /* Payment Info */
-    .payment-info {
-        background: #f8fafc;
-        padding: 1rem;
-        border-radius: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .payment-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.4rem 0;
-    }
-
-    .payment-row.debt {
-        border-top: 1px solid #e2e8f0;
-        margin-top: 0.3rem;
-        padding-top: 0.6rem;
-    }
-
-    .text-success {
-        color: #10b981;
-    }
-
-    .text-danger {
-        color: #ef4444;
-    }
-
-    /* Parent Reference */
-    .parent-reference {
-        background: #f0fdfa;
-        padding: 0.75rem 1rem;
-        border-radius: 0.75rem;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.85rem;
-        flex-wrap: wrap;
-    }
-
-    .parent-reference i {
-        color: #0d9488;
-    }
-
-    .parent-link-btn {
-        color: #0d9488;
-        margin-left: auto;
-        transition: all 0.3s ease;
-    }
-
-    .parent-link-btn:hover {
-        transform: translateX(3px);
-        color: #0f766e;
-    }
-
-    /* Worker Comment Box */
-    .worker-comment-box {
-        background: #fef3c7;
-        padding: 0.75rem;
-        border-radius: 0.75rem;
-        margin-bottom: 1rem;
-        display: flex;
-        gap: 0.75rem;
-        border-left: 3px solid #f59e0b;
-    }
-
-    .worker-comment-box i {
-        color: #f59e0b;
-        font-size: 1rem;
-        margin-top: 0.2rem;
-    }
-
-    .comment-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: #92400e;
-        display: block;
-        margin-bottom: 0.25rem;
-    }
-
-    .worker-comment-box p {
-        font-size: 0.8rem;
-        color: #78350f;
-        margin: 0;
-    }
-
-    /* Workers List */
-    .workers-list {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        font-size: 0.75rem;
-        color: #64748b;
-    }
-
-    .worker-tag {
-        background: #e2e8f0;
-        padding: 0.25rem 0.6rem;
-        border-radius: 30px;
-        font-size: 0.7rem;
-        color: #475569;
-    }
-
-    .worker-tag i {
-        font-size: 0.65rem;
-        margin-right: 0.2rem;
-    }
-
-    /* Card Footer */
-    .card-footer {
-        padding: 1rem 1.5rem 1.5rem;
-        background: white;
-        border-top: 1px solid #e2e8f0;
-    }
-
-    .footer-actions {
-        display: flex;
-        gap: 0.75rem;
-        margin-bottom: 1rem;
-    }
-
-    .btn-pdf, .btn-detail {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.6rem;
-        border-radius: 0.75rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all 0.3s ease;
-    }
-
-    .btn-pdf {
-        background: #fef2f2;
-        color: #dc2626;
-    }
-
-    .btn-pdf:hover {
-        background: #fee2e2;
-        transform: translateY(-2px);
-    }
-
-    .btn-detail {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        color: white;
-    }
-
-    .btn-detail:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
-        color: white;
-    }
-
-    .completion-date {
+    
+    .hero-content {
+        flex-direction: column;
         text-align: center;
-        font-size: 0.7rem;
-        color: #94a3b8;
     }
-
-    .completion-date i {
-        margin-right: 0.3rem;
+    
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr);
     }
-
-    /* Pagination */
-    .pagination-wrapper {
-        margin-top: 2.5rem;
-        display: flex;
-        justify-content: center;
+    
+    .orders-grid {
+        grid-template-columns: 1fr;
     }
-
-    .pagination-container {
-        display: flex;
+    
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .dimensions-row {
+        flex-direction: column;
+    }
+    
+    .payment-row-mini {
+        flex-direction: column;
         gap: 0.5rem;
-        background: white;
-        padding: 0.5rem;
-        border-radius: 60px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
     }
+}
 
-    .page-link {
-        display: flex;
-        align-items: center;
+@media (max-width: 480px) {
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-grid {
+        flex-direction: column;
+    }
+    
+    .filter-chip {
         justify-content: center;
-        min-width: 40px;
-        height: 40px;
-        padding: 0 0.75rem;
-        background: transparent;
-        border-radius: 40px;
-        color: #475569;
-        text-decoration: none;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        border: none;
-        cursor: pointer;
     }
-
-    .page-link:hover {
-        background: #f1f5f9;
-        color: #0d9488;
-    }
-
-    .page-link.active {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        color: white;
-    }
-
-    /* Empty State */
-    .empty-state {
-        text-align: center;
-        padding: 4rem 2rem;
-    }
-
-    .empty-icon {
-        width: 100px;
-        height: 100px;
-        background: linear-gradient(135deg, #ccfbf1 0%, #f0fdfa 100%);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 1.5rem;
-    }
-
-    .empty-icon i {
-        font-size: 3rem;
-        color: #0d9488;
-    }
-
-    .empty-state h3 {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 0.5rem;
-    }
-
-    .empty-state p {
-        color: #64748b;
-        margin-bottom: 1.5rem;
-    }
-
-    .empty-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 2rem;
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        border-radius: 50px;
-        color: white;
-        text-decoration: none;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-
-    .empty-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(13, 148, 136, 0.3);
-        color: white;
-    }
-
-    /* Animation for cards */
-    .order-card {
-        animation: slideInUp 0.4s ease backwards;
-    }
-
-    @keyframes slideInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    /* Stagger animation delay */
-    .order-card:nth-child(1) { animation-delay: 0.05s; }
-    .order-card:nth-child(2) { animation-delay: 0.1s; }
-    .order-card:nth-child(3) { animation-delay: 0.15s; }
-    .order-card:nth-child(4) { animation-delay: 0.2s; }
-    .order-card:nth-child(5) { animation-delay: 0.25s; }
-    .order-card:nth-child(6) { animation-delay: 0.3s; }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .hero-content {
-            flex-direction: column;
-            text-align: center;
-        }
-
-        .hero-text {
-            margin-left: 0;
-        }
-
-        .hero-icon {
-            margin: 0 auto;
-        }
-
-        .search-wrapper {
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .search-icon {
-            display: none;
-        }
-
-        .search-input {
-            padding: 1rem;
-        }
-
-        .search-btn {
-            position: static;
-            width: 100%;
-            justify-content: center;
-        }
-
-        .tabs-container {
-            flex-direction: column;
-            border-radius: 1rem;
-            gap: 0.5rem;
-        }
-
-        .orders-grid, .mixed-orders-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .product-info {
-            grid-template-columns: 1fr;
-        }
-
-        .dimensions {
-            flex-direction: column;
-        }
-
-        .footer-actions {
-            flex-direction: column;
-        }
-
-        .parent-reference {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
-        .parent-link-btn {
-            margin-left: 0;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .hero-title {
-            font-size: 1.4rem;
-        }
-
-        .card-header {
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .customer-info {
-            flex-direction: column;
-            text-align: center;
-        }
-    }
+}
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Tab switching for admin/manager
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        const tabPanels = document.querySelectorAll('.tab-panel');
-        
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const tabId = this.getAttribute('data-tab');
-                
-                tabBtns.forEach(b => b.classList.remove('active'));
-                tabPanels.forEach(p => p.classList.remove('active'));
-                
-                this.classList.add('active');
-                const panel = document.getElementById(`${tabId}-panel`);
-                if (panel) {
-                    panel.classList.add('active');
-                }
-            });
-        });
-
-        // Card hover effects
         const cards = document.querySelectorAll('.order-card');
         cards.forEach(card => {
             card.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-5px)';
+                this.style.transform = 'translateY(-4px)';
             });
             card.addEventListener('mouseleave', function() {
                 this.style.transform = 'translateY(0)';
