@@ -15,9 +15,11 @@
                     </h1>
                     <p class="hero-subtitle">
                         {% if is_worker %}
-                            Siz muvaffaqiyatli yakunlagan <span class="highlight">{{ main_orders.count }}</span> ta buyurtma
+                            Siz muvaffaqiyatli yakunlagan 
+                            <span class="highlight">{{ main_orders_count }}</span> ta buyurtma
                         {% else %}
                             Tizimdagi barcha yakunlangan buyurtmalar arxivi
+                            <span class="highlight">{{ main_orders_count }}</span> ta
                         {% endif %}
                     </p>
                 </div>
@@ -55,311 +57,238 @@
             </div>
         </div>
 
-        <!-- Tab Navigation (faqat admin va menejerlar uchun) -->
-        {% if not is_worker %}
-        <div class="tabs-wrapper">
-            <div class="tabs-container">
-                <button class="tab-btn active" data-tab="parent">
-                    <i class="fas fa-layer-group"></i>
-                    <span>Asosiy Buyurtmalar</span>
-                    <span class="tab-count">{{ main_orders.count }}</span>
-                </button>
-                <button class="tab-btn" data-tab="child">
-                    <i class="fas fa-th-large"></i>
-                    <span>Ichki Detallar</span>
-                    <span class="tab-count">{{ child_orders.count }}</span>
-                </button>
+        <!-- Usta statistikasi (faqat ustalar uchun) -->
+        {% if is_worker and worker_stats %}
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">Jami tugatilgan</span>
+                        <span class="stat-value">{{ worker_stats.total }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">BAJARILDI</span>
+                        <span class="stat-value">{{ worker_stats.by_status.BAJARILDI }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-tools"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">USTA_TUGATDI</span>
+                        <span class="stat-value">{{ worker_stats.by_status.USTA_TUGATDI }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon info">
+                        <i class="fas fa-check-double"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-label">TAYYOR</span>
+                        <span class="stat-value">{{ worker_stats.by_status.TAYYOR }}</span>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
 
-        <!-- Main Orders Content -->
-        <div class="tab-panel active" id="parent-panel">
-            {% if main_orders %}
-            <div class="orders-grid">
-                {% for order in main_orders %}
-                <div class="order-card">
-                    <div class="card-header">
-                        <div class="order-badge">
-                            <i class="fas fa-hashtag"></i>
-                            <span>{{ order.order_number }}</span>
+        <!-- Orders Grid -->
+        {% if main_orders %}
+        <div class="orders-grid">
+            {% for order in main_orders %}
+            <div class="order-card">
+                <div class="card-header status-{{ order.status|lower }}">
+                    <div class="order-badge">
+                        <i class="fas fa-hashtag"></i>
+                        <span>{{ order.order_number }}</span>
+                    </div>
+                    <div class="status-badge">
+                        <i class="fas {% if order.status == 'BAJARILDI' %}fa-check-circle{% elif order.status == 'USTA_TUGATDI' %}fa-tools{% else %}fa-check-double{% endif %}"></i>
+                        <span>{{ order.get_status_display|default:order.status }}</span>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Customer Info -->
+                    <div class="customer-info">
+                        <div class="customer-avatar">
+                            {{ order.customer_name|slice:":1"|upper }}
                         </div>
-                        <div class="status-badge {{ order.status|lower }}">
-                            <i class="fas fa-check-circle"></i>
-                            <span>{{ order.get_status_display }}</span>
+                        <div class="customer-details">
+                            <h3 class="customer-name">{{ order.customer_name }}</h3>
+                            <p class="customer-id">
+                                <i class="fas fa-id-card"></i> ID: {{ order.customer_unique_id }}
+                            </p>
                         </div>
                     </div>
-                    
-                    <div class="card-body">
-                        <!-- Customer Info -->
-                        <div class="customer-info">
-                            <div class="customer-avatar">
-                                {{ order.customer_name|slice:":1"|upper }}
-                            </div>
-                            <div class="customer-details">
-                                <h3 class="customer-name">{{ order.customer_name }}</h3>
-                                <p class="customer-id">
-                                    <i class="fas fa-id-card"></i> ID: {{ order.customer_unique_id }}
-                                </p>
-                            </div>
-                        </div>
 
-                        <!-- Product Info -->
-                        <div class="product-info">
-                            <div class="info-row">
-                                <span class="info-label">
-                                    <i class="fas fa-box"></i> Mahsulot
-                                </span>
-                                <span class="info-value">{{ order.product_name|default:"-" }}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">
-                                    <i class="fas fa-chart-line"></i> Kvadrat
-                                </span>
-                                <span class="info-value highlight">{{ order.panel_kvadrat|default:"0" }} m²</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">
-                                    <i class="fas fa-door-open"></i> Eshik turi
-                                </span>
-                                <span class="info-value">{{ order.eshik_turi|default:"-" }}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">
-                                    <i class="fas fa-arrow-right"></i> Yo'nalish
-                                </span>
-                                <span class="info-value">{{ order.eshik_yonalishi|default:"-" }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Dimensions -->
-                        <div class="dimensions">
-                            <div class="dimension-item">
-                                <i class="fas fa-arrow-up"></i>
-                                <div>
-                                    <span class="dim-label">Balandligi</span>
-                                    <span class="dim-value">{{ order.balandligi|default:"-" }} sm</span>
-                                </div>
-                            </div>
-                            <div class="dimension-item">
-                                <i class="fas fa-arrow-right"></i>
-                                <div>
-                                    <span class="dim-label">Eni</span>
-                                    <span class="dim-value">{{ order.eni|default:"-" }} sm</span>
-                                </div>
-                            </div>
-                            <div class="dimension-item">
-                                <i class="fas fa-cube"></i>
-                                <div>
-                                    <span class="dim-label">Qalinligi</span>
-                                    <span class="dim-value">{{ order.panel_thickness|default:"0" }} mm</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Payment Summary (faqat admin va menejerlar uchun) -->
-                        {% if not is_worker %}
-                        <div class="payment-info">
-                            <div class="payment-row">
-                                <span>Umumiy summa</span>
-                                <strong>{{ order.total_price|floatformat:0 }} USD</strong>
-                            </div>
-                            <div class="payment-row">
-                                <span>Avans to'lov</span>
-                                <strong class="text-success">{{ order.prepayment|floatformat:0 }} USD</strong>
-                            </div>
-                            {% if order.remaining_amount > 0 %}
-                            <div class="payment-row debt">
-                                <span>Qoldiq qarz</span>
-                                <strong class="text-danger">{{ order.remaining_amount|floatformat:0 }} USD</strong>
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-
-                        <!-- Assigned Workers -->
-                        {% if order.assigned_workers.all %}
-                        <div class="workers-list">
-                            <i class="fas fa-users"></i>
-                            <span>Ustalar:</span>
-                            {% for worker in order.assigned_workers.all %}
-                            <span class="worker-tag">
-                                <i class="fas fa-user-check"></i>
-                                {{ worker.user.get_full_name|default:worker.user.username }}
+                    <!-- Product Info -->
+                    <div class="product-info">
+                        <div class="info-row">
+                            <span class="info-label">
+                                <i class="fas fa-box"></i> Mahsulot
                             </span>
-                            {% endfor %}
+                            <span class="info-value">{{ order.product_name|default:"-" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">
+                                <i class="fas fa-chart-line"></i> Kvadrat
+                            </span>
+                            <span class="info-value highlight">{{ order.panel_kvadrat|default:"0" }} m²</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">
+                                <i class="fas fa-door-open"></i> Eshik turi
+                            </span>
+                            <span class="info-value">{{ order.eshik_turi|default:"-" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">
+                                <i class="fas fa-arrow-right"></i> Yo'nalish
+                            </span>
+                            <span class="info-value">{{ order.eshik_yonalishi|default:"-" }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Dimensions -->
+                    <div class="dimensions">
+                        <div class="dimension-item">
+                            <i class="fas fa-arrow-up"></i>
+                            <div>
+                                <span class="dim-label">Balandligi</span>
+                                <span class="dim-value">{{ order.balandligi|default:"-" }} sm</span>
+                            </div>
+                        </div>
+                        <div class="dimension-item">
+                            <i class="fas fa-arrow-right"></i>
+                            <div>
+                                <span class="dim-label">Eni</span>
+                                <span class="dim-value">{{ order.eni|default:"-" }} sm</span>
+                            </div>
+                        </div>
+                        <div class="dimension-item">
+                            <i class="fas fa-cube"></i>
+                            <div>
+                                <span class="dim-label">Qalinligi</span>
+                                <span class="dim-value">{{ order.panel_thickness|default:"0" }} mm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Info (faqat admin va menejerlar uchun) -->
+                    {% if not is_worker %}
+                    <div class="payment-info">
+                        <div class="payment-row">
+                            <span>Umumiy summa</span>
+                            <strong>{{ order.total_price|floatformat:0 }} USD</strong>
+                        </div>
+                        <div class="payment-row">
+                            <span>Avans to'lov</span>
+                            <strong class="text-success">{{ order.prepayment|floatformat:0 }} USD</strong>
+                        </div>
+                        {% if order.remaining_amount > 0 %}
+                        <div class="payment-row debt">
+                            <span>Qoldiq qarz</span>
+                            <strong class="text-danger">{{ order.remaining_amount|floatformat:0 }} USD</strong>
                         </div>
                         {% endif %}
                     </div>
-                    
-                    <div class="card-footer">
-                        <div class="footer-actions">
-                            {% if order.pdf_file %}
-                            <a href="{{ order.pdf_file.url }}" class="btn-pdf" target="_blank">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </a>
-                            {% endif %}
-                            <a href="{% url 'order_detail' order.pk %}" class="btn-detail">
-                                <i class="fas fa-eye"></i> Batafsil
-                            </a>
-                        </div>
-                        <div class="completion-date">
-                            <i class="far fa-calendar-check"></i>
-                            Tugatilgan: 
-{% if order.worker_finished_at %}
-    {{ order.worker_finished_at|date:"d.m.Y H:i" }}
-{% else %}
-    {{ order.created_at|date:"d.m.Y H:i" }}
-{% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- Pagination -->
-            {% if main_orders.has_other_pages %}
-            <div class="pagination-wrapper">
-                <div class="pagination-container">
-                    {% if main_orders.has_previous %}
-                    <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                    {% endif %}
-                    
-                    {% for i in main_orders.paginator.page_range %}
-                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
-                       class="page-link {% if main_orders.number == i %}active{% endif %}">
-                        {{ i }}
-                    </a>
-                    {% endfor %}
-                    
-                    {% if main_orders.has_next %}
-                    <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-            
-            {% else %}
-            <!-- Empty State -->
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-archive"></i>
-                </div>
-                <h3>Arxiv bo'sh</h3>
-                <p>
-                    {% if is_worker %}
-                        Siz hali hech qanday buyurtmani tugatmagan ko'rinasiz.
-                    {% else %}
-                        Hozircha arxivlangan buyurtmalar mavjud emas.
-                    {% endif %}
-                </p>
-                <a href="{% url 'order_list' %}" class="empty-btn">
-                    <i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish
-                </a>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Child Orders Content (faqat admin va menejerlar uchun) -->
-        {% if not is_worker %}
-        <div class="tab-panel" id="child-panel">
-            {% if child_orders %}
-            <div class="child-grid">
-                {% for child in child_orders %}
-                <div class="child-card">
-                    <div class="child-header">
-                        <span class="child-badge">
-                            <i class="fas fa-hashtag"></i> {{ child.id }}
-                        </span>
-                        <span class="parent-link">
-                            <i class="fas fa-link"></i> Asosiy #{{ child.parent_order_id }}
-                        </span>
-                    </div>
-                    
-                    <h4 class="child-title">
-                        <i class="fas fa-cube"></i>
-                        {{ child.product_name|default:"Mahsulot" }}
-                    </h4>
-                    
-                    <div class="child-specs">
-                        <div class="spec">
-                            <span>Qalinligi</span>
-                            <strong>{{ child.panel_thickness|default:"-" }} mm</strong>
-                        </div>
-                        <div class="spec">
-                            <span>Kvadrat</span>
-                            <strong>{{ child.panel_kvadrat|default:"0" }} m²</strong>
-                        </div>
-                    </div>
-
-                    {% if child.worker_comment %}
-                    <div class="child-comment">
-                        <i class="fas fa-comment-dots"></i>
-                        <p>{{ child.worker_comment|truncatechars:60 }}</p>
-                    </div>
                     {% endif %}
 
-                    {% if child.assigned_workers.all %}
-                    <div class="child-workers">
-                        {% for worker in child.assigned_workers.all %}
-                        <span class="worker-badge">
-                            <i class="fas fa-user"></i>
+                    <!-- Assigned Workers -->
+                    {% if order.assigned_workers.all %}
+                    <div class="workers-list">
+                        <i class="fas fa-users"></i>
+                        <span>Ustalar:</span>
+                        {% for worker in order.assigned_workers.all %}
+                        <span class="worker-tag">
+                            <i class="fas fa-user-check"></i>
                             {{ worker.user.get_full_name|default:worker.user.username }}
                         </span>
                         {% endfor %}
                     </div>
                     {% endif %}
-
-                    <div class="child-footer">
-                        <div class="completion-time">
-                            <i class="far fa-clock"></i>
-                            {{ child.worker_finished_at|date:"d.m.Y H:i"|default:child.updated_at|date:"d.m.Y H:i" }}
-                        </div>
-                        <div class="status-dot"></div>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="footer-actions">
+                        {% if order.pdf_file %}
+                        <a href="{{ order.pdf_file.url }}" class="btn-pdf" target="_blank">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'order_detail' order.pk %}" class="btn-detail">
+                            <i class="fas fa-eye"></i> Batafsil
+                        </a>
+                    </div>
+                    <div class="completion-date">
+                        <i class="far fa-calendar-check"></i>
+                        Tugatilgan: 
+                        {% if order.worker_finished_at %}
+                            {{ order.worker_finished_at|date:"d.m.Y H:i" }}
+                        {% else %}
+                            {{ order.updated_at|date:"d.m.Y H:i" }}
+                        {% endif %}
                     </div>
                 </div>
-                {% endfor %}
             </div>
+            {% endfor %}
+        </div>
 
-            <!-- Pagination for child orders -->
-            {% if child_orders.has_other_pages %}
-            <div class="pagination-wrapper">
-                <div class="pagination-container">
-                    {% if child_orders.has_previous %}
-                    <a href="?page={{ child_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
+        <!-- Pagination -->
+        {% if main_orders.has_other_pages %}
+        <div class="pagination-wrapper">
+            <div class="pagination-container">
+                {% if main_orders.has_previous %}
+                <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% endif %}
+                
+                {% for i in main_orders.paginator.page_range %}
+                    {% if main_orders.number|add:-3 <= i and i <= main_orders.number|add:3 %}
+                        <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
+                           class="page-link {% if main_orders.number == i %}active{% endif %}">
+                            {{ i }}
+                        </a>
                     {% endif %}
-                    
-                    {% for i in child_orders.paginator.page_range %}
-                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}" 
-                       class="page-link {% if child_orders.number == i %}active{% endif %}">
-                        {{ i }}
-                    </a>
-                    {% endfor %}
-                    
-                    {% if child_orders.has_next %}
-                    <a href="?page={{ child_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    {% endif %}
-                </div>
+                {% endfor %}
+                
+                {% if main_orders.has_next %}
+                <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}" class="page-link">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
             </div>
-            {% endif %}
-            
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-cogs"></i>
-                </div>
-                <h3>Ichki detallar topilmadi</h3>
-                <p>Tugatilgan ichki detallar arxivi bo'sh</p>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <!-- Empty State -->
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-archive"></i>
             </div>
-            {% endif %}
+            <h3>Arxiv bo'sh</h3>
+            <p>
+                {% if is_worker %}
+                    Siz hali hech qanday buyurtmani tugatmagan ko'rinasiz.
+                {% else %}
+                    Hozircha arxivlangan buyurtmalar mavjud emas.
+                {% endif %}
+            </p>
+            <a href="{% url 'order_list' %}" class="empty-btn">
+                <i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish
+            </a>
         </div>
         {% endif %}
     </div>
@@ -374,6 +303,7 @@
 
     body {
         background: linear-gradient(135deg, #f5f7fa 0%, #eef2f5 100%);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
     .archive-container {
@@ -483,10 +413,6 @@
         box-shadow: 0 10px 35px rgba(0, 0, 0, 0.05);
     }
 
-    .search-form {
-        width: 100%;
-    }
-
     .search-wrapper {
         position: relative;
         display: flex;
@@ -554,74 +480,75 @@
         color: #0f766e;
     }
 
-    /* Tabs */
-    .tabs-wrapper {
+    /* Stats Section */
+    .stats-section {
         margin-bottom: 2rem;
     }
 
-    .tabs-container {
-        display: flex;
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 1rem;
-        background: white;
-        padding: 0.5rem;
-        border-radius: 60px;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-        max-width: 500px;
-        margin: 0 auto;
     }
 
-    .tab-btn {
-        flex: 1;
+    .stat-card {
+        background: white;
+        border-radius: 1.25rem;
+        padding: 1.25rem;
         display: flex;
         align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.8rem 1.5rem;
-        background: transparent;
-        border: none;
-        border-radius: 50px;
-        font-weight: 600;
-        color: #64748b;
-        cursor: pointer;
+        gap: 1rem;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
         transition: all 0.3s ease;
     }
 
-    .tab-btn i {
-        font-size: 1rem;
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(13, 148, 136, 0.1);
     }
 
-    .tab-btn .tab-count {
-        background: #e2e8f0;
-        padding: 0.2rem 0.5rem;
-        border-radius: 30px;
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        background: #ccfbf1;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #0d9488;
+    }
+
+    .stat-icon.success {
+        background: #dcfce7;
+        color: #10b981;
+    }
+
+    .stat-icon.warning {
+        background: #fed7aa;
+        color: #f59e0b;
+    }
+
+    .stat-icon.info {
+        background: #dbeafe;
+        color: #3b82f6;
+    }
+
+    .stat-info {
+        flex: 1;
+    }
+
+    .stat-label {
         font-size: 0.75rem;
-        color: #475569;
-    }
-
-    .tab-btn.active {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        color: white;
-        box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
-    }
-
-    .tab-btn.active .tab-count {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
-
-    /* Tab Panels */
-    .tab-panel {
-        display: none;
-        animation: fadeIn 0.4s ease;
-    }
-
-    .tab-panel.active {
+        color: #64748b;
         display: block;
+        margin-bottom: 0.25rem;
     }
 
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
     }
 
     /* Orders Grid */
@@ -631,6 +558,7 @@
         gap: 1.5rem;
     }
 
+    /* Order Cards */
     .order-card {
         background: white;
         border-radius: 1.5rem;
@@ -645,11 +573,22 @@
     }
 
     .card-header {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
         padding: 1.25rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
+    }
+
+    .card-header.status-bajarildi {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .card-header.status-usta_tugatdi {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .card-header.status-tayyor {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
 
     .order-badge {
@@ -669,15 +608,8 @@
         border-radius: 50px;
         font-size: 0.8rem;
         font-weight: 600;
+        background: rgba(255, 255, 255, 0.2);
         color: white;
-    }
-
-    .status-badge.bajarildi, .status-badge.tayyor {
-        background: #10b981;
-    }
-
-    .status-badge.usta_tugatdi {
-        background: #f59e0b;
     }
 
     .card-body {
@@ -812,6 +744,14 @@
         padding-top: 0.6rem;
     }
 
+    .text-success {
+        color: #10b981;
+    }
+
+    .text-danger {
+        color: #ef4444;
+    }
+
     /* Workers List */
     .workers-list {
         display: flex;
@@ -880,6 +820,7 @@
     .btn-detail:hover {
         transform: translateY(-2px);
         box-shadow: 0 5px 15px rgba(13, 148, 136, 0.3);
+        color: white;
     }
 
     .completion-date {
@@ -890,146 +831,6 @@
 
     .completion-date i {
         margin-right: 0.3rem;
-    }
-
-    /* Child Cards */
-    .child-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 1.5rem;
-    }
-
-    .child-card {
-        background: white;
-        border-radius: 1.25rem;
-        padding: 1.25rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-    }
-
-    .child-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 35px rgba(13, 148, 136, 0.12);
-        border-left: 3px solid #0d9488;
-    }
-
-    .child-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-
-    .child-badge {
-        background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-        padding: 0.3rem 0.8rem;
-        border-radius: 50px;
-        color: white;
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-
-    .parent-link {
-        font-size: 0.7rem;
-        color: #64748b;
-    }
-
-    .child-title {
-        font-size: 1rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .child-specs {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .spec {
-        flex: 1;
-        background: #f8fafc;
-        padding: 0.5rem;
-        border-radius: 0.75rem;
-        text-align: center;
-    }
-
-    .spec span {
-        font-size: 0.65rem;
-        color: #64748b;
-        display: block;
-    }
-
-    .spec strong {
-        font-size: 0.85rem;
-        color: #0d9488;
-    }
-
-    .child-comment {
-        background: #f0fdfa;
-        padding: 0.75rem;
-        border-radius: 0.75rem;
-        margin-bottom: 1rem;
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .child-comment i {
-        color: #0d9488;
-        font-size: 0.8rem;
-    }
-
-    .child-comment p {
-        font-size: 0.75rem;
-        color: #475569;
-        margin: 0;
-    }
-
-    .child-workers {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .worker-badge {
-        background: #e2e8f0;
-        padding: 0.2rem 0.6rem;
-        border-radius: 30px;
-        font-size: 0.7rem;
-        color: #475569;
-    }
-
-    .child-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-top: 0.75rem;
-        border-top: 1px solid #e2e8f0;
-    }
-
-    .completion-time {
-        font-size: 0.7rem;
-        color: #94a3b8;
-    }
-
-    .status-dot {
-        width: 10px;
-        height: 10px;
-        background: #10b981;
-        border-radius: 50%;
-        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-        animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
     /* Pagination */
@@ -1126,6 +927,29 @@
         color: white;
     }
 
+    /* Animation */
+    .order-card {
+        animation: slideInUp 0.4s ease backwards;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .order-card:nth-child(1) { animation-delay: 0.05s; }
+    .order-card:nth-child(2) { animation-delay: 0.1s; }
+    .order-card:nth-child(3) { animation-delay: 0.15s; }
+    .order-card:nth-child(4) { animation-delay: 0.2s; }
+    .order-card:nth-child(5) { animation-delay: 0.25s; }
+    .order-card:nth-child(6) { animation-delay: 0.3s; }
+
     /* Responsive */
     @media (max-width: 768px) {
         .hero-content {
@@ -1160,10 +984,8 @@
             justify-content: center;
         }
 
-        .tabs-container {
-            flex-direction: column;
-            border-radius: 1rem;
-            gap: 0.5rem;
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
         }
 
         .orders-grid {
@@ -1197,30 +1019,18 @@
             flex-direction: column;
             text-align: center;
         }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Tab switching
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        const tabPanels = document.querySelectorAll('.tab-panel');
-        
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const tabId = this.getAttribute('data-tab');
-                
-                tabBtns.forEach(b => b.classList.remove('active'));
-                tabPanels.forEach(p => p.classList.remove('active'));
-                
-                this.classList.add('active');
-                document.getElementById(`${tabId}-panel`).classList.add('active');
-            });
-        });
-
-        // Card hover effect for child cards
-        const childCards = document.querySelectorAll('.child-card');
-        childCards.forEach(card => {
+        // Card hover effects
+        const cards = document.querySelectorAll('.order-card');
+        cards.forEach(card => {
             card.addEventListener('mouseenter', function() {
                 this.style.transform = 'translateY(-5px)';
             });
