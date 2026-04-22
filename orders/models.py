@@ -746,3 +746,91 @@ def order_status_notifier(sender, instance, **kwargs):
             instance.customer_name, 
             instance.car_number
         )
+# constructor/models.py
+from django.db import models
+from django.contrib.auth.models import User
+
+
+class Project(models.Model):
+    """Loyiha - sovutish kamerasi buyurtmasi"""
+    
+    # Asosiy ma'lumotlar
+    project_name = models.CharField(max_length=200, blank=True, verbose_name="Loyiha nomi")
+    room_code = models.CharField(max_length=50, default="EP-001", verbose_name="Loyiha kodi")
+    
+    # O'lchamlar (metr)
+    length_m = models.DecimalField(max_digits=6, decimal_places=2, default=5.0, verbose_name="Uzunlik (m)")
+    width_m = models.DecimalField(max_digits=6, decimal_places=2, default=4.0, verbose_name="Eni (m)")
+    height_m = models.DecimalField(max_digits=6, decimal_places=2, default=3.0, verbose_name="Balandlik (m)")
+    
+    # Devor
+    wall_type = models.CharField(max_length=50, default="Sovutgich (PIR)", verbose_name="Devor turi")
+    wall_thickness = models.CharField(max_length=10, default="100mm", verbose_name="Devor qalinligi")
+    
+    # Patalok (Shift)
+    ceiling_type = models.CharField(max_length=50, default="Sovutgich (PIR)", verbose_name="Patalok turi")
+    ceiling_thickness = models.CharField(max_length=10, default="80mm", verbose_name="Patalok qalinligi")
+    
+    # Pol
+    has_floor = models.BooleanField(default=True, verbose_name="Pol paneli bormi?")
+    floor_type = models.CharField(max_length=50, blank=True, default="PIR (Standart)", verbose_name="Pol turi")
+    floor_thickness = models.CharField(max_length=10, blank=True, default="100mm", verbose_name="Pol qalinligi")
+    
+    # Panel
+    panel_width = models.DecimalField(max_digits=5, decimal_places=2, default=1.16, verbose_name="Panel ishchi eni (m)")
+    
+    # Eshik
+    door_type = models.CharField(max_length=50, default="Muzlatkich eshigi", verbose_name="Eshik turi")
+    door_side = models.CharField(max_length=20, default="Old", verbose_name="Eshik joyi")
+    door_position = models.CharField(max_length=20, default="O'rta", verbose_name="Eshik pozitsiyasi")
+    door_opening = models.CharField(max_length=20, default="Ichkariga", verbose_name="Eshik ochilishi")
+    
+    # Agregat
+    unit_type = models.CharField(max_length=50, default="Split-sistema (Nizkotemp)", verbose_name="Agregat turi")
+    unit_side = models.CharField(max_length=20, default="Old", verbose_name="Agregat joyi")
+    unit_brand = models.CharField(max_length=50, default="Bitzer", verbose_name="Agregat brendi")
+    
+    # Mahsulot parametrlari (AI uchun)
+    product_type = models.CharField(max_length=50, default="Go'sht", verbose_name="Mahsulot turi")
+    storage_temp = models.CharField(max_length=20, default="-18°C", verbose_name="Saqlash harorati")
+    opening_freq = models.CharField(max_length=20, default="Kam", verbose_name="Ochilish soni")
+    region = models.CharField(max_length=20, default="Mo'tadil", verbose_name="Hudud")
+    humidity = models.CharField(max_length=20, default="Standart", verbose_name="Namlik talabi")
+    
+    # AI natijalari (JSON)
+    ai_result = models.JSONField(blank=True, null=True, verbose_name="AI tavsiya natijasi")
+    
+    # Hisob-kitob natijalari (JSON)
+    calculations = models.JSONField(blank=True, null=True, verbose_name="Hisob-kitob natijalari")
+    
+    # Meta
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Loyiha"
+        verbose_name_plural = "Loyihalar"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.room_code} - {self.project_name or 'Nomsiz'}"
+    
+    def get_wall_mm(self):
+        return int(self.wall_thickness.replace('mm', '').strip())
+    
+    def get_ceiling_mm(self):
+        return int(self.ceiling_thickness.replace('mm', '').strip())
+    
+    def get_floor_mm(self):
+        if not self.has_floor:
+            return 0
+        return int(self.floor_thickness.replace('mm', '').strip())
+    
+    def get_door_dimensions(self):
+        door_map = {
+            "Bir tabaqali (90x190)": (900, 1900),
+            "Surilma (120x200)": (1200, 2000),
+            "Muzlatkich eshigi": (960, 2000),
+        }
+        return door_map.get(self.door_type, (0, 0))
