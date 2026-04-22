@@ -219,66 +219,47 @@ class CustomLoginView(LoginView):
 # ----------------------------------------------------------------------
 @login_required 
 def order_list(request):
-    
-    # Guruhlar tekshiruvi
-    is_glavniy_admin = request.user.is_superuser or is_in_group(request.user, 'Glavniy Admin')
-    is_production_boss = is_in_group(request.user, "Ishlab Chiqarish Boshlig'i")
-    is_manager_or_confirmer = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
-    is_worker = is_in_group(request.user, 'Usta')
-    is_observer = is_in_group(request.user, 'Kuzatuvchi')
-    # Filtr parametri
-    search_query = request.GET.get('q', '')
-    filter_type = request.GET.get('filter', 'all')  # all, completed, in_progress, overdue
-    
+    user = request.user
     now = timezone.now()
     
-    # ARXIV BUYURTMALAR (bajarilganlar) - Avval bazaviy querysetni tayyorlaymiz
+    # ================================================================
+    # 1. GURUHLAR TEKSHIRUVI (BIR MARTA)
+    # ================================================================
+    is_glavniy_admin = user.is_superuser or is_in_group(user, 'Glavniy Admin')
+    is_production_boss = is_in_group(user, "Ishlab Chiqarish Boshlig'i")
+    is_manager = is_in_group(user, 'Menejer/Tasdiqlovchi')
+    is_worker = is_in_group(user, 'Usta')
+    is_observer = is_in_group(user, 'Kuzatuvchi')
+    
+    # ================================================================
+    # 2. FILTR PARAMETRLARI
+    # ================================================================
+    search_query = request.GET.get('q', '').strip()
+    filter_type = request.GET.get('filter', 'all')
+    page_number = request.GET.get('page', 1)
+    
+    # ================================================================
+    # 3. ARXIV BUYURTMALAR (OPTIMALLASHTIRILGAN)
+    # ================================================================
     archived_orders_qs = Order.objects.filter(
         status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
-    )
+    ).select_related('customer').prefetch_related('assigned_workers__user')
     
-    # USTA bo'lsa, faqat o'zining arxiv buyurtmalarini olish
-    if is_worker and not (is_glavniy_admin or is_production_boss or is_manager_or_confirmer or is_observer):
-        archived_orders_qs = archived_orders_qs.filter(
-            assigned_workers__user=request.user
-        ).distinct()
+    if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
+        archived_orders_qs = archived_orders_qs.filter(assigned_workers__user=user).distinct()
     
     archived_count = archived_orders_qs.count()
     
-    # 1. Avval barcha faol (bitmagan) buyurtmalarni bazaviy filtrlab olamiz
-    base_qs = Order.objects.exclude(status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR'])
-
-    main_orders = base_qs.filter(parent_order__isnull=True).order_by('-created_at')
+    # ================================================================
+    # 4. FAOL BUYURTMALAR - SELECT_RELATED VA PREFETCH_RELATED
+    # ================================================================
+    base_qs = Order.objects.select_related('parent_order').prefetch_related(
+        'assigned_workers__user'
+    ).exclude(status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR'])
     
-    # CHILD BUYURTMALAR - PANEL va UGUL
-    all_child_orders = base_qs.filter(parent_order__isnull=False).order_by('-created_at')
-    
-    # Panel child orderlar (product_name ichida "panel" so'zi borlar)
-    panel_child_orders = all_child_orders.filter(
-        Q(product_name__icontains='panel') | 
-        Q(product_name__icontains='панель') |
-        Q(product_name__icontains='панел')
-    )
-    
-    # Ugul child orderlar (product_name ichida "ugul" so'zi borlar)
-    ugul_child_orders = all_child_orders.filter(
-        Q(product_name__icontains='ugul') | 
-        Q(product_name__icontains='угол') |
-        Q(product_name__icontains='уголь')
-    )
-    
-    # Boshqa child orderlar
-    other_child_orders = all_child_orders.exclude(
-        Q(product_name__icontains='panel') | 
-        Q(product_name__icontains='панель') |
-        Q(product_name__icontains='панел') |
-        Q(product_name__icontains='ugul') | 
-        Q(product_name__icontains='угол') |
-        Q(product_name__icontains='уголь')
-    )
-    
-    # Hammasini vaqt bo'yicha ko'rsatadi (asosiy va child birlashtirilgan)
-    orders = base_qs.all().order_by('-created_at')
+    # ================================================================
+    # 5. QIDIRUV FILTRI
+    # ================================================================
     if search_query:
         search_filter = (
             Q(order_number__icontains=search_query) |
@@ -286,221 +267,223 @@ def order_list(request):
             Q(product_name__icontains=search_query) |
             Q(customer_unique_id__icontains=search_query)
         )
-        # Barcha asosiy querysetlarni qidiruv bo'yicha filtrlaymiz
-        main_orders = main_orders.filter(search_filter)
-        panel_child_orders = panel_child_orders.filter(search_filter)
-        ugul_child_orders = ugul_child_orders.filter(search_filter)
-        other_child_orders = other_child_orders.filter(search_filter)
-        orders = orders.filter(search_filter)
-    # ASOSIY BUYURTMALAR (parent_order=None)
-    customers_count = Order.objects.values('customer_unique_id').distinct().count()
+        base_qs = base_qs.filter(search_filter)
     
-    # Filtrlash
-    now = timezone.now()
-    if filter_type == 'completed':
-        # Tayyor buyurtmalar
-        main_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        panel_child_orders = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        ugul_child_orders = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        other_child_orders = other_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-        orders = orders.filter(status__in=['TAYYOR', 'BAJARILDI'])
-    elif filter_type == 'in_progress':
-        # Jarayondagi buyurtmalar - FAQAT MUDDATI O'TMAGANLAR
-        main_orders = main_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
-            Q(deadline__isnull=True) | Q(deadline__gte=now)
-        )
-        panel_child_orders = panel_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
-            Q(deadline__isnull=True) | Q(deadline__gte=now)
-        )
-        ugul_child_orders = ugul_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
-            Q(deadline__isnull=True) | Q(deadline__gte=now)
-        )
-        other_child_orders = other_child_orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
-            Q(deadline__isnull=True) | Q(deadline__gte=now)
-        )
-        orders = orders.exclude(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']).filter(
-            Q(deadline__isnull=True) | Q(deadline__gte=now)
-        )
-    elif filter_type == 'overdue':
-        # Muddati o'tgan buyurtmalar - FAQAT JARAYONDAGI VA MUDDATI O'TGANLAR
-        main_orders = main_orders.filter(
-            deadline__lt=now
-        ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
-        )
-        panel_child_orders = panel_child_orders.filter(
-            deadline__lt=now
-        ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
-        )
-        ugul_child_orders = ugul_child_orders.filter(
-            deadline__lt=now
-        ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
-        )
-        other_child_orders = other_child_orders.filter(
-            deadline__lt=now
-        ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
-        )
-        orders = orders.filter(
-            deadline__lt=now
-        ).exclude(
-            status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
-        )
+    # ================================================================
+    # 6. ROL BO'YICHA FILTR (AGENT UCHUN)
+    # ================================================================
+    if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
+        base_qs = base_qs.filter(assigned_workers__user=user).exclude(status='RAD_ETILDI').distinct()
     
-    # Filterlash mantigi
-    should_filter = True 
-
-    if is_glavniy_admin or is_production_boss or is_manager_or_confirmer or is_observer:
-        should_filter = False 
+    # ================================================================
+    # 7. ORDER TIPINI ANNOTATSIYA QILISH (BIR SO'ROVDA)
+    # ================================================================
+    from django.db.models import Case, When, Value, CharField
     
-    if is_worker:
-        if not (is_glavniy_admin or is_production_boss or is_manager_or_confirmer or is_observer):
-            try:
-                # Ustaga tayinlangan barcha buyurtmalar ro'yxatini olamiz
-                orders = orders.filter(
-                    assigned_workers__user=request.user, 
-                ).exclude(
-                    status='RAD_ETILDI'
-                ).distinct().order_by('-created_at')
-                
-                main_orders = main_orders.filter(
-                    assigned_workers__user=request.user, 
-                ).exclude(
-                    status='RAD_ETILDI'
-                ).distinct().order_by('-created_at')
-                
-                panel_child_orders = panel_child_orders.filter(
-                    assigned_workers__user=request.user, 
-                ).exclude(
-                    status='RAD_ETILDI'
-                ).distinct().order_by('-created_at')
-                
-                ugul_child_orders = ugul_child_orders.filter(
-                    assigned_workers__user=request.user, 
-                ).exclude(
-                    status='RAD_ETILDI'
-                ).distinct().order_by('-created_at')
-                
-                other_child_orders = other_child_orders.filter(
-                    assigned_workers__user=request.user, 
-                ).exclude(
-                    status='RAD_ETILDI'
-                ).distinct().order_by('-created_at')
-                
-                if not orders.exists():
-                    messages.info(request, "Sizga tayinlangan buyurtmalar topilmadi.")
-
-            except Exception:
-                orders = orders.none() 
-                main_orders = main_orders.none()
-                panel_child_orders = panel_child_orders.none()
-                ugul_child_orders = ugul_child_orders.none()
-                other_child_orders = other_child_orders.none()
-                messages.warning(request, "Buyurtmalarni yuklashda xato: Usta profili noto'g'ri bog'langan bo'lishi mumkin.")
-            
-            should_filter = True
-
-    if should_filter and not is_worker:
-        pass
-
-    # Muddat buzilishini tekshirish
-    if is_glavniy_admin or is_production_boss:
-        overdue_orders = main_orders.filter(
-            deadline__lt=timezone.now(),
-            status__in=['TASDIQLANDI', 'USTA_QABUL_QILDI', 'USTA_BOSHLA', 'ISHDA', 'KIRITILDI']
+    orders_with_type = base_qs.annotate(
+        order_type=Case(
+            When(parent_order__isnull=True, then=Value('MAIN')),
+            When(
+                Q(product_name__icontains='panel') | 
+                Q(product_name__icontains='панель') |
+                Q(product_name__icontains='панел'), 
+                then=Value('PANEL_CHILD')
+            ),
+            When(
+                Q(product_name__icontains='ugul') | 
+                Q(product_name__icontains='угол') |
+                Q(product_name__icontains='уголь'), 
+                then=Value('UGUL_CHILD')
+            ),
+            default=Value('OTHER_CHILD'),
+            output_field=CharField()
         )
-        for order in overdue_orders:
-            check_and_create_overdue_alerts(order)
-
-    user_notifications = Notification.objects.filter(user=request.user, is_read=False)[:5]
+    ).order_by('-created_at')
     
-    # STATISTIKA
-    total_orders = main_orders.count()  # Faqat asosiy buyurtmalar
-    completed_orders = main_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
+    # ================================================================
+    # 8. FILTRLASH TURLARI (BIR MARTA QO'LLASH)
+    # ================================================================
+    filter_conditions = {
+        'completed': Q(status__in=['TAYYOR', 'BAJARILDI']),
+        'in_progress': ~Q(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']) & (Q(deadline__isnull=True) | Q(deadline__gte=now)),
+        'overdue': Q(deadline__lt=now) & ~Q(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']),
+    }
     
-    # Jarayondagi buyurtmalar soni - FAQAT MUDDATI O'TMAGANLAR
-    in_progress_orders = main_orders.exclude(
-        status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']
-    ).filter(
-        Q(deadline__isnull=True) | Q(deadline__gte=now)
-    ).count()
+    if filter_type in filter_conditions:
+        orders_with_type = orders_with_type.filter(filter_conditions[filter_type])
     
-    # Muddati o'tgan buyurtmalar soni
-    overdue_orders_count = main_orders.filter(
-        deadline__lt=now
-    ).exclude(
-        status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']
-    ).count()
+    # ================================================================
+    # 9. PAGINATION (50 TA)
+    # ================================================================
+    from django.core.paginator import Paginator
+    paginator = Paginator(orders_with_type, 50)
+    page_obj = paginator.get_page(page_number)
     
-    # Child orderlar statistikasi
-    all_child_orders_count = all_child_orders.count()
-    panel_child_count = panel_child_orders.count()
-    ugul_child_count = ugul_child_orders.count()
-    other_child_count = other_child_orders.count()
+    # ================================================================
+    # 10. GURUHLASH (PYTHON DA - TEZ)
+    # ================================================================
+    main_orders = []
+    panel_child_orders = []
+    ugul_child_orders = []
+    other_child_orders = []
     
-    panel_completed = panel_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
-    ugul_completed = ugul_child_orders.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
-    unpaid_orders = Order.objects.none() # Bo'sh queryset
+    for order in page_obj:
+        if order.order_type == 'MAIN':
+            main_orders.append(order)
+        elif order.order_type == 'PANEL_CHILD':
+            panel_child_orders.append(order)
+        elif order.order_type == 'UGUL_CHILD':
+            ugul_child_orders.append(order)
+        else:
+            other_child_orders.append(order)
+    
+    # ================================================================
+    # 11. STATISTIKA (BIR AGGREGATE SO'ROV)
+    # ================================================================
+    from django.db.models import Count, Sum, F
+    
+    main_qs = Order.objects.filter(parent_order__isnull=True)
+    if search_query:
+        main_qs = main_qs.filter(search_filter)
+    
+    if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
+        main_qs = main_qs.filter(assigned_workers__user=user).exclude(status='RAD_ETILDI')
+    
+    stats = main_qs.aggregate(
+        total_orders=Count('id'),
+        completed_orders=Count('id', filter=Q(status__in=['TAYYOR', 'BAJARILDI'])),
+        in_progress_orders=Count('id', filter=~Q(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']) & (Q(deadline__isnull=True) | Q(deadline__gte=now))),
+        overdue_orders_count=Count('id', filter=Q(deadline__lt=now) & ~Q(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR'])),
+    )
+    
+    # ================================================================
+    # 12. CHILD ORDERLAR STATISTIKASI (BIR SO'ROV)
+    # ================================================================
+    child_stats = Order.objects.filter(parent_order__isnull=False).aggregate(
+        all_child_orders_count=Count('id'),
+        panel_child_count=Count('id', filter=Q(product_name__icontains='panel') | Q(product_name__icontains='панель') | Q(product_name__icontains='панел')),
+        ugul_child_count=Count('id', filter=Q(product_name__icontains='ugul') | Q(product_name__icontains='угол') | Q(product_name__icontains='уголь')),
+        panel_completed=Count('id', filter=(Q(product_name__icontains='panel') | Q(product_name__icontains='панель') | Q(product_name__icontains='панел')) & Q(status__in=['TAYYOR', 'BAJARILDI'])),
+        ugul_completed=Count('id', filter=(Q(product_name__icontains='ugul') | Q(product_name__icontains='угол') | Q(product_name__icontains='уголь')) & Q(status__in=['TAYYOR', 'BAJARILDI'])),
+    )
+    
+    # ================================================================
+    # 13. TO'LANMAGAN BUYURTMALAR (DATABASE DA HISOBLASH)
+    # ================================================================
+    unpaid_orders = Order.objects.none()
     total_unpaid_amount = 0
     unpaid_orders_count = 0
-
-    if is_glavniy_admin or is_manager_or_confirmer:
+    
+    if is_glavniy_admin or is_manager:
         unpaid_orders = Order.objects.filter(
             parent_order__isnull=True,
             total_price__gt=F('prepayment')
-        ).exclude(status='BEKOR_QILINDI')
+        ).exclude(status='BEKOR_QILINDI').only('order_number', 'customer_name', 'total_price', 'prepayment')
         
-        # Usta bo'lsa va admin/menejer bo'lmasa, to'lanmagan buyurtmalarni ko'rsatma
-        if is_worker and not is_glavniy_admin and not is_manager_or_confirmer:
+        if is_worker and not is_glavniy_admin and not is_manager:
             unpaid_orders = Order.objects.none()
+        else:
+            unpaid_orders_count = unpaid_orders.count()
+            total_unpaid_amount = unpaid_orders.aggregate(
+                total=Sum(F('total_price') - F('prepayment'))
+            )['total'] or 0
     
-    unpaid_orders_count = unpaid_orders.count()
-    total_unpaid_amount = sum(order.remaining_amount for order in unpaid_orders)
+    # ================================================================
+    # 14. NOTIFICATIONLAR
+    # ================================================================
+    user_notifications = Notification.objects.filter(user=user, is_read=False)[:5]
     
-    can_view_orders = any([
-        is_glavniy_admin, 
-        is_production_boss, 
-        is_manager_or_confirmer, 
-        is_worker, 
-        is_observer
-    ])
-
+    # ================================================================
+    # 15. MUDDAT BUZILISHINI TEKSHIRISH (FAQAT ADMINLAR UCHUN)
+    # ================================================================
+    if is_glavniy_admin or is_production_boss:
+        overdue_check_orders = main_orders[:20]  # Faqat 20 tasini tekshirish
+        for order in overdue_check_orders:
+            if order.deadline and order.deadline < now and order.status not in ['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']:
+                check_and_create_overdue_alerts(order)
+    
+    # ================================================================
+    # 16. MIJOZLAR SONI (KESH YOKI BIR SO'ROV)
+    # ================================================================
+    customers_count = Order.objects.values('customer_unique_id').distinct().count()
+    
+    # ================================================================
+    # 17. PROGRESS FOIZLARI
+    # ================================================================
+    panel_progress_percentage = 0
+    other_progress_percentage = 0
+    panel_in_progress = 0
+    other_in_progress = 0
+    
+    if child_stats['panel_child_count'] > 0:
+        panel_progress_percentage = (child_stats['panel_completed'] / child_stats['panel_child_count']) * 100
+        panel_in_progress = child_stats['panel_child_count'] - child_stats['panel_completed']
+    
+    if child_stats['ugul_child_count'] > 0:
+        other_progress_percentage = (child_stats['ugul_completed'] / child_stats['ugul_child_count']) * 100
+        other_in_progress = child_stats['ugul_child_count'] - child_stats['ugul_completed']
+    
+    # ================================================================
+    # 18. CONTEXT
+    # ================================================================
     context = {
-        'archived_count': archived_count,
-        'archived_orders': archived_orders_qs,  # Qo'shimcha: arxiv buyurtmalarini ham yuboramiz
-        'orders': orders,
-        'unpaid_orders_count': unpaid_orders_count,
-        'total_unpaid_amount': total_unpaid_amount,
+        # Pagination
+        'page_obj': page_obj,
+        'orders': page_obj,
+        
+        # Guruhlangan orderlar
         'main_orders': main_orders,
         'panel_child_orders': panel_child_orders,
         'ugul_child_orders': ugul_child_orders,
         'other_child_orders': other_child_orders,
+        
+        # Arxiv
+        'archived_count': archived_count,
+        'archived_orders': archived_orders_qs[:100],
+        
+        # To'lanmaganlar
+        'unpaid_orders_count': unpaid_orders_count,
+        'total_unpaid_amount': total_unpaid_amount,
+        
+        # Rollar
         'is_glavniy_admin': is_glavniy_admin,
-        'is_manager': is_manager_or_confirmer, 
+        'is_manager': is_manager,
         'is_production_boss': is_production_boss,
         'is_worker': is_worker,
         'is_observer': is_observer,
+        'is_storekeeper': user.username.lower() == 'omborchi' or 'store' in user.username.lower(),
+        'can_view_orders': any([is_glavniy_admin, is_production_boss, is_manager, is_worker, is_observer]),
+        
+        # Filtrlar
         'search_query': search_query,
-        'notifications': user_notifications, 
-        'now': timezone.now(),
         'filter_type': filter_type,
-        'total_orders': total_orders,
-        'completed_orders': completed_orders,
-        'in_progress_orders': in_progress_orders,
-        'overdue_orders_count': overdue_orders_count,
-        'all_child_orders_count': all_child_orders_count,
-        'panel_child_count': panel_child_count,
-        'ugul_child_count': ugul_child_count,
-        'other_child_count': other_child_count,
-        'panel_completed': panel_completed,
-        'ugul_completed': ugul_completed,
-        'is_storekeeper': request.user.username.lower() == 'omborchi' or 'store' in request.user.username.lower(),
+        'now': now,
+        
+        # Statistikalar
+        'total_orders': stats['total_orders'],
+        'completed_orders': stats['completed_orders'],
+        'in_progress_orders': stats['in_progress_orders'],
+        'overdue_orders_count': stats['overdue_orders_count'],
+        
+        # Child statistikalar
+        'all_child_orders_count': child_stats['all_child_orders_count'],
+        'panel_child_count': child_stats['panel_child_count'],
+        'ugul_child_count': child_stats['ugul_child_count'],
+        'other_child_count': child_stats['all_child_orders_count'] - child_stats['panel_child_count'] - child_stats['ugul_child_count'],
+        'panel_completed': child_stats['panel_completed'],
+        'ugul_completed': child_stats['ugul_completed'],
+        'panel_in_progress': panel_in_progress,
+        'other_in_progress': other_in_progress,
+        'panel_progress_percentage': round(panel_progress_percentage, 1),
+        'other_progress_percentage': round(other_progress_percentage, 1),
+        
+        # Boshqa
         'customers_count': customers_count,
-        'can_view_orders': can_view_orders,
+        'notifications': user_notifications,
     }
+    
     return render(request, 'orders/order_list.html', context)
+
 
 
 
@@ -4227,3 +4210,1109 @@ def detect_category(name):
         return 'Краники'
     else:
         return 'Разное'
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from .models import Order
+import json
+
+@login_required
+def chamber_drawing(request, pk):
+    """Texnik chizma sahifasi"""
+    order = get_object_or_404(Order, pk=pk)
+    
+    # Spetsifikatsiyani olish
+    spec = order.technical_spec_json or {}
+    
+    context = {
+        'order': order,
+        'spec': spec,
+    }
+    return render(request, 'orders/chamber_drawing.html', context)
+
+
+@login_required
+def download_drawing_svg(request, pk):
+    """SVG faylni yuklash"""
+    order = get_object_or_404(Order, pk=pk)
+    
+    if order.technical_drawing_svg:
+        response = HttpResponse(order.technical_drawing_svg.read(), content_type='image/svg+xml')
+        response['Content-Disposition'] = f'attachment; filename="{order.order_number}_drawing.svg"'
+        return response
+    
+    return JsonResponse({'error': 'Fayl topilmadi'}, status=404)
+
+
+@login_required
+def download_drawing_pdf(request, pk):
+    """PDF faylni yuklash"""
+    import weasyprint
+    from django.template.loader import render_to_string
+    
+    order = get_object_or_404(Order, pk=pk)
+    
+    html_string = render_to_string('orders/chamber_drawing_pdf.html', {
+        'order': order,
+        'spec': order.technical_spec_json or {}
+    })
+    
+    pdf = weasyprint.HTML(string=html_string).write_pdf()
+    
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{order.order_number}_drawing.pdf"'
+    return response
+
+
+@login_required
+def download_spec_json(request, pk):
+    """JSON spetsifikatsiyani yuklash"""
+    order = get_object_or_404(Order, pk=pk)
+    
+    response = HttpResponse(
+        json.dumps(order.technical_spec_json, indent=2, ensure_ascii=False),
+        content_type='application/json'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{order.order_number}_spec.json"'
+    return response
+
+
+@csrf_exempt
+@login_required
+def generate_drawing(request, pk):
+    """Chizma yaratish"""
+    from .signals import generate_chamber_drawing
+    
+    order = get_object_or_404(Order, pk=pk)
+    
+    try:
+        result = generate_chamber_drawing(order)
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+# constructor/views.py
+import json
+import math
+import os
+from datetime import datetime
+from decimal import Decimal
+from typing import Dict, List, Tuple
+
+import requests
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db import models
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
+from django.views.decorators.csrf import csrf_exempt
+
+from .forms import ProjectForm, QuickCalculatorForm
+from .models import Project
+
+# =========================================================
+# YORDAMCHI FUNKSIYALAR
+# =========================================================
+
+def mm_val(s: str) -> int:
+    """'100mm' -> 100"""
+    return int(str(s).replace("mm", "").strip())
+
+
+def m_to_mm(m: float) -> int:
+    """Metrni millimetrga o'tkazish"""
+    return int(round(m * 1000))
+
+
+def door_dimensions(door_type: str) -> Tuple[int, int]:
+    """Eshik o'lchamlarini qaytaradi (en, bo'y) mm da"""
+    door_map = {
+        "Bir tabaqali (90x190)": (900, 1900),
+        "Surilma (120x200)": (1200, 2000),
+        "Muzlatkich eshigi": (960, 2000),
+        "Yo'q": (0, 0),
+    }
+    return door_map.get(door_type, (0, 0))
+
+
+def panel_count_linear(length_m: float, panel_width_m: float = 1.16) -> Dict:
+    """Berilgan uzunlik uchun panel sonini hisoblash"""
+    full = int(length_m // panel_width_m)
+    rem = round(length_m - (full * panel_width_m), 3)
+    total = full + (1 if rem > 0.01 else 0)
+    return {
+        "full_panels": full,
+        "remainder_m": rem,
+        "total_panels": total
+    }
+
+
+def split_center_by_960(center_mm: int, module_mm: int = 960) -> List[int]:
+    """Markaziy qismni 960mm modullarga bo'lish"""
+    if center_mm <= 0:
+        return []
+    
+    parts = []
+    remain = center_mm
+    
+    while remain > module_mm:
+        next_remain = remain - module_mm
+        if next_remain <= module_mm:
+            parts.append(module_mm)
+            remain = next_remain
+            break
+        parts.append(module_mm)
+        remain -= module_mm
+    
+    if remain > 0:
+        parts.append(remain)
+    
+    return parts
+
+
+def build_side_segments(total_mm: int, corner_mm: int = 480, module_mm: int = 960) -> List[int]:
+    """Devor tomonini segmentlarga bo'lish (burchak 480mm + markaziy modullar)"""
+    if total_mm <= 0:
+        return []
+    if total_mm <= corner_mm * 2:
+        return [total_mm]
+    
+    center_mm = total_mm - (corner_mm * 2)
+    center_parts = split_center_by_960(center_mm, module_mm)
+    return [corner_mm] + center_parts + [corner_mm]
+
+
+def segment_meta(parts: List[int], has_door: bool = False, door_size: int = 960) -> List[Dict]:
+    """Segmentlarni tiplar bilan qaytarish (panel yoki eshik)"""
+    result = []
+    door_used = False
+    
+    for p in parts:
+        if has_door and (not door_used) and p == door_size:
+            result.append({"size": p, "type": "door"})
+            door_used = True
+        else:
+            result.append({"size": p, "type": "panel"})
+    
+    return result
+
+
+def calculate_all(project) -> Dict:
+    """Loyiha bo'yicha barcha hisob-kitoblarni bajarish"""
+    
+    L = float(project.length_m)
+    W = float(project.width_m)
+    H = float(project.height_m)
+    
+    wall_mm = mm_val(project.wall_thickness)
+    ceil_mm = mm_val(project.ceiling_thickness)
+    floor_mm = mm_val(project.floor_thickness) if project.has_floor else 0
+    
+    panel_width = float(project.panel_width)
+    door_w_mm, door_h_mm = door_dimensions(project.door_type)
+    
+    # Hajmlar
+    hajm = round(L * W * H, 2)
+    inner_L_mm = max(0, m_to_mm(L) - (2 * wall_mm))
+    inner_W_mm = max(0, m_to_mm(W) - (2 * wall_mm))
+    inner_H_mm = max(0, m_to_mm(H) - ceil_mm - floor_mm)
+    inner_hajm = round((inner_L_mm * inner_W_mm * inner_H_mm) / 1_000_000_000, 2)
+    
+    # Maydonlar
+    s_devor = round(2 * (L + W) * H, 2)
+    s_patalok = round(L * W, 2)
+    s_pol = round(L * W, 2) if project.has_floor else 0
+    total_panel_area = round(s_devor + s_patalok + s_pol, 2)
+    
+    # Panel sonlari
+    wall_layout_L = panel_count_linear(L, panel_width)
+    wall_layout_W = panel_count_linear(W, panel_width)
+    
+    devor_panels_total = (wall_layout_L["total_panels"] * 2) + (wall_layout_W["total_panels"] * 2)
+    patalok_panels_total = math.ceil(W / panel_width)
+    pol_panels_total = math.ceil(W / panel_width) if project.has_floor else 0
+    estimated_all_panels = devor_panels_total + patalok_panels_total + pol_panels_total
+    
+    # Segmentlar
+    top_parts = build_side_segments(m_to_mm(L))
+    right_parts = build_side_segments(m_to_mm(W))
+    
+    has_door_top = project.door_type != "Yo'q" and project.door_side in ["Old", "Orqa"]
+    has_door_right = project.door_type != "Yo'q" and project.door_side in ["Chap", "O'ng"]
+    
+    top_meta = segment_meta(top_parts, has_door=has_door_top, door_size=door_w_mm)
+    right_meta = segment_meta(right_parts, has_door=has_door_right, door_size=door_w_mm)
+    
+    # Eshik offset
+    door_offset_mm = 0
+    if project.door_type != "Yo'q":
+        if project.door_side in ["Chap", "O'ng"]:
+            door_offset_mm = get_door_offset(right_parts, project.door_position, "vertical", door_h_mm)
+        else:
+            door_offset_mm = get_door_offset(top_parts, project.door_position, "horizontal", door_w_mm)
+    
+    return {
+        "outer_volume_m3": hajm,
+        "inner_volume_m3": inner_hajm,
+        "inner_L_mm": inner_L_mm,
+        "inner_W_mm": inner_W_mm,
+        "inner_H_mm": inner_H_mm,
+        "wall_area_m2": s_devor,
+        "ceiling_area_m2": s_patalok,
+        "floor_area_m2": s_pol,
+        "total_panel_area_m2": total_panel_area,
+        "wall_panels_total": devor_panels_total,
+        "ceiling_panels_total": patalok_panels_total,
+        "floor_panels_total": pol_panels_total,
+        "total_panels_estimated": estimated_all_panels,
+        "top_segments": top_parts,
+        "right_segments": right_parts,
+        "top_meta": top_meta,
+        "right_meta": right_meta,
+        "wall_mm": wall_mm,
+        "ceil_mm": ceil_mm,
+        "floor_mm": floor_mm,
+        "door_w_mm": door_w_mm,
+        "door_h_mm": door_h_mm,
+        "door_offset_mm": door_offset_mm,
+        "wall_layout_L": wall_layout_L,
+        "wall_layout_W": wall_layout_W,
+    }
+
+
+def get_door_offset(parts: List[int], position: str, side_type: str, door_size_mm: int) -> int:
+    """Eshikning aniq joylashuv offsetini hisoblash (mm)"""
+    total = sum(parts)
+    if total <= 0:
+        return 0
+    
+    if side_type == "vertical":  # Chap/O'ng tomon
+        if position == "Tepa":
+            offset = 480
+        elif position == "Past":
+            offset = total - 480 - door_size_mm
+        else:  # O'rta
+            offset = (total - door_size_mm) / 2
+    else:  # Old/Orqa tomon (gorizontal)
+        if position == "Chap":
+            offset = 480
+        elif position == "O'ng":
+            offset = total - 480 - door_size_mm
+        else:  # O'rta
+            offset = (total - door_size_mm) / 2
+    
+    return int(max(0, min(offset, total - door_size_mm)))
+
+
+def generate_svg(project, calculations):
+    """Loyiha uchun texnik chizma SVG yaratish"""
+    
+    L = float(project.length_m)
+    W = float(project.width_m)
+    H = float(project.height_m)
+    
+    wall_mm = calculations['wall_mm']
+    ceil_mm = calculations['ceil_mm']
+    floor_mm = calculations['floor_mm']
+    
+    outer_w_mm = m_to_mm(L)
+    outer_h_mm = m_to_mm(W)
+    outer_z_mm = m_to_mm(H)
+    
+    top_meta = calculations['top_meta']
+    right_meta = calculations['right_meta']
+    
+    door_w_mm = calculations['door_w_mm']
+    door_h_mm = calculations['door_h_mm']
+    door_offset_mm = calculations['door_offset_mm']
+    
+    # Masshtab
+    max_draw_w = 250
+    max_draw_h = 185
+    scale = min(max_draw_w / outer_w_mm, max_draw_h / outer_h_mm)
+    
+    draw_w = outer_w_mm * scale
+    draw_h = outer_h_mm * scale
+    wall_t = max(6, wall_mm * scale)
+    
+    svg_w = 800
+    svg_h = 600
+    
+    x_center = 400
+    px = x_center - draw_w / 2
+    py = 100
+    
+    inner_L_mm = calculations['inner_L_mm']
+    inner_W_mm = calculations['inner_W_mm']
+    inner_H_mm = calculations['inner_H_mm']
+    
+    # Ranglar
+    c = {
+        "sheet": "#ffffff",
+        "line": "#111111",
+        "dim": "#222222",
+        "text": "#111111",
+        "muted": "#555555",
+        "door": "#111111",
+    }
+    
+    date_str = datetime.now().strftime("%d.%m.%Y")
+    
+    # ========== SVG YIG'ISH ==========
+    svg_parts = []
+    
+    # Header
+    svg_parts.append(f'<svg width="100%" viewBox="0 0 {svg_w} {svg_h}" xmlns="http://www.w3.org/2000/svg">')
+    svg_parts.append(f'<rect x="10" y="10" width="{svg_w-20}" height="{svg_h-20}" fill="{c["sheet"]}" stroke="none"/>')
+    
+    svg_parts.append(f'<text x="{x_center}" y="40" font-size="16" font-weight="bold" text-anchor="middle" fill="{c["text"]}">TEXNIK CHIZMA</text>')
+    svg_parts.append(f'<text x="{x_center}" y="60" font-size="12" font-weight="bold" text-anchor="middle" fill="{c["text"]}">{(project.project_name or "").upper()}</text>')
+    svg_parts.append(f'<text x="{svg_w-20}" y="40" font-size="11" text-anchor="end" fill="{c["muted"]}">{project.room_code}</text>')
+    
+    # Tashqi va ichki to'rtburchak
+    svg_parts.append(f'<rect x="{px}" y="{py}" width="{draw_w}" height="{draw_h}" fill="none" stroke="{c["line"]}" stroke-width="1.6"/>')
+    svg_parts.append(f'<rect x="{px+wall_t}" y="{py+wall_t}" width="{draw_w-2*wall_t}" height="{draw_h-2*wall_t}" fill="none" stroke="{c["line"]}" stroke-width="1.1"/>')
+    
+    # Ichki o'lcham matni
+    svg_parts.append(f'<text x="{px+draw_w/2+8}" y="{py+draw_h/2-8}" font-size="14" font-weight="bold" text-anchor="middle" fill="{c["text"]}" transform="rotate(90 {px+draw_w/2+8},{py+draw_h/2-8})">H-{outer_z_mm}</text>')
+    svg_parts.append(f'<text x="{px+draw_w/2}" y="{py+draw_h+40}" font-size="10" text-anchor="middle" fill="{c["muted"]}">Ichki: {inner_L_mm} x {inner_W_mm} x {inner_H_mm} mm</text>')
+    
+    # Uzunlik o'lchami
+    svg_parts.append(dim_h(px, px+draw_w, py-15, f"{outer_w_mm} mm", c["dim"]))
+    
+    # En o'lchami
+    svg_parts.append(dim_v(px+draw_w+15, py, py+draw_h, f"{outer_h_mm} mm", c["dim"]))
+    
+    # Eshik (agar bor bo'lsa)
+    if project.door_type != "Yo'q":
+        door_svg = draw_door(project, px, py, draw_w, draw_h, scale, door_offset_mm, door_w_mm, door_h_mm, c)
+        svg_parts.append(door_svg)
+    
+    # Segment chiziqlari
+    svg_parts.append(chain_dim_top(px, py-6, top_meta, scale, c["dim"]))
+    svg_parts.append(chain_dim_right(px+draw_w+8, py, right_meta, scale, c["dim"]))
+    
+    # Devor qalinligi
+    svg_parts.append(f'<text x="{px+draw_w/2}" y="{py+draw_h+20}" font-size="11" text-anchor="middle" fill="{c["text"]}">Devor: {wall_mm} mm | Patalok: {ceil_mm} mm | Pol: {floor_mm if project.has_floor else 0} mm</text>')
+    
+    # Title block
+    svg_parts.append(title_block(px-50, py+draw_h+60, draw_w+100, 80, project, wall_mm, ceil_mm, floor_mm, date_str, c))
+    
+    svg_parts.append(f'<text x="{svg_w-20}" y="{svg_h-20}" font-size="10" text-anchor="end" fill="{c["muted"]}">EcoProm Konstruktor</text>')
+    svg_parts.append('</svg>')
+    
+    return '\n'.join(svg_parts)
+
+
+def dim_h(x1, x2, y, text, color="#222"):
+    """Gorizontal o'lcham chizig'i"""
+    return f"""
+    <g stroke="{color}" fill="none" stroke-width="1">
+        <line x1="{x1}" y1="{y}" x2="{x2}" y2="{y}" />
+        <line x1="{x1}" y1="{y-5}" x2="{x1}" y2="{y+5}" />
+        <line x1="{x2}" y1="{y-5}" x2="{x2}" y2="{y+5}" />
+    </g>
+    <text x="{(x1+x2)/2}" y="{y-6}" font-size="10" text-anchor="middle" fill="{color}">{text}</text>
+    """
+
+
+def dim_v(x, y1, y2, text, color="#222"):
+    """Vertikal o'lcham chizig'i"""
+    return f"""
+    <g stroke="{color}" fill="none" stroke-width="1">
+        <line x1="{x}" y1="{y1}" x2="{x}" y2="{y2}" />
+        <line x1="{x-5}" y1="{y1}" x2="{x+5}" y2="{y1}" />
+        <line x1="{x-5}" y1="{y2}" x2="{x+5}" y2="{y2}" />
+    </g>
+    <text x="{x+12}" y="{(y1+y2)/2}" font-size="10" text-anchor="middle" fill="{color}" transform="rotate(90 {x+12},{(y1+y2)/2})">{text}</text>
+    """
+
+
+def chain_dim_top(x, y, parts, scale, color="#222"):
+    """Yuqori segment o'lchamlari"""
+    svg = ""
+    cur = x
+    for p in parts:
+        nx = cur + p["size"] * scale
+        label = f'{p["size"]} ESHIK' if p["type"] == "door" else str(p["size"])
+        svg += f'<line x1="{cur}" y1="{y}" x2="{cur}" y2="{y-6}" stroke="{color}" stroke-width="1"/>'
+        svg += f'<text x="{(cur+nx)/2}" y="{y-4}" font-size="9" text-anchor="middle" fill="{color}">{label}</text>'
+        cur = nx
+    svg += f'<line x1="{cur}" y1="{y}" x2="{cur}" y2="{y-6}" stroke="{color}" stroke-width="1"/>'
+    return svg
+
+
+def chain_dim_right(x, y, parts, scale, color="#222"):
+    """O'ng segment o'lchamlari"""
+    svg = ""
+    cur = y
+    for p in parts:
+        ny = cur + p["size"] * scale
+        label = f'{p["size"]} ESHIK' if p["type"] == "door" else str(p["size"])
+        svg += f'<line x1="{x}" y1="{cur}" x2="{x+6}" y2="{cur}" stroke="{color}" stroke-width="1"/>'
+        svg += f'<text x="{x+10}" y="{(cur+ny)/2}" font-size="9" text-anchor="middle" fill="{color}" transform="rotate(90 {x+10},{(cur+ny)/2})">{label}</text>'
+        cur = ny
+    svg += f'<line x1="{x}" y1="{cur}" x2="{x+6}" y2="{cur}" stroke="{color}" stroke-width="1"/>'
+    return svg
+
+
+def draw_door(project, px, py, draw_w, draw_h, scale, offset_mm, door_w_mm, door_h_mm, c):
+    """Eshik chizish"""
+    door_side = project.door_side
+    opening = project.door_opening
+    
+    if door_side == "Chap":
+        top = py + offset_mm * scale
+        bot = top + door_h_mm * scale
+        if opening == "Ichkariga":
+            return f"""
+            <line x1="{px}" y1="{top}" x2="{px+20}" y2="{top+30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{px}" y1="{bot}" x2="{px+20}" y2="{bot-30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{px+20}" y1="{top+30}" x2="{px+20}" y2="{bot-30}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+        else:
+            return f"""
+            <line x1="{px}" y1="{top}" x2="{px-20}" y2="{top-30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{px}" y1="{bot}" x2="{px-20}" y2="{bot+30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{px-20}" y1="{top-30}" x2="{px-20}" y2="{bot+30}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+    
+    elif door_side == "O'ng":
+        rx = px + draw_w
+        top = py + offset_mm * scale
+        bot = top + door_h_mm * scale
+        if opening == "Ichkariga":
+            return f"""
+            <line x1="{rx}" y1="{top}" x2="{rx-20}" y2="{top+30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{rx}" y1="{bot}" x2="{rx-20}" y2="{bot-30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{rx-20}" y1="{top+30}" x2="{rx-20}" y2="{bot-30}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+        else:
+            return f"""
+            <line x1="{rx}" y1="{top}" x2="{rx+20}" y2="{top-30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{rx}" y1="{bot}" x2="{rx+20}" y2="{bot+30}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{rx+20}" y1="{top-30}" x2="{rx+20}" y2="{bot+30}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+    
+    elif door_side == "Old":
+        left = px + offset_mm * scale
+        right = left + door_w_mm * scale
+        by = py + draw_h
+        if opening == "Ichkariga":
+            return f"""
+            <line x1="{left}" y1="{by}" x2="{left+30}" y2="{by-20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{right}" y1="{by}" x2="{right-30}" y2="{by-20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{left+30}" y1="{by-20}" x2="{right-30}" y2="{by-20}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+        else:
+            return f"""
+            <line x1="{left}" y1="{by}" x2="{left-30}" y2="{by+20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{right}" y1="{by}" x2="{right+30}" y2="{by+20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{left-30}" y1="{by+20}" x2="{right+30}" y2="{by+20}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+    
+    elif door_side == "Orqa":
+        left = px + offset_mm * scale
+        right = left + door_w_mm * scale
+        if opening == "Ichkariga":
+            return f"""
+            <line x1="{left}" y1="{py}" x2="{left+30}" y2="{py+20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{right}" y1="{py}" x2="{right-30}" y2="{py+20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{left+30}" y1="{py+20}" x2="{right-30}" y2="{py+20}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+        else:
+            return f"""
+            <line x1="{left}" y1="{py}" x2="{left-30}" y2="{py-20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{right}" y1="{py}" x2="{right+30}" y2="{py-20}" stroke="{c["door"]}" stroke-width="1.5"/>
+            <line x1="{left-30}" y1="{py-20}" x2="{right+30}" y2="{py-20}" stroke="{c["door"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+            """
+    
+    return ""
+
+
+def title_block(x, y, w, h, project, wall_mm, ceil_mm, floor_mm, date_str, c):
+    """Sarlavha bloki"""
+    L_mm = m_to_mm(float(project.length_m))
+    W_mm = m_to_mm(float(project.width_m))
+    H_mm = m_to_mm(float(project.height_m))
+    
+    return f"""
+    <g>
+        <rect x="{x}" y="{y}" width="{w}" height="{h}" fill="none" stroke="{c["line"]}" stroke-width="1"/>
+        <line x1="{x}" y1="{y+25}" x2="{x+w}" y2="{y+25}" stroke="{c["line"]}" stroke-width="1"/>
+        
+        <text x="{x+10}" y="{y+18}" font-size="11" font-weight="bold" fill="{c["text"]}">ECOPROM TECHNICAL DRAWING</text>
+        
+        <text x="{x+10}" y="{y+45}" font-size="10" fill="{c["muted"]}">Loyiha:</text>
+        <text x="{x+60}" y="{y+45}" font-size="10" font-weight="bold" fill="{c["text"]}">{project.project_name or "-"}</text>
+        
+        <text x="{x+10}" y="{y+65}" font-size="10" fill="{c["muted"]}">O'lcham:</text>
+        <text x="{x+60}" y="{y+65}" font-size="10" fill="{c["text"]}">{L_mm} x {W_mm} x {H_mm} mm</text>
+        
+        <text x="{x+250}" y="{y+45}" font-size="10" fill="{c["muted"]}">Kod:</text>
+        <text x="{x+280}" y="{y+45}" font-size="10" font-weight="bold" fill="{c["text"]}">{project.room_code}</text>
+        
+        <text x="{x+250}" y="{y+65}" font-size="10" fill="{c["muted"]}">Devor/Patalok/Pol:</text>
+        <text x="{x+360}" y="{y+65}" font-size="10" fill="{c["text"]}">{wall_mm}/{ceil_mm}/{floor_mm} mm</text>
+        
+        <text x="{x+w-10}" y="{y+45}" font-size="10" text-anchor="end" fill="{c["muted"]}">Sana: {date_str}</text>
+        <text x="{x+w-10}" y="{y+65}" font-size="10" text-anchor="end" fill="{c["muted"]}">Sheet: 1/1</text>
+    </g>
+    """
+
+
+def get_ai_recommendation(project):
+    """Groq API orqali AI tavsiya olish"""
+    api_key = getattr(settings, 'GROQ_API_KEY', os.getenv('GROQ_API_KEY', ''))
+    
+    if not api_key:
+        return {"success": False, "message": "GROQ_API_KEY topilmadi"}
+    
+    prompt = f"""
+Siz sovutish kamerasi bo'yicha professional muhandissiz.
+Foydalanuvchiga texnik tavsiya bering.
+
+Mijoz ma'lumotlari:
+- Mahsulot turi: {project.product_type}
+- Talab qilinadigan harorat: {project.storage_temp}
+- Kunlik eshik ochilish soni: {project.opening_freq}
+- Hudud / iqlim: {project.region}
+- Namlik talabi: {project.humidity}
+- O'lcham: {project.length_m}m x {project.width_m}m x {project.height_m}m
+- Pol paneli: {"Ha" if project.has_floor else "Yo'q"}
+
+JSON formatda qaytaring:
+{{
+  "rejim": "...",
+  "devor_qalinligi_mm": 100,
+  "patalok_qalinligi_mm": 80,
+  "pol_qalinligi_mm": 100,
+  "agregat_turi": "...",
+  "eshik_turi": "...",
+  "izoh": "...",
+  "xulosa": "..."
+}}
+
+Faqat JSON qaytaring.
+"""
+    
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "temperature": 0.3,
+                "messages": [
+                    {"role": "system", "content": "Siz texnik sovutish kamerasi mutaxassisisiz."},
+                    {"role": "user", "content": prompt}
+                ]
+            },
+            timeout=60
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        
+        start = content.find("{")
+        end = content.rfind("}")
+        if start == -1 or end == -1:
+            return {"success": False, "message": f"JSON parse bo'lmadi"}
+        
+        parsed = json.loads(content[start:end+1])
+        return {"success": True, "data": parsed}
+    
+    except Exception as e:
+        return {"success": False, "message": f"Groq xatolik: {e}"}
+
+
+def send_to_telegram(project, calculations):
+    """Telegram kanalga hisobot yuborish"""
+    token = getattr(settings, 'TELEGRAM_BOT_TOKEN', os.getenv('TELEGRAM_BOT_TOKEN', ''))
+    chat_id = getattr(settings, 'TELEGRAM_CHAT_ID', os.getenv('TELEGRAM_CHAT_ID', '-1002338157363'))
+    
+    if not token:
+        return False, "TELEGRAM_BOT_TOKEN topilmadi"
+    
+    # Hisobot matnini tayyorlash
+    top_report = " + ".join([
+        f"{p['size']} ESHIK" if p["type"] == "door" else str(p["size"]) 
+        for p in calculations['top_meta']
+    ])
+    right_report = " + ".join([
+        f"{p['size']} ESHIK" if p["type"] == "door" else str(p["size"]) 
+        for p in calculations['right_meta']
+    ])
+    
+    message = f"""
+<b>🏗 Yangi buyurtma / loyiha</b>
+
+<b>Loyiha:</b> {project.project_name or '-'}
+<b>Kod:</b> {project.room_code}
+<b>Sana:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}
+
+<b>Tashqi o'lcham:</b> {project.length_m} × {project.width_m} × {project.height_m} m
+<b>Ichki foydali o'lcham:</b> {calculations['inner_L_mm']} × {calculations['inner_W_mm']} × {calculations['inner_H_mm']} mm
+<b>Hajm:</b> {calculations['outer_volume_m3']} m³
+
+<b>Devor:</b> {project.wall_type} / {calculations['wall_mm']} mm / {calculations['wall_area_m2']} m²
+<b>Patalok:</b> {project.ceiling_type} / {calculations['ceil_mm']} mm / {calculations['ceiling_area_m2']} m²
+<b>Pol:</b> {project.floor_type if project.has_floor else 'Mavjud emas'} / {calculations['floor_mm'] if project.has_floor else 0} mm
+
+<b>Eshik:</b> {project.door_type}
+<b>Eshik joylashuvi:</b> {project.door_side} / {project.door_position} / {project.door_opening}
+
+<b>Agregat:</b> {project.unit_type} ({project.unit_brand}) / {project.unit_side}
+
+<b>Panel ishchi eni:</b> {project.panel_width} m
+<b>Umumiy devor paneli:</b> {calculations['wall_panels_total']} ta
+<b>Patalok paneli:</b> {calculations['ceiling_panels_total']} ta
+<b>Pol paneli:</b> {calculations['floor_panels_total']} ta
+
+<b>Segmentlar (Uzunlik):</b> {top_report}
+<b>Segmentlar (En):</b> {right_report}
+""".strip()
+    
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={
+                "chat_id": chat_id,
+                "text": message,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=30
+        )
+        if response.status_code != 200:
+            return False, f"Telegram xatolik: {response.text}"
+        return True, "Yuborildi"
+    except Exception as e:
+        return False, f"Xatolik: {e}"
+
+
+# =========================================================
+# VIEWS
+# =========================================================
+
+@login_required
+def constructor_index(request):
+    """Konstruktor asosiy sahifasi"""
+    
+    # So'nggi loyihalar
+    recent_projects = Project.objects.all().order_by('-created_at')[:10]
+    
+    # Tez kalkulyator formasi
+    form = QuickCalculatorForm(request.GET or None)
+    
+    context = {
+        'form': form,
+        'recent_projects': recent_projects,
+        'title': 'Sovutish Kamerasi Konstruktori',
+    }
+    
+    return render(request, 'orders/chizma.html', context)
+
+
+@login_required
+def project_create(request):
+    """Yangi loyiha yaratish"""
+    
+    if request.method == 'POST':
+        form = ProjectForm(request.POST)
+        if form.is_valid():
+            project = form.save(commit=False)
+            project.created_by = request.user
+            
+            # Hisob-kitoblarni bajarish
+            calculations = calculate_all(project)
+            project.calculations = calculations
+            project.save()
+            
+            messages.success(request, f"✅ Loyiha '{project.room_code}' muvaffaqiyatli yaratildi!")
+            return redirect('constructor:project_detail', pk=project.pk)
+    else:
+        form = ProjectForm()
+    
+    context = {
+        'form': form,
+        'title': 'Yangi Loyiha Yaratish',
+    }
+    
+    return render(request, 'constructor/project_form.html', context)
+
+
+@login_required
+def project_detail(request, pk):
+    """Loyiha tafsilotlari"""
+    
+    project = get_object_or_404(Project, pk=pk)
+    
+    # Hisob-kitoblar (agar mavjud bo'lmasa, qayta hisoblash)
+    if not project.calculations:
+        calculations = calculate_all(project)
+        project.calculations = calculations
+        project.save()
+    else:
+        calculations = project.calculations
+    
+    # SVG yaratish
+    svg_content = generate_svg(project, calculations)
+    
+    context = {
+        'project': project,
+        'calculations': calculations,
+        'svg_content': svg_content,
+        'title': f'Loyiha: {project.room_code}',
+    }
+    
+    return render(request, 'constructor/project_detail.html', context)
+
+
+@login_required
+def project_edit(request, pk):
+    """Loyihani tahrirlash"""
+    
+    project = get_object_or_404(Project, pk=pk)
+    
+    if request.method == 'POST':
+        form = ProjectForm(request.POST, instance=project)
+        if form.is_valid():
+            project = form.save()
+            
+            # Hisob-kitoblarni qayta bajarish
+            calculations = calculate_all(project)
+            project.calculations = calculations
+            project.save()
+            
+            messages.success(request, f"✅ Loyiha '{project.room_code}' yangilandi!")
+            return redirect('constructor:project_detail', pk=project.pk)
+    else:
+        form = ProjectForm(instance=project)
+    
+    context = {
+        'form': form,
+        'project': project,
+        'title': f'Loyihani tahrirlash: {project.room_code}',
+    }
+    
+    return render(request, 'constructor/project_form.html', context)
+
+
+@login_required
+def project_delete(request, pk):
+    """Loyihani o'chirish"""
+    
+    project = get_object_or_404(Project, pk=pk)
+    
+    if request.method == 'POST':
+        room_code = project.room_code
+        project.delete()
+        messages.success(request, f"✅ Loyiha '{room_code}' o'chirildi!")
+        return redirect('constructor:project_list')
+    
+    context = {
+        'project': project,
+        'title': f'Loyihani o\'chirish: {project.room_code}',
+    }
+    
+    return render(request, 'constructor/project_confirm_delete.html', context)
+
+
+@login_required
+def project_list(request):
+    """Barcha loyihalar ro'yxati"""
+    
+    projects = Project.objects.all().order_by('-created_at')
+    
+    # Filtrlar
+    search = request.GET.get('search', '')
+    if search:
+        projects = projects.filter(
+            models.Q(project_name__icontains=search) |
+            models.Q(room_code__icontains=search)
+        )
+    
+    # Pagination
+    paginator = Paginator(projects, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'search': search,
+        'title': 'Barcha Loyihalar',
+    }
+    
+    return render(request, 'constructor/project_list.html', context)
+
+
+@login_required
+def ai_recommendation(request, pk):
+    """AI tavsiya olish"""
+    
+    project = get_object_or_404(Project, pk=pk)
+    
+    result = get_ai_recommendation(project)
+    
+    if result['success']:
+        project.ai_result = result['data']
+        project.save()
+        messages.success(request, "✅ AI tavsiya muvaffaqiyatli olindi!")
+    else:
+        messages.error(request, f"❌ AI tavsiya olinmadi: {result['message']}")
+    
+    return redirect('constructor:project_detail', pk=project.pk)
+
+
+@login_required
+def send_report(request, pk):
+    """Telegramga hisobot yuborish"""
+    
+    project = get_object_or_404(Project, pk=pk)
+    
+    if not project.calculations:
+        calculations = calculate_all(project)
+        project.calculations = calculations
+        project.save()
+    else:
+        calculations = project.calculations
+    
+    success, message = send_to_telegram(project, calculations)
+    
+    if success:
+        messages.success(request, "✅ Hisobot Telegram kanalga yuborildi!")
+    else:
+        messages.error(request, f"❌ Yuborilmadi: {message}")
+    
+    return redirect('constructor:project_detail', pk=project.pk)
+
+
+@login_required
+def create_order_from_project(request, pk):
+    """Loyihadan buyurtma yaratish (orders app ga o'tkazish)"""
+    
+    project = get_object_or_404(Project, pk=pk)
+    
+    if not project.calculations:
+        calculations = calculate_all(project)
+        project.calculations = calculations
+        project.save()
+    else:
+        calculations = project.calculations
+    
+    # Order modelini import qilish (orders app dan)
+    try:
+        from orders.models import Order
+        
+        order = Order.objects.create(
+            order_number=f"ORD-{datetime.now().strftime('%Y%m%d')}-{Order.objects.count()+1:04d}",
+            customer_name=project.project_name or "Noma'lum",
+            customer_unique_id=project.room_code,
+            product_name=f"Sovutish kamerasi {project.length_m}x{project.width_m}x{project.height_m}m ({project.wall_type})",
+            panel_kvadrat=Decimal(str(calculations['total_panel_area_m2'])),
+            panel_thickness=str(calculations['wall_mm']),
+            total_price=Decimal('0'),  # Narxni keyinroq kiritish mumkin
+            prepayment=Decimal('0'),
+            status='KIRITILDI',
+            created_by=request.user,
+            comment=f"Konstruktor orqali yaratilgan. Loyiha ID: {project.id}",
+        )
+        
+        messages.success(request, f"✅ Buyurtma #{order.order_number} muvaffaqiyatli yaratildi!")
+        return redirect('order_detail', pk=order.pk)
+        
+    except ImportError:
+        messages.error(request, "❌ Orders app topilmadi yoki ulanishda xatolik!")
+    except Exception as e:
+        messages.error(request, f"❌ Xatolik: {str(e)}")
+    
+    return redirect('constructor:project_detail', pk=project.pk)
+
+
+# =========================================================
+# API ENDPOINTLAR (AJAX uchun)
+# =========================================================
+
+@login_required
+def api_calculate(request):
+    """AJAX orqali hisob-kitob qilish"""
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Faqat POST so\'rovi'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Vaqtinchalik project obyekti yaratish
+        class TempProject:
+            def __init__(self, data):
+                self.length_m = float(data.get('length', 5))
+                self.width_m = float(data.get('width', 4))
+                self.height_m = float(data.get('height', 3))
+                self.wall_thickness = data.get('wall_thickness', '100mm')
+                self.ceiling_thickness = data.get('ceiling_thickness', '80mm')
+                self.floor_thickness = data.get('floor_thickness', '100mm')
+                self.has_floor = data.get('has_floor', True)
+                self.panel_width = float(data.get('panel_width', 1.16))
+                self.door_type = data.get('door_type', 'Muzlatkich eshigi')
+                self.door_side = data.get('door_side', 'Old')
+                self.door_position = data.get('door_position', 'O\'rta')
+                self.door_opening = data.get('door_opening', 'Ichkariga')
+                self.unit_type = data.get('unit_type', 'Split-sistema (Nizkotemp)')
+                self.unit_side = data.get('unit_side', 'Old')
+                self.unit_brand = data.get('unit_brand', 'Bitzer')
+                self.project_name = data.get('project_name', '')
+                self.room_code = data.get('room_code', 'EP-001')
+                self.product_type = data.get('product_type', 'Go\'sht')
+                self.storage_temp = data.get('storage_temp', '-18°C')
+                self.opening_freq = data.get('opening_freq', 'Kam')
+                self.region = data.get('region', 'Mo\'tadil')
+                self.humidity = data.get('humidity', 'Standart')
+        
+        project = TempProject(data)
+        calculations = calculate_all(project)
+        
+        return JsonResponse({
+            'success': True,
+            'calculations': calculations
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+# orders/views.py - api_generate_svg funksiyasi
+
+@login_required
+def api_generate_svg(request):
+    """AJAX orqali SVG yaratish"""
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Faqat POST so\'rovi'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        print("API generate-svg received:", data.keys())  # DEBUG
+        
+        # Vaqtinchalik project yaratish
+        class TempProject:
+            def __init__(self, **kwargs):
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
+        
+        # Kerakli maydonlarni olish
+        project = TempProject(
+            length_m=float(data.get('length', 5)),
+            width_m=float(data.get('width', 4)),
+            height_m=float(data.get('height', 3)),
+            wall_thickness=data.get('wall_thickness', '100mm'),
+            ceiling_thickness=data.get('ceiling_thickness', '80mm'),
+            floor_thickness=data.get('floor_thickness', '100mm'),
+            has_floor=data.get('has_floor', True),
+            panel_width=float(data.get('panel_width', 1.16)),
+            door_type=data.get('door_type', 'Muzlatkich eshigi'),
+            door_side=data.get('door_side', 'Old'),
+            door_position=data.get('door_position', 'O\'rta'),
+            door_opening=data.get('door_opening', 'Ichkariga'),
+            project_name=data.get('project_name', ''),
+            room_code=data.get('room_code', 'EP-001'),
+        )
+        
+        # Hisob-kitoblar (agar data da calculations bo'lmasa)
+        if 'calculations' in data and data['calculations']:
+            calculations = data['calculations']
+        else:
+            calculations = calculate_all(project)
+        
+        # SVG yaratish
+        svg = generate_svg(project, calculations)
+        
+        return JsonResponse({
+            'success': True,
+            'svg': svg
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()  # Konsolga to'liq xatolikni chiqarish
+        return JsonResponse({
+            'success': False, 
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }, status=400)
+
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def download_svg(request, pk):
+    """
+    Constructor loyihasi uchun SVG chizmani yuklab olish.
+    Agar Project modeli mavjud bo'lsa, undan foydalanadi.
+    """
+    try:
+        # Constructor app dagi Project modelini import qilishga harakat
+        from constructor.models import Project
+        from constructor.views import calculate_all, generate_svg
+        
+        project = get_object_or_404(Project, pk=pk)
+        
+        if not project.calculations:
+            calculations = calculate_all(project)
+            project.calculations = calculations
+            project.save()
+        else:
+            calculations = project.calculations
+        
+        svg_content = generate_svg(project, calculations)
+        
+        response = HttpResponse(svg_content, content_type='image/svg+xml')
+        response['Content-Disposition'] = f'attachment; filename="{project.room_code}_technical_sheet.svg"'
+        return response
+        
+    except ImportError:
+        # Agar constructor app hali yaratilmagan bo'lsa
+        from django.http import HttpResponseNotFound
+        return HttpResponseNotFound("Constructor app hali o'rnatilmagan")
+    
+# constructor/views.py ga qo'shing:
+
+@login_required
+def api_project_detail(request, pk):
+    """AJAX orqali loyiha ma'lumotlarini olish"""
+    project = get_object_or_404(Project, pk=pk)
+    
+    data = {
+        'id': project.id,
+        'project_name': project.project_name,
+        'room_code': project.room_code,
+        'length_m': float(project.length_m),
+        'width_m': float(project.width_m),
+        'height_m': float(project.height_m),
+        'wall_type': project.wall_type,
+        'wall_thickness': project.wall_thickness,
+        'ceiling_type': project.ceiling_type,
+        'ceiling_thickness': project.ceiling_thickness,
+        'has_floor': project.has_floor,
+        'floor_type': project.floor_type,
+        'floor_thickness': project.floor_thickness,
+        'panel_width': float(project.panel_width),
+        'door_type': project.door_type,
+        'door_side': project.door_side,
+        'door_position': project.door_position,
+        'door_opening': project.door_opening,
+        'unit_type': project.unit_type,
+        'unit_side': project.unit_side,
+        'unit_brand': project.unit_brand,
+        'calculations': project.calculations,
+    }
+    
+    return JsonResponse(data)
