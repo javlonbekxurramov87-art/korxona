@@ -501,53 +501,113 @@ def is_in_group(user, group_name):
 def order_archive(request):
     """Arxivlangan (bajarilgan) buyurtmalar ro'yxati"""
     
-    # Foydalanuvchi huquqlarini tekshirish
+    # Foydalanuvchi rollari
     is_glavniy_admin = request.user.is_superuser or is_in_group(request.user, 'Glavniy Admin')
     is_manager = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
-    is_worker = is_in_group(request.user, 'Usta')
-    is_observer = is_in_group(request.user, 'Kuzatuvchi')
+    is_worker = is_in_group(request.user, 'Usta') or is_in_group(request.user, 'Eshik Ustasi')
     
-    # Statuslarni bazadagi aniq nomlari bilan moslang (Katta/kichik harfga e'tibor bering)
-    # Siz yuborgan template-da 'Tugatildi' deb tekshirilgan ekan
-    archived_orders = Order.objects.filter(
-        status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR', 'Tugatildi']
-    ).order_by('-created_at') 
+    # Arxivlangan statuslar
+    archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
     
-    # Usta bo'lsa, faqat o'zining buyurtmalarini ko'rsat
-    if is_worker and not (is_glavniy_admin or is_manager):
-        archived_orders = archived_orders.filter(
+    # Asosiy queryset
+    main_orders = Order.objects.filter(
+        status__in=archived_statuses
+    ).order_by('-worker_finished_at', '-created_at')
+    
+    # Filtrlar
+    search_query = request.GET.get('q', '')
+    worker_filter = request.GET.get('worker_type', '')  # list, panel, eshik, ugol
+    
+    # USTA TURI BO'YICHA FILTR (userlar bo'yicha)
+    if not is_worker and worker_filter:
+        # Usta username'larini aniqlash
+        worker_usernames = {
+            'list': 'list_usta',
+            'panel': 'panel_usta',
+            'eshik': 'eshik_usta',
+            'ugol': 'ugol_usta'
+        }
+        
+        if worker_filter in worker_usernames:
+            username = worker_usernames[worker_filter]
+            from django.contrib.auth.models import User
+            try:
+                worker_user = User.objects.get(username=username)
+                main_orders = main_orders.filter(
+                    assigned_workers__user=worker_user
+                ).distinct()
+            except User.DoesNotExist:
+                main_orders = main_orders.none()
+    
+    # USTA UCHUN FILTR - o'z orderlari
+    elif is_worker and not (is_glavniy_admin or is_manager):
+        main_orders = main_orders.filter(
             assigned_workers__user=request.user
         ).distinct()
     
-    # Observer (Kuzatuvchi) bo'lsa va boshqa ruxsati bo'lmasa
-    if is_observer and not (is_glavniy_admin or is_manager or is_worker):
-        archived_orders = archived_orders.none()
-    
-    # Filtrlash (Qidiruv) - Template'da name="q" ishlatilgan
-    search_query = request.GET.get('q', '')
+    # Qidiruv
     if search_query:
-        archived_orders = archived_orders.filter(
+        main_orders = main_orders.filter(
             Q(order_number__icontains=search_query) |
             Q(customer_name__icontains=search_query) |
-            Q(product_name__icontains=search_query)
+            Q(product_name__icontains=search_query) |
+            Q(customer_unique_id__icontains=search_query)
         )
     
     # Pagination
-    paginator = Paginator(archived_orders, 20)
+    paginator = Paginator(main_orders, 12)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # STATISTIKA (admin/menejer uchun) - userlar bo'yicha
+    worker_stats = {'list': 0, 'panel': 0, 'eshik': 0, 'ugol': 0}
+    if not is_worker:
+        from django.contrib.auth.models import User
+        worker_usernames = {
+            'list': 'list_usta',
+            'panel': 'panel_usta',
+            'eshik': 'eshik_usta',
+            'ugol': 'ugol_usta'
+        }
+        for key, username in worker_usernames.items():
+            try:
+                worker_user = User.objects.get(username=username)
+                count = Order.objects.filter(
+                    status__in=archived_statuses,
+                    assigned_workers__user=worker_user
+                ).distinct().count()
+                worker_stats[key] = count
+            except User.DoesNotExist:
+                worker_stats[key] = 0
+    
+    # USTA STATISTIKASI
+    personal_stats = {}
+    if is_worker:
+        worker_orders = Order.objects.filter(
+            assigned_workers__user=request.user,
+            status__in=archived_statuses
+        ).distinct()
+        personal_stats = {
+            'total': worker_orders.count(),
+            'bajarildi': worker_orders.filter(status='BAJARILDI').count(),
+            'usta_tugatdi': worker_orders.filter(status='USTA_TUGATDI').count(),
+            'tayyor': worker_orders.filter(status='TAYYOR').count(),
+        }
+    
     context = {
-        'page_obj': page_obj,
-        'archived_count': archived_orders.count(),
+        'main_orders': page_obj,
+        'main_orders_count': main_orders.count(),
         'search_query': search_query,
-        'main_orders': page_obj,  # Sahifadagi buyurtmalarni yuboramiz
-        'child_orders': [],       # Model bo'lmagani uchun bo'sh ro'yxat
+        'worker_filter': worker_filter,
         'is_worker': is_worker,
         'is_manager': is_manager,
         'is_glavniy_admin': is_glavniy_admin,
+        'worker_stats': worker_stats,
+        'personal_stats': personal_stats,
     }
+    
     return render(request, 'orders/order_archive.html', context)
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import DriverTrip, TripPoint
