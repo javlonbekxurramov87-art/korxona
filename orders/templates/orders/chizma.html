@@ -1,0 +1,1410 @@
+<!-- orders/templates/orders/chizma.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>EcoProm Konstruktor | Sovutish Kamerasi</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Plotly 3D -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #1a1a1a;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #e5e7eb;
+            --bg-light: #f9fafb;
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            background: #f3f4f6;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            padding: 20px;
+        }
+        
+        .main-container { max-width: 1600px; margin: 0 auto; }
+        
+        .sidebar {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            height: calc(100vh - 40px);
+            overflow-y: auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .content-area {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .metric-title {
+            font-size: 13px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metric-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 8px;
+        }
+        
+        .form-group { margin-bottom: 16px; }
+        
+        .form-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #4b5563;
+            margin-bottom: 6px;
+        }
+        
+        .btn-primary-custom {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary-custom:hover {
+            background: #333;
+            transform: translateY(-1px);
+        }
+        
+        .btn-success-custom {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .btn-outline-custom {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .badge-custom {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            border: 1px solid var(--border);
+            font-size: 12px;
+            margin: 4px 4px 0 0;
+        }
+        
+        .ai-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        
+        .svg-container {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            margin-top: 20px;
+            border: 1px solid var(--border);
+        }
+        
+        .spec-card {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        
+        .nav-tabs-custom {
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        
+        .nav-tabs-custom .nav-link {
+            color: #6b7280;
+            border: none;
+            padding: 12px 20px;
+            font-weight: 600;
+        }
+        
+        .nav-tabs-custom .nav-link.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            background: transparent;
+        }
+        
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            z-index: 9999;
+            display: none;
+        }
+        
+        .project-list-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .project-list-item:hover { background: var(--bg-light); }
+        .project-list-item.active { background: var(--primary); color: white; }
+        
+        #floor_options, #door_options { transition: all 0.3s; }
+        
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+        }
+        
+        #loading-overlay .spinner-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                height: auto;
+                max-height: 500px;
+            }
+            
+            .metric-card {
+                padding: 10px;
+            }
+            
+            .metric-value {
+                font-size: 20px;
+            }
+            
+            #plotly_3d {
+                height: 300px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="spinner-container">
+            <div class="spinner-border" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Yuklanmoqda...</span>
+            </div>
+            <p class="mt-3">Iltimos kuting...</p>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="row g-4">
+            
+            <!-- ================================================= -->
+            <!-- SIDEBAR - BARCHA SOZLAMALAR -->
+            <!-- ================================================= -->
+            <div class="col-lg-4 col-xl-3">
+                <div class="sidebar">
+                    <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h3 class="mb-0" style="font-weight: 800;">🏗 EcoProm</h3>
+                        <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Orqaga
+                        </a>
+                    </div>
+                    
+                    <!-- Loyihalar ro'yxati -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">📁 LOYIHALAR</label>
+                            <button class="btn btn-sm btn-outline-primary" onclick="createNewProject()">
+                                <i class="fas fa-plus"></i> Yangi
+                            </button>
+                        </div>
+                        <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                            {% for project in recent_projects %}
+                            <div class="project-list-item" onclick="loadProject({{ project.id }})">
+                                <strong>{{ project.room_code }}</strong><br>
+                                <small>{{ project.project_name|default:"Nomsiz" }}</small>
+                            </div>
+                            {% empty %}
+                            <div class="p-3 text-muted text-center">Loyihalar yo'q</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- O'lchamlar -->
+                    <div class="mb-4">
+                        <label class="form-label">📏 O'LCHAMLAR (metr)</label>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <input type="number" id="length" class="form-control" placeholder="Uzunlik" value="5" step="0.1" min="0.1" max="100">
+                            </div>
+                            <div class="col-4">
+                                <input type="number" id="width" class="form-control" placeholder="Eni" value="4" step="0.1" min="0.1" max="100">
+                            </div>
+                            <div class="col-4">
+                                <input type="number" id="height" class="form-control" placeholder="Balandlik" value="3" step="0.1" min="0.1" max="20">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Devor va Panel -->
+                    <div class="mb-4">
+                        <label class="form-label">🧱 DEVOR VA PANEL</label>
+                        <div class="form-group">
+                            <select id="wall_type" class="form-select">
+                                <option value="Sovutgich (PIR)">Sovutgich (PIR)</option>
+                                <option value="Oddiy Devor">Oddiy Devor</option>
+                                <option value="Sendvich Mineral paxta">Sendvich Mineral paxta</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <select id="wall_thickness" class="form-select">
+                                <option value="50mm">50mm</option>
+                                <option value="80mm">80mm</option>
+                                <option value="100mm" selected>100mm</option>
+                                <option value="120mm">120mm</option>
+                                <option value="150mm">150mm</option>
+                                <option value="200mm">200mm</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <select id="ceiling_type" class="form-select">
+                                <option value="Sovutgich (PIR)">Patalok: PIR</option>
+                                <option value="Tom uchun (Trapsiya)">Tom uchun (Trapsiya)</option>
+                                <option value="Tekis panel">Tekis panel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <select id="ceiling_thickness" class="form-select">
+                                <option value="50mm">50mm</option>
+                                <option value="80mm" selected>80mm</option>
+                                <option value="100mm">100mm</option>
+                                <option value="120mm">120mm</option>
+                                <option value="150mm">150mm</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <select id="panel_width" class="form-select">
+                                <option value="0.96">Panel eni: 0.96 m</option>
+                                <option value="1.00">Panel eni: 1.00 m</option>
+                                <option value="1.16" selected>Panel eni: 1.16 m</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- POL - Dinamik -->
+                    <div class="mb-4">
+                        <div class="form-check mb-2">
+                            <input type="checkbox" id="has_floor" class="form-check-input" checked onchange="toggleFloorOptions()">
+                            <label for="has_floor" class="form-check-label fw-bold">🧊 Pol paneli qo'shish</label>
+                        </div>
+                        <div id="floor_options">
+                            <select id="floor_type" class="form-select mb-2">
+                                <option value="PIR (Standart)">PIR (Standart)</option>
+                                <option value="PIR (Kuchaytirilgan)">PIR (Kuchaytirilgan)</option>
+                            </select>
+                            <select id="floor_thickness" class="form-select">
+                                <option value="50mm">50mm</option>
+                                <option value="80mm">80mm</option>
+                                <option value="100mm" selected>100mm</option>
+                                <option value="120mm">120mm</option>
+                                <option value="150mm">150mm</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- ESHIK - Dinamik -->
+                    <div class="mb-4">
+                        <label class="form-label">🚪 ESHIK</label>
+                        <select id="door_type" class="form-select mb-2" onchange="toggleDoorOptions()">
+                            <option value="Muzlatkich eshigi" selected>Muzlatkich eshigi (960x2000)</option>
+                            <option value="Bir tabaqali (90x190)">Bir tabaqali (900x1900)</option>
+                            <option value="Surilma (120x200)">Surilma (1200x2000)</option>
+                            <option value="Yo'q">❌ Eshik yo'q</option>
+                        </select>
+                        <div id="door_options">
+                            <select id="door_side" class="form-select mb-2">
+                                <option value="Old" selected>Old tomon</option>
+                                <option value="Orqa">Orqa tomon</option>
+                                <option value="Chap">Chap tomon</option>
+                                <option value="O'ng">O'ng tomon</option>
+                            </select>
+                            <select id="door_position" class="form-select mb-2">
+                                <option value="O'rta" selected>O'rta</option>
+                                <option value="Chap">Chap / Tepa</option>
+                                <option value="O'ng">O'ng / Past</option>
+                            </select>
+                            <select id="door_opening" class="form-select">
+                                <option value="Ichkariga" selected>Ichkariga ochiladi</option>
+                                <option value="Tashqariga">Tashqariga ochiladi</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Agregat -->
+                    <div class="mb-4">
+                        <label class="form-label">❄️ AGREGAT</label>
+                        <select id="unit_type" class="form-select mb-2" onchange="toggleUnitOptions()">
+                            <option value="Split-sistema (Nizkotemp)" selected>Split-sistema (Nizkotemp)</option>
+                            <option value="Mono-blok (Srednetemp)">Mono-blok (Srednetemp)</option>
+                            <option value="Zanotti (Italiya)">Zanotti (Italiya)</option>
+                            <option value="Yo'q">❌ Agregat yo'q</option>
+                        </select>
+                        <div id="unit_options">
+                            <select id="unit_side" class="form-select mb-2">
+                                <option value="Old" selected>Old tomon</option>
+                                <option value="Orqa">Orqa tomon</option>
+                                <option value="Chap">Chap tomon</option>
+                                <option value="O'ng">O'ng tomon</option>
+                            </select>
+                            <select id="unit_brand" class="form-select">
+                                <option value="Bitzer" selected>Bitzer</option>
+                                <option value="Zanotti">Zanotti</option>
+                                <option value="Frascold">Frascold</option>
+                                <option value="Copeland">Copeland</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- AI uchun ma'lumot -->
+                    <div class="mb-4">
+                        <label class="form-label">🤖 AI UCHUN MA'LUMOT</label>
+                        <select id="product_type" class="form-select mb-2">
+                            <option value="Go'sht" selected>Go'sht</option>
+                            <option value="Tovuq">Tovuq</option>
+                            <option value="Baliq">Baliq</option>
+                            <option value="Muzqaymoq">Muzqaymoq</option>
+                            <option value="Sut mahsulotlari">Sut mahsulotlari</option>
+                            <option value="Meva-sabzavot">Meva-sabzavot</option>
+                        </select>
+                        <input type="text" id="storage_temp" class="form-control mb-2" placeholder="Harorat" value="-18°C">
+                        <select id="opening_freq" class="form-select mb-2">
+                            <option value="Kam" selected>Ochilish: Kam</option>
+                            <option value="O'rtacha">Ochilish: O'rtacha</option>
+                            <option value="Ko'p">Ochilish: Ko'p</option>
+                        </select>
+                        <select id="region" class="form-select mb-2">
+                            <option value="Mo'tadil" selected>Hudud: Mo'tadil</option>
+                            <option value="Sovuq">Hudud: Sovuq</option>
+                            <option value="Issiq">Hudud: Issiq</option>
+                        </select>
+                        <select id="humidity" class="form-select">
+                            <option value="Standart" selected>Namlik: Standart</option>
+                            <option value="Past namlik">Past namlik</option>
+                            <option value="Yuqori namlik">Yuqori namlik</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Loyiha nomi -->
+                    <div class="mb-4">
+                        <label class="form-label">📋 LOYIHA</label>
+                        <input type="text" id="project_name" class="form-control mb-2" placeholder="Loyiha nomi" value="">
+                        <input type="text" id="room_code" class="form-control" placeholder="Loyiha kodi" value="EP-001">
+                    </div>
+                    
+                    <!-- Tugmalar -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary-custom" onclick="calculateAndUpdate()">
+                            <i class="fas fa-calculator"></i> HISOBLASH
+                        </button>
+                        <button class="btn btn-outline-custom" onclick="getAIRecommendation()">
+                            <i class="fas fa-robot"></i> AI TAVSIYA OLISH
+                        </button>
+                        <button class="btn btn-outline-custom" onclick="saveProject()">
+                            <i class="fas fa-save"></i> LOYIHANI SAQLASH
+                        </button>
+                        <button class="btn btn-success-custom" onclick="sendToTelegram()">
+                            <i class="fab fa-telegram"></i> TELEGRAMGA YUBORISH
+                        </button>
+                        <button class="btn btn-outline-custom" onclick="downloadSVG()">
+                            <i class="fas fa-download"></i> SVG YUKLAB OLISH
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ================================================= -->
+            <!-- ASOSIY KONTENT -->
+            <!-- ================================================= -->
+            <div class="col-lg-8 col-xl-9">
+                <div class="content-area">
+                    
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs-custom" id="mainTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#overview">
+                                <i class="fas fa-chart-pie"></i> Umumiy
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#threed">
+                                <i class="fas fa-cube"></i> 3D Ko'rinish
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#drawing">
+                                <i class="fas fa-drafting-compass"></i> Texnik Chizma
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#specs">
+                                <i class="fas fa-clipboard-list"></i> Spetsifikatsiya
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- OVERVIEW TAB -->
+                        <div class="tab-pane fade show active" id="overview">
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="metric-card">
+                                        <div class="metric-title">Tashqi hajm</div>
+                                        <div class="metric-value" id="metric_volume">0 m³</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="metric-card">
+                                        <div class="metric-title">Ichki hajm</div>
+                                        <div class="metric-value" id="metric_inner_volume">0 m³</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="metric-card">
+                                        <div class="metric-title">Panel maydoni</div>
+                                        <div class="metric-value" id="metric_area">0 m²</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="metric-card">
+                                        <div class="metric-title">Panel soni</div>
+                                        <div class="metric-value" id="metric_panels">0 ta</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="spec-card">
+                                <h5>📐 Ichki foydali o'lchamlar</h5>
+                                <p class="mb-1"><span id="inner_dims">0 x 0 x 0 mm</span></p>
+                            </div>
+                            
+                            <div class="spec-card">
+                                <h5>🔲 Panel раскладка (Segmentlar)</h5>
+                                <p><strong>Uzunlik:</strong> <span id="top_segments">-</span></p>
+                                <p><strong>Eni:</strong> <span id="right_segments">-</span></p>
+                            </div>
+                            
+                            <div id="ai_result_container"></div>
+                        </div>
+                        
+                        <!-- 3D TAB -->
+                        <div class="tab-pane fade" id="threed">
+                            <div id="plotly_3d" style="width: 100%; height: 500px;"></div>
+                            <div class="mt-3">
+                                <label>Montaj progress: <span id="progress_value">100</span>%</label>
+                                <input type="range" id="progress_slider" class="form-range" min="0" max="100" value="100" onchange="updateProgress()">
+                            </div>
+                        </div>
+                        
+                        <!-- DRAWING TAB -->
+                        <div class="tab-pane fade" id="drawing">
+                            <div class="svg-container" id="svg_container">
+                                <p class="text-muted text-center">Hisoblash tugmasini bosing...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- SPECS TAB -->
+                        <div class="tab-pane fade" id="specs">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="spec-card">
+                                        <h5>🧱 Devor</h5>
+                                        <p>Turi: <span id="spec_wall_type">-</span></p>
+                                        <p>Qalinligi: <span id="spec_wall_thickness">-</span></p>
+                                        <p>Maydoni: <span id="spec_wall_area">-</span> m²</p>
+                                        <p>Panel soni: <span id="spec_wall_panels">-</span> ta</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="spec-card">
+                                        <h5>📦 Patalok</h5>
+                                        <p>Turi: <span id="spec_ceiling_type">-</span></p>
+                                        <p>Qalinligi: <span id="spec_ceiling_thickness">-</span></p>
+                                        <p>Maydoni: <span id="spec_ceiling_area">-</span> m²</p>
+                                        <p>Panel soni: <span id="spec_ceiling_panels">-</span> ta</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="spec-card">
+                                        <h5>🧊 Pol</h5>
+                                        <p>Turi: <span id="spec_floor_type">-</span></p>
+                                        <p>Qalinligi: <span id="spec_floor_thickness">-</span></p>
+                                        <p>Maydoni: <span id="spec_floor_area">-</span> m²</p>
+                                        <p>Panel soni: <span id="spec_floor_panels">-</span> ta</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="spec-card">
+                                        <h5>🚪 Eshik & Agregat</h5>
+                                        <p>Eshik: <span id="spec_door">-</span></p>
+                                        <p>Joyi: <span id="spec_door_side">-</span> / <span id="spec_door_position">-</span></p>
+                                        <p>Ochilishi: <span id="spec_door_opening">-</span></p>
+                                        <p>Agregat: <span id="spec_unit">-</span></p>
+                                        <p>Brend: <span id="spec_unit_brand">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3" id="badges_container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div class="toast-notification" id="toast">
+        <span id="toast_message"></span>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // =====================================================
+        // GLOBAL O'ZGARUVCHILAR VA YORDAMCHI FUNKSIYALAR
+        // =====================================================
+        let currentProjectId = null;
+        let currentCalculations = null;
+        let currentSVG = null;
+        
+        // Loading ko'rsatish/yashirish
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'block';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+        
+        // CSRF Token olish
+        function getCSRFToken() {
+            const metaToken = document.querySelector('meta[name="csrf-token"]');
+            if (metaToken) return metaToken.getAttribute('content');
+            
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'csrftoken') return value;
+            }
+            return '';
+        }
+        
+        // Toast xabar
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast_message');
+            msg.innerHTML = message;
+            toast.style.display = 'block';
+            toast.style.background = type === 'success' ? '#10b981' : '#ef4444';
+            setTimeout(() => toast.style.display = 'none', 4000);
+        }
+        
+        // Dinamik toggle funksiyalari
+        function toggleFloorOptions() {
+            const hasFloor = document.getElementById('has_floor').checked;
+            document.getElementById('floor_options').style.display = hasFloor ? 'block' : 'none';
+        }
+        
+        function toggleDoorOptions() {
+            const hasDoor = document.getElementById('door_type').value !== 'Yo\'q';
+            document.getElementById('door_options').style.display = hasDoor ? 'block' : 'none';
+        }
+        
+        function toggleUnitOptions() {
+            const hasUnit = document.getElementById('unit_type').value !== 'Yo\'q';
+            document.getElementById('unit_options').style.display = hasUnit ? 'block' : 'none';
+        }
+        
+        // Validatsiya
+        function validateFormData(data) {
+            const errors = [];
+            
+            if (data.length <= 0) errors.push('Uzunlik musbat son bo\'lishi kerak');
+            if (data.width <= 0) errors.push('Eni musbat son bo\'lishi kerak');
+            if (data.height <= 0) errors.push('Balandlik musbat son bo\'lishi kerak');
+            if (data.length > 100) errors.push('Uzunlik 100m dan oshmasligi kerak');
+            if (data.width > 100) errors.push('Eni 100m dan oshmasligi kerak');
+            if (data.height > 20) errors.push('Balandlik 20m dan oshmasligi kerak');
+            
+            return errors;
+        }
+        
+        // Forma ma'lumotlari
+        function collectFormData() {
+            const panelWidthSelect = document.getElementById('panel_width');
+            const panelWidthText = panelWidthSelect.options[panelWidthSelect.selectedIndex].text;
+            const panelWidthMatch = panelWidthText.match(/(\d+\.?\d*)/);
+            const panelWidth = panelWidthMatch ? parseFloat(panelWidthMatch[1]) : 1.16;
+            
+            return {
+                length: parseFloat(document.getElementById('length').value) || 5,
+                width: parseFloat(document.getElementById('width').value) || 4,
+                height: parseFloat(document.getElementById('height').value) || 3,
+                wall_type: document.getElementById('wall_type').value,
+                wall_thickness: document.getElementById('wall_thickness').value,
+                ceiling_type: document.getElementById('ceiling_type').value,
+                ceiling_thickness: document.getElementById('ceiling_thickness').value,
+                panel_width: panelWidth,
+                has_floor: document.getElementById('has_floor').checked,
+                floor_type: document.getElementById('floor_type').value,
+                floor_thickness: document.getElementById('floor_thickness').value,
+                door_type: document.getElementById('door_type').value,
+                door_side: document.getElementById('door_side').value,
+                door_position: document.getElementById('door_position').value,
+                door_opening: document.getElementById('door_opening').value,
+                unit_type: document.getElementById('unit_type').value,
+                unit_side: document.getElementById('unit_side').value,
+                unit_brand: document.getElementById('unit_brand').value,
+                product_type: document.getElementById('product_type').value,
+                storage_temp: document.getElementById('storage_temp').value,
+                opening_freq: document.getElementById('opening_freq').value,
+                region: document.getElementById('region').value,
+                humidity: document.getElementById('humidity').value,
+                project_name: document.getElementById('project_name').value,
+                room_code: document.getElementById('room_code').value,
+            };
+        }
+        
+        // =====================================================
+        // ASOSIY HISOBLASH FUNKSIYASI
+        // =====================================================
+        async function calculateAndUpdate() {
+            const data = collectFormData();
+            
+            // Validatsiya
+            const errors = validateFormData(data);
+            if (errors.length > 0) {
+                showToast('❌ ' + errors.join('<br>'), 'error');
+                return;
+            }
+            
+            showToast('⏳ Hisoblanmoqda...', 'success');
+            showLoading();
+            
+            try {
+                const response = await fetch('/orders/api/calculate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentCalculations = result.calculations;
+                    updateUI(currentCalculations, data);
+                    await generateSVG();
+                    render3D(currentCalculations, data);
+                    showToast('✅ Hisoblandi!', 'success');
+                    
+                    // Formani localStorage ga saqlash
+                    localStorage.setItem('lastFormData', JSON.stringify(data));
+                } else {
+                    showToast('❌ ' + (result.error || 'Xatolik'), 'error');
+                }
+            } catch (e) {
+                console.error('Calculation error:', e);
+                showToast('❌ Xatolik: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // UI Yangilash
+        function updateUI(calc, data) {
+            document.getElementById('metric_volume').textContent = calc.outer_volume_m3 + ' m³';
+            document.getElementById('metric_inner_volume').textContent = calc.inner_volume_m3 + ' m³';
+            document.getElementById('metric_area').textContent = calc.total_panel_area_m2 + ' m²';
+            document.getElementById('metric_panels').textContent = calc.total_panels_estimated + ' ta';
+            
+            document.getElementById('inner_dims').textContent = 
+                `${calc.inner_L_mm} x ${calc.inner_W_mm} x ${calc.inner_H_mm} mm`;
+            
+            const topSeg = calc.top_meta.map(p => p.type === 'door' ? `${p.size} ESHIK` : p.size + 'mm').join(' + ');
+            const rightSeg = calc.right_meta.map(p => p.type === 'door' ? `${p.size} ESHIK` : p.size + 'mm').join(' + ');
+            document.getElementById('top_segments').textContent = topSeg || '-';
+            document.getElementById('right_segments').textContent = rightSeg || '-';
+            
+            // Spetsifikatsiya
+            document.getElementById('spec_wall_type').textContent = data.wall_type;
+            document.getElementById('spec_wall_thickness').textContent = calc.wall_mm + ' mm';
+            document.getElementById('spec_wall_area').textContent = calc.wall_area_m2;
+            document.getElementById('spec_wall_panels').textContent = calc.wall_panels_total;
+            
+            document.getElementById('spec_ceiling_type').textContent = data.ceiling_type;
+            document.getElementById('spec_ceiling_thickness').textContent = calc.ceil_mm + ' mm';
+            document.getElementById('spec_ceiling_area').textContent = calc.ceiling_area_m2;
+            document.getElementById('spec_ceiling_panels').textContent = calc.ceiling_panels_total;
+            
+            // POL
+            if (data.has_floor) {
+                document.getElementById('spec_floor_type').textContent = data.floor_type;
+                document.getElementById('spec_floor_thickness').textContent = calc.floor_mm + ' mm';
+                document.getElementById('spec_floor_area').textContent = calc.floor_area_m2;
+                document.getElementById('spec_floor_panels').textContent = calc.floor_panels_total;
+            } else {
+                document.getElementById('spec_floor_type').textContent = 'Mavjud emas';
+                document.getElementById('spec_floor_thickness').textContent = '0 mm';
+                document.getElementById('spec_floor_area').textContent = '0';
+                document.getElementById('spec_floor_panels').textContent = '0';
+            }
+            
+            // ESHIK
+            if (data.door_type !== 'Yo\'q') {
+                document.getElementById('spec_door').textContent = data.door_type + ` (${calc.door_w_mm}x${calc.door_h_mm}mm)`;
+                document.getElementById('spec_door_side').textContent = data.door_side;
+                document.getElementById('spec_door_position').textContent = data.door_position;
+                document.getElementById('spec_door_opening').textContent = data.door_opening;
+            } else {
+                document.getElementById('spec_door').textContent = 'Yo\'q';
+                document.getElementById('spec_door_side').textContent = '-';
+                document.getElementById('spec_door_position').textContent = '-';
+                document.getElementById('spec_door_opening').textContent = '-';
+            }
+            
+            // AGREGAT
+            if (data.unit_type !== 'Yo\'q') {
+                document.getElementById('spec_unit').textContent = data.unit_type;
+                document.getElementById('spec_unit_brand').textContent = data.unit_brand;
+            } else {
+                document.getElementById('spec_unit').textContent = 'Yo\'q';
+                document.getElementById('spec_unit_brand').textContent = '-';
+            }
+            
+            // Badgelar
+            const badges = document.getElementById('badges_container');
+            let badgesHtml = `
+                <span class="badge-custom">${data.wall_type}</span>
+                <span class="badge-custom">Devor: ${calc.wall_mm}mm</span>
+                <span class="badge-custom">Patalok: ${calc.ceil_mm}mm</span>
+                <span class="badge-custom">Panel: ${data.panel_width}m</span>
+            `;
+            if (data.door_type !== 'Yo\'q') {
+                badgesHtml += `<span class="badge-custom">🚪 ${data.door_type}</span>`;
+            }
+            if (data.has_floor) {
+                badgesHtml += `<span class="badge-custom">🧊 Pol: ${calc.floor_mm}mm</span>`;
+            }
+            badges.innerHTML = badgesHtml;
+        }
+        
+        // =====================================================
+        // SVG GENERATSIYA (POL VA PATALOK BILAN)
+        // =====================================================
+        async function generateSVG() {
+            const data = collectFormData();
+            data.calculations = currentCalculations;
+            
+            try {
+                const response = await fetch('/orders/api/generate-svg/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    currentSVG = result.svg;
+                    document.getElementById('svg_container').innerHTML = result.svg;
+                } else {
+                    // Agar API dan SVG kelmasa, local yaratish
+                    generateLocalSVG(data);
+                }
+            } catch (e) {
+                console.error('SVG API error:', e);
+                // Xatolik bo'lsa local yaratish
+                generateLocalSVG(data);
+            }
+        }
+        
+        // Local SVG yaratish (Pol va Patalok bilan)
+        function generateLocalSVG(data) {
+            const calc = currentCalculations;
+            if (!calc) return;
+            
+            const L = data.length * 100;  // piksellarda
+            const W = data.width * 100;
+            const H = data.height * 100;
+            const wallT = calc.wall_mm / 10;
+            const ceilT = calc.ceil_mm / 10;
+            const floorT = data.has_floor ? calc.floor_mm / 10 : 0;
+            
+            const svgWidth = L + 400;
+            const svgHeight = H + W + 200;
+            
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="100%" height="100%">`;
+            
+            // Fon
+            svg += `<rect width="100%" height="100%" fill="#f9fafb"/>`;
+            
+            // Sarlavha
+            svg += `<text x="20" y="30" font-size="18" font-weight="bold" fill="#1a1a1a">${data.room_code} - ${data.length} x ${data.width} x ${data.height} m</text>`;
+            
+            // ========== ASOSIY QUTI (Old ko'rinish) ==========
+            const offsetX = 50;
+            const offsetY = 80;
+            
+            // Tashqi quti
+            svg += `<rect x="${offsetX}" y="${offsetY}" width="${L}" height="${H}" 
+                    fill="#e5e7eb" stroke="#1a1a1a" stroke-width="2"/>`;
+            
+            // Ichki quti (devor qalinligi hisobiga)
+            svg += `<rect x="${offsetX + wallT}" y="${offsetY + (data.has_floor ? floorT : wallT)}" 
+                    width="${L - 2*wallT}" height="${H - wallT - (data.has_floor ? floorT : wallT)}" 
+                    fill="#d1fae5" stroke="#10b981" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+            
+            // ========== PATALOK (Yuqori panel) ==========
+            svg += `<rect x="${offsetX}" y="${offsetY - ceilT}" width="${L}" height="${ceilT}" 
+                    fill="#93c5fd" stroke="#3b82f6" stroke-width="1.5" opacity="0.7"/>`;
+            svg += `<text x="${offsetX + L/2}" y="${offsetY - ceilT/2}" 
+                    text-anchor="middle" font-size="12" fill="#1e40af" font-weight="bold">PATALOK (${calc.ceil_mm}mm)</text>`;
+            
+            // ========== POL (Pastki panel) ==========
+            if (data.has_floor) {
+                svg += `<rect x="${offsetX}" y="${offsetY + H}" width="${L}" height="${floorT}" 
+                        fill="#fcd34d" stroke="#d97706" stroke-width="1.5" opacity="0.7"/>`;
+                svg += `<text x="${offsetX + L/2}" y="${offsetY + H + floorT/2}" 
+                        text-anchor="middle" font-size="12" fill="#92400e" font-weight="bold">POL (${calc.floor_mm}mm)</text>`;
+            }
+            
+            // ========== ESHIK ==========
+            if (data.door_type !== 'Yo\'q') {
+                const doorW = calc.door_w_mm / 10;
+                const doorH = calc.door_h_mm / 10;
+                const doorX = offsetX + (L - doorW) / 2;
+                const doorY = offsetY + (data.has_floor ? floorT : wallT);
+                
+                svg += `<rect x="${doorX}" y="${doorY}" width="${doorW}" height="${doorH}" 
+                        fill="#fca5a5" stroke="#dc2626" stroke-width="2" rx="3"/>`;
+                svg += `<text x="${doorX + doorW/2}" y="${doorY + doorH/2}" 
+                        text-anchor="middle" font-size="11" fill="#991b1b" font-weight="bold">ESHIK</text>`;
+                svg += `<text x="${doorX + doorW/2}" y="${doorY + doorH/2 + 15}" 
+                        text-anchor="middle" font-size="9" fill="#991b1b">${calc.door_w_mm}x${calc.door_h_mm}mm</text>`;
+            }
+            
+            // ========== Yon ko'rinish (Izometrik) ==========
+            const isoX = offsetX + L + 80;
+            const isoY = offsetY + 30;
+            const depth = W;
+            
+            // Tashqi quti (izometrik)
+            svg += `<polygon points="${isoX},${isoY} ${isoX+depth*0.7},${isoY-depth*0.5} ${isoX+depth*0.7+L},${isoY-depth*0.5} ${isoX+L},${isoY}" 
+                    fill="#d1d5db" stroke="#1a1a1a" stroke-width="1.5"/>`;
+            svg += `<polygon points="${isoX},${isoY} ${isoX},${isoY+H} ${isoX+depth*0.7},${isoY+H-depth*0.5} ${isoX+depth*0.7},${isoY-depth*0.5}" 
+                    fill="#9ca3af" stroke="#1a1a1a" stroke-width="1.5"/>`;
+            
+            // Patalok (izometrik)
+            svg += `<polygon points="${isoX},${isoY-ceilT} ${isoX+depth*0.7},${isoY-depth*0.5-ceilT} ${isoX+depth*0.7+L},${isoY-depth*0.5-ceilT} ${isoX+L},${isoY-ceilT}" 
+                    fill="#93c5fd" stroke="#3b82f6" stroke-width="1" opacity="0.6"/>`;
+            
+            // Pol (izometrik)
+            if (data.has_floor) {
+                svg += `<polygon points="${isoX},${isoY+H} ${isoX+depth*0.7},${isoY+H-depth*0.5} ${isoX+depth*0.7+L},${isoY+H-depth*0.5} ${isoX+L},${isoY+H}" 
+                        fill="#fcd34d" stroke="#d97706" stroke-width="1" opacity="0.6"/>`;
+            }
+            
+            // ========== O'lcham chiziqlari ==========
+            // Uzunlik
+            svg += `<line x1="${offsetX}" y1="${offsetY + H + 30}" x2="${offsetX + L}" y2="${offsetY + H + 30}" 
+                    stroke="#6b7280" stroke-width="1" marker-start="url(#arrow)" marker-end="url(#arrow)"/>`;
+            svg += `<text x="${offsetX + L/2}" y="${offsetY + H + 45}" text-anchor="middle" font-size="12" fill="#6b7280">${data.length} m</text>`;
+            
+            // Balandlik
+            svg += `<line x1="${offsetX - 30}" y1="${offsetY}" x2="${offsetX - 30}" y2="${offsetY + H}" 
+                    stroke="#6b7280" stroke-width="1"/>`;
+            svg += `<text x="${offsetX - 40}" y="${offsetY + H/2}" text-anchor="middle" font-size="12" fill="#6b7280" transform="rotate(-90, ${offsetX-40}, ${offsetY+H/2})">${data.height} m</text>`;
+            
+            // Devor qalinligi
+            svg += `<text x="${offsetX + 10}" y="${offsetY + 25}" font-size="10" fill="#ef4444">Devor: ${calc.wall_mm}mm</text>`;
+            
+            // Legend
+            const legendY = offsetY + H + 80;
+            svg += `<rect x="20" y="${legendY}" width="16" height="16" fill="#d1fae5" stroke="#10b981"/>`;
+            svg += `<text x="42" y="${legendY + 13}" font-size="12" fill="#1a1a1a">Ichki hajm</text>`;
+            
+            svg += `<rect x="120" y="${legendY}" width="16" height="16" fill="#93c5fd" stroke="#3b82f6"/>`;
+            svg += `<text x="142" y="${legendY + 13}" font-size="12" fill="#1a1a1a">Patalok</text>`;
+            
+            if (data.has_floor) {
+                svg += `<rect x="230" y="${legendY}" width="16" height="16" fill="#fcd34d" stroke="#d97706"/>`;
+                svg += `<text x="252" y="${legendY + 13}" font-size="12" fill="#1a1a1a">Pol</text>`;
+            }
+            
+            if (data.door_type !== 'Yo\'q') {
+                svg += `<rect x="320" y="${legendY}" width="16" height="16" fill="#fca5a5" stroke="#dc2626"/>`;
+                svg += `<text x="342" y="${legendY + 13}" font-size="12" fill="#1a1a1a">Eshik</text>`;
+            }
+            
+            // Arrow marker
+            svg += `<defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                    <path d="M0,0 L10,5 L0,10 Z" fill="#6b7280"/>
+                </marker>
+            </defs>`;
+            
+            svg += `</svg>`;
+            
+            currentSVG = svg;
+            document.getElementById('svg_container').innerHTML = svg;
+        }
+        
+        // =====================================================
+        // 3D RENDER (TO'G'RILANGAN)
+        // =====================================================
+        function render3D(calc, data) {
+            const L = data.length;
+            const W = data.width;
+            const H = data.height;
+            const T = calc.wall_mm / 1000;
+            const ceilT = calc.ceil_mm / 1000;
+            const floorT = data.has_floor ? calc.floor_mm / 1000 : 0;
+            
+            const traces = [];
+            
+            // Tashqi quti
+            traces.push({
+                type: 'mesh3d',
+                x: [0, L, L, 0, 0, L, L, 0],
+                y: [0, 0, W, W, 0, 0, W, W],
+                z: [-floorT, -floorT, -floorT, -floorT, H + ceilT, H + ceilT, H + ceilT, H + ceilT],
+                i: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4],
+                j: [1, 2, 4, 2, 5, 3, 6, 0, 7, 5, 6, 7],
+                k: [2, 3, 5, 3, 6, 1, 7, 2, 4, 6, 7, 5],
+                color: '#1a1a1a',
+                opacity: 0.1,
+                flatshading: true,
+                name: 'Tashqi quti',
+                showlegend: true
+            });
+            
+            // Ichki bo'shliq
+            traces.push({
+                type: 'mesh3d',
+                x: [T, L-T, L-T, T, T, L-T, L-T, T],
+                y: [T, T, W-T, W-T, T, T, W-T, W-T],
+                z: [0, 0, 0, 0, H, H, H, H],
+                i: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4],
+                j: [1, 2, 4, 2, 5, 3, 6, 0, 7, 5, 6, 7],
+                k: [2, 3, 5, 3, 6, 1, 7, 2, 4, 6, 7, 5],
+                color: '#10b981',
+                opacity: 0.3,
+                flatshading: true,
+                name: 'Ichki hajm',
+                showlegend: true
+            });
+            
+            // Patalok
+            traces.push({
+                type: 'mesh3d',
+                x: [0, L, L, 0, 0, L, L, 0],
+                y: [0, 0, W, W, 0, 0, W, W],
+                z: [H, H, H, H, H + ceilT, H + ceilT, H + ceilT, H + ceilT],
+                i: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4],
+                j: [1, 2, 4, 2, 5, 3, 6, 0, 7, 5, 6, 7],
+                k: [2, 3, 5, 3, 6, 1, 7, 2, 4, 6, 7, 5],
+                color: '#3b82f6',
+                opacity: 0.5,
+                flatshading: true,
+                name: 'Patalok',
+                showlegend: true
+            });
+            
+            // Pol (agar bor bo'lsa)
+            if (data.has_floor) {
+                traces.push({
+                    type: 'mesh3d',
+                    x: [0, L, L, 0, 0, L, L, 0],
+                    y: [0, 0, W, W, 0, 0, W, W],
+                    z: [-floorT, -floorT, -floorT, -floorT, 0, 0, 0, 0],
+                    i: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4],
+                    j: [1, 2, 4, 2, 5, 3, 6, 0, 7, 5, 6, 7],
+                    k: [2, 3, 5, 3, 6, 1, 7, 2, 4, 6, 7, 5],
+                    color: '#d97706',
+                    opacity: 0.6,
+                    flatshading: true,
+                    name: 'Pol',
+                    showlegend: true
+                });
+            }
+            
+            // Eshik (agar bor bo'lsa)
+            if (data.door_type !== 'Yo\'q') {
+                const doorW = calc.door_w_mm / 1000;
+                const doorH = calc.door_h_mm / 1000;
+                let doorX = 0, doorY = 0;
+                
+                if (data.door_side === 'Old') {
+                    doorX = (L - doorW) / 2;
+                    doorY = -0.05;
+                } else if (data.door_side === 'Orqa') {
+                    doorX = (L - doorW) / 2;
+                    doorY = W + 0.05;
+                } else if (data.door_side === 'Chap') {
+                    doorX = -0.05;
+                    doorY = (W - doorW) / 2;
+                } else if (data.door_side === 'O\'ng') {
+                    doorX = L + 0.05;
+                    doorY = (W - doorW) / 2;
+                }
+                
+                const isHorizontal = data.door_side === 'Old' || data.door_side === 'Orqa';
+                const meshW = isHorizontal ? doorW : 0.1;
+                const meshD = isHorizontal ? 0.1 : doorW;
+                
+                traces.push({
+                    type: 'mesh3d',
+                    x: [doorX, doorX + meshW, doorX + meshW, doorX, 
+                        doorX, doorX + meshW, doorX + meshW, doorX],
+                    y: [doorY, doorY, doorY + meshD, doorY + meshD, 
+                        doorY, doorY, doorY + meshD, doorY + meshD],
+                    z: [0, 0, 0, 0, doorH, doorH, doorH, doorH],
+                    i: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4],
+                    j: [1, 2, 4, 2, 5, 3, 6, 0, 7, 5, 6, 7],
+                    k: [2, 3, 5, 3, 6, 1, 7, 2, 4, 6, 7, 5],
+                    color: '#dc2626',
+                    opacity: 0.8,
+                    flatshading: true,
+                    name: 'Eshik',
+                    showlegend: true
+                });
+            }
+            
+            const layout = {
+                title: {
+                    text: `${data.room_code} - ${data.length}x${data.width}x${data.height}m`,
+                    font: { size: 16, family: 'Segoe UI' }
+                },
+                scene: {
+                    xaxis: { title: 'Uzunlik (m)', color: '#1a1a1a' },
+                    yaxis: { title: 'Eni (m)', color: '#1a1a1a' },
+                    zaxis: { title: 'Balandlik (m)', color: '#1a1a1a' },
+                    aspectmode: 'data',
+                    bgcolor: '#f9fafb',
+                    camera: { eye: { x: 1.5, y: 1.5, z: 1.2 } }
+                },
+                margin: { l: 0, r: 0, b: 0, t: 50 },
+                height: 500,
+                showlegend: true,
+                legend: { x: 0.02, y: 0.98, bgcolor: 'rgba(255,255,255,0.8)' }
+            };
+            
+            Plotly.newPlot('plotly_3d', traces, layout);
+        }
+        
+        // =====================================================
+        // AI TAVSIYA
+        // =====================================================
+        async function getAIRecommendation() {
+            const data = collectFormData();
+            showToast('🤖 AI tavsiya olinmoqda...', 'success');
+            showLoading();
+            
+            try {
+                const response = await fetch('/orders/api/ai-recommendation/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const container = document.getElementById('ai_result_container');
+                    container.innerHTML = `
+                        <div class="ai-box">
+                            <h5><i class="fas fa-robot"></i> AI Tavsiya</h5>
+                            <p><strong>Rejim:</strong> ${result.data.rejim || '-'}</p>
+                            <p><strong>Devor:</strong> ${result.data.devor_qalinligi_mm || '-'} mm</p>
+                            <p><strong>Patalok:</strong> ${result.data.patalok_qalinligi_mm || '-'} mm</p>
+                            <p><strong>Pol:</strong> ${result.data.pol_qalinligi_mm || '-'} mm</p>
+                            <p><strong>Agregat:</strong> ${result.data.agregat_turi || '-'}</p>
+                            <p><strong>Eshik:</strong> ${result.data.eshik_turi || '-'}</p>
+                            <p><strong>Xulosa:</strong> ${result.data.xulosa || '-'}</p>
+                        </div>
+                    `;
+                    showToast('✅ AI tavsiya olindi!', 'success');
+                } else {
+                    showToast('❌ ' + (result.message || 'AI xatolik'), 'error');
+                }
+            } catch (e) {
+                console.error('AI error:', e);
+                showToast('❌ Server xatoligi', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // =====================================================
+        // QO'SHIMCHA FUNKSIYALAR
+        // =====================================================
+        async function saveProject() {
+            const data = collectFormData();
+            if (currentCalculations) {
+                data.calculations = currentCalculations;
+            }
+            
+            showToast('⏳ Saqlanmoqda...', 'success');
+            
+            try {
+                const response = await fetch('/orders/api/save-project/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    currentProjectId = result.project_id;
+                    showToast('✅ Loyiha saqlandi!', 'success');
+                } else {
+                    showToast('❌ Saqlashda xatolik', 'error');
+                }
+            } catch (e) {
+                console.error('Save error:', e);
+                showToast('📝 LocalStorage ga saqlandi', 'success');
+                localStorage.setItem('savedProject_' + data.room_code, JSON.stringify(data));
+            }
+        }
+        
+        async function sendToTelegram() {
+            const data = collectFormData();
+            if (currentCalculations) {
+                data.calculations = currentCalculations;
+            }
+            
+            showToast('📤 Telegramga yuborilmoqda...', 'success');
+            
+            try {
+                const response = await fetch('/orders/api/send-telegram/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast('✅ Telegramga yuborildi!', 'success');
+                } else {
+                    showToast('❌ Yuborishda xatolik', 'error');
+                }
+            } catch (e) {
+                console.error('Telegram error:', e);
+                showToast('❌ Server xatoligi', 'error');
+            }
+        }
+        
+        function downloadSVG() {
+            if (currentSVG) {
+                const blob = new Blob([currentSVG], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ecoprom_${document.getElementById('room_code').value || 'project'}.svg`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('✅ SVG yuklab olindi!', 'success');
+            } else {
+                showToast('❌ Avval hisoblash tugmasini bosing!', 'error');
+            }
+        }
+        
+        function updateProgress() {
+            const slider = document.getElementById('progress_slider');
+            document.getElementById('progress_value').textContent = slider.value;
+            
+            // 3D render opacity ni o'zgartirish
+            const plotElement = document.getElementById('plotly_3d');
+            if (plotElement && plotElement._fullLayout) {
+                const progress = slider.value / 100;
+                Plotly.restyle('plotly_3d', {opacity: progress}, [0]);
+            }
+        }
+        
+        function createNewProject() {
+            currentProjectId = null;
+            currentCalculations = null;
+            currentSVG = null;
+            
+            document.getElementById('length').value = 5;
+            document.getElementById('width').value = 4;
+            document.getElementById('height').value = 3;
+            document.getElementById('project_name').value = '';
+            document.getElementById('room_code').value = 'EP-' + new Date().getTime().toString().slice(-4);
+            document.getElementById('has_floor').checked = true;
+            document.getElementById('door_type').value = 'Muzlatkich eshigi';
+            document.getElementById('wall_thickness').value = '100mm';
+            document.getElementById('ceiling_thickness').value = '80mm';
+            document.getElementById('floor_thickness').value = '100mm';
+            document.getElementById('panel_width').value = '1.16';
+            
+            toggleFloorOptions();
+            toggleDoorOptions();
+            toggleUnitOptions();
+            
+            document.getElementById('svg_container').innerHTML = '<p class="text-muted text-center">Yangi loyiha yaratildi. Hisoblash tugmasini bosing...</p>';
+            document.getElementById('ai_result_container').innerHTML = '';
+            
+            showToast('🆕 Yangi loyiha yaratildi', 'success');
+        }
+        
+        async function loadProject(id) {
+            showToast('📂 Yuklanmoqda...', 'success');
+            showLoading();
+            
+            try {
+                const response = await fetch(`/orders/api/project/${id}/`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    Object.keys(data).forEach(key => {
+                        const element = document.getElementById(key);
+                        if (element) {
+                            if (element.type === 'checkbox') {
+                                element.checked = data[key];
+                            } else {
+                                element.value = data[key];
+                            }
+                        }
+                    });
+                    
+                    currentProjectId = id;
+                    toggleFloorOptions();
+                    toggleDoorOptions();
+                    toggleUnitOptions();
+                    
+                    await calculateAndUpdate();
+                    showToast('✅ Loyiha yuklandi!', 'success');
+                }
+            } catch (e) {
+                console.error('Load error:', e);
+                showToast('❌ Yuklashda xatolik', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // LocalStorage dan ma'lumotlarni yuklash
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('lastFormData');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    Object.keys(data).forEach(key => {
+                        const element = document.getElementById(key);
+                        if (element) {
+                            if (element.type === 'checkbox') {
+                                element.checked = data[key];
+                            } else if (element.tagName === 'SELECT' || element.tagName === 'INPUT') {
+                                element.value = data[key];
+                            }
+                        }
+                    });
+                    toggleFloorOptions();
+                    toggleDoorOptions();
+                    toggleUnitOptions();
+                } catch (e) {
+                    console.error('LocalStorage error:', e);
+                }
+            }
+        }
+        
+        // =====================================================
+        // SAHIFA YUKLANGANDA
+        // =====================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleFloorOptions();
+            toggleDoorOptions();
+            toggleUnitOptions();
+            
+            // LocalStorage dan yuklash
+            loadFromLocalStorage();
+            
+            // Avtomatik hisoblash
+            setTimeout(calculateAndUpdate, 500);
+        });
+    </script>
+</body>
+</html>
