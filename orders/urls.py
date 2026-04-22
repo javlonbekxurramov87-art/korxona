@@ -75,7 +75,40 @@ urlpatterns = [
     path('material_report/', views.material_sarfi_report, name='material_report'),
     path('guard/', views.guard_dashboard, name='guard_dashboard'),
     path('patrol/', views.guard_patrol_view, name='guard_patrol'),
+  path('', views.constructor_index, name='index'),
+    path('calculator/', views.constructor_index, name='calculator'),
+    
+    # =========================================================
+    # LOYIHA CRUD
+    # =========================================================
+    path('projects/', views.project_list, name='project_list'),
+    path('projects/create/', views.project_create, name='project_create'),
+    path('projects/<int:pk>/', views.project_detail, name='project_detail'),
+    path('projects/<int:pk>/edit/', views.project_edit, name='project_edit'),
+    path('projects/<int:pk>/delete/', views.project_delete, name='project_delete'),
+    
+    # =========================================================
+    # LOYIHA AMALLARI
+    # =========================================================
+    # AI tavsiya olish
+    path('projects/<int:pk>/ai/', views.ai_recommendation, name='ai_recommendation'),
+    
+    # Telegramga hisobot yuborish
+    path('projects/<int:pk>/send/', views.send_report, name='send_report'),
+    
+    # Buyurtmaga o'tkazish (orders app bilan bog'lash)
+    path('projects/<int:pk>/create-order/', views.create_order_from_project, name='create_order'),
+    
+    # SVG yuklab olish
+    path('projects/<int:pk>/download-svg/', views.download_svg, name='download_svg'),
+    path('api/project/<int:pk>/', views.api_project_detail, name='api_project_detail'),
+    path('chizma/', views.constructor_index, name='chizma'),
 
+    # =========================================================
+    # API ENDPOINTLAR (AJAX)
+    # =========================================================
+    path('api/calculate/', views.api_calculate, name='api_calculate'),
+    path('api/generate-svg/', views.api_generate_svg, name='api_generate_svg'),
     path('debts/', views.debt_report, name='debt_report'),
     path('add-payment/<int:order_id>/', views.add_prepayment, name='add_prepayment'),
     path('rating/', views.customer_rating, name='customer_rating'), # SHU QATORNI TEKSHIRING
