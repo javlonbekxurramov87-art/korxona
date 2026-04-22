@@ -655,3 +655,58 @@ class OrderFilterForm(forms.Form):
         label="Ish Turi",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+# constructor/forms.py
+from django import forms
+from .models import Project
+
+
+class ProjectForm(forms.ModelForm):
+    
+    class Meta:
+        model = Project
+        fields = '__all__'
+        exclude = ['created_by', 'ai_result', 'calculations', 'created_at', 'updated_at']
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # CSS klasslar qo'shish
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'form-control'})
+        
+        # Select uchun maxsus klass
+        select_fields = [
+            'wall_type', 'wall_thickness', 'ceiling_type', 'ceiling_thickness',
+            'floor_type', 'floor_thickness', 'door_type', 'door_side',
+            'door_position', 'door_opening', 'unit_type', 'unit_side',
+            'unit_brand', 'product_type', 'opening_freq', 'region', 'humidity'
+        ]
+        for field in select_fields:
+            if field in self.fields:
+                self.fields[field].widget.attrs.update({'class': 'form-select'})
+
+
+# O'lchamlar uchun oddiy forma (GET parametrlari uchun)
+class QuickCalculatorForm(forms.Form):
+    length = forms.FloatField(min_value=0.1, max_value=30, initial=5.0, label="Uzunlik (m)")
+    width = forms.FloatField(min_value=0.1, max_value=30, initial=4.0, label="Eni (m)")
+    height = forms.FloatField(min_value=0.1, max_value=10, initial=3.0, label="Balandlik (m)")
+    
+    wall_thickness = forms.ChoiceField(
+        choices=[('50mm', '50mm'), ('80mm', '80mm'), ('100mm', '100mm'), 
+                 ('120mm', '120mm'), ('150mm', '150mm'), ('200mm', '200mm')],
+        initial='100mm'
+    )
+    
+    ceiling_thickness = forms.ChoiceField(
+        choices=[('50mm', '50mm'), ('80mm', '80mm'), ('100mm', '100mm'), 
+                 ('120mm', '120mm'), ('150mm', '150mm')],
+        initial='80mm'
+    )
+    
+    has_floor = forms.BooleanField(required=False, initial=True)
+    
+    panel_width = forms.ChoiceField(
+        choices=[('0.96', '0.96 m'), ('1.00', '1.00 m'), ('1.16', '1.16 m')],
+        initial='1.16'
+    )
