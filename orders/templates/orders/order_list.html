@@ -238,6 +238,12 @@
             gap: 2rem;
             margin-top: 1rem;
         }
+        
+        /* Full width content uchun (sales_manager) */
+        .main-content-full {
+            display: block;
+            margin-top: 1rem;
+        }
 
         /* Sidebar */
         .sidebar {
@@ -457,6 +463,69 @@
 
         .observer-banner i {
             color: var(--neutral-600);
+            font-size: 1.5rem;
+        }
+
+        /* Sales Manager specific styles */
+        .sales-manager-panel {
+            background: var(--gradient-card);
+            border-radius: var(--radius-xl);
+            padding: 3rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+
+        .sales-manager-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem;
+            color: white;
+            font-size: 2.5rem;
+            box-shadow: 0 10px 30px rgba(245, 158, 11, 0.3);
+        }
+
+        .sales-manager-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--neutral-800);
+            margin-bottom: 1rem;
+        }
+
+        .sales-manager-description {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn-chizma-large {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem 3rem;
+            background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: var(--radius-xl);
+            font-weight: 600;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-chizma-large:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+            color: white;
+        }
+
+        .btn-chizma-large i {
             font-size: 1.5rem;
         }
 
@@ -743,7 +812,7 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
-        /* Orders Grid - Asosiy buyurtmalar uchun 2-3 qator */
+        /* Orders Grid */
         .orders-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -783,7 +852,7 @@
             border: 2px solid white;
         }
 
-        /* Order Card Styles - BARCHA ORDERLAR UCHUN (main va child) */
+        /* Order Card Styles */
         .order-card {
             background: white;
             border-radius: var(--radius-lg);
@@ -1349,7 +1418,8 @@
             .admin-panel,
             .storekeeper-panel,
             .orders-section,
-            .child-orders-section {
+            .child-orders-section,
+            .sales-manager-panel {
                 padding: 1.5rem;
             }
             
@@ -1401,6 +1471,7 @@
                     <div class="user-details">
                         <div class="user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
                         <div class="user-role">
+                            {% if is_sales_manager %}Sales Menejer{% endif %}
                             {% if is_observer %}Kuzatuvchi{% endif %}
                             {% if is_worker %}Usta{% endif %}
                             {% if is_manager %}Menejer{% endif %}
@@ -1420,6 +1491,43 @@
             </div>
         </div>
 
+        {# ===================================================== #}
+        {# SALES MANAGER UCHUN MAXSUS KO'RINISH #}
+        {# ===================================================== #}
+        {% if is_sales_manager %}
+        <div class="main-content-full">
+            <!-- Welcome Banner -->
+            <div class="welcome-banner">
+                <div class="welcome-content">
+                    <h1 class="welcome-title">Xush kelibsiz, Sales Menejer!</h1>
+                    <p class="welcome-subtitle">
+                        Konstruktor orqali sovutish kameralari loyihalarini yarating va hisoblang.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Sales Manager Panel -->
+            <div class="sales-manager-panel">
+                <div class="sales-manager-icon">
+                    <i class="fas fa-drafting-compass"></i>
+                </div>
+                <h2 class="sales-manager-title">Chizma Konstruktori</h2>
+                <p class="sales-manager-description">
+                    Sovutish kameralari uchun professional 3D konstruktor. 
+                    O'lchamlarni kiriting, materiallarni tanlang va tayyor loyihani yuklab oling.
+                </p>
+                <a href="{% url 'chizma' %}" class="btn-chizma-large">
+                    <i class="fas fa-cube"></i>
+                    <span>Konstruktorga o'tish</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+        
+        {# ===================================================== #}
+        {# QOLGAN FOYDALANUVCHILAR UCHUN OLDINGI KO'RINISH #}
+        {# ===================================================== #}
+        {% else %}
         <!-- Main Content -->
         <div class="main-content">
             <!-- Sidebar -->
@@ -1586,136 +1694,135 @@
                 {% endif %}
 
                 <!-- Admin Panel -->
-          {% if not is_observer and "omborchi" not in request.user.username|lower %}
-    {% if not is_observer and "omborchi" not in request.user.username|lower %}
-        <div class="admin-panel">
-            <div class="admin-header">
-                <div class="admin-icon">
-                    <i class="fas fa-cogs"></i>
-                </div>
-                <h2 class="admin-title">Admin va Hisobotlar</h2>
-            </div>
-            
-            <div class="action-grid">
-                
-                {# FAQAT ASOSIY ADMINLAR UCHUN TUGMALAR #}
-                {% if is_glavniy_admin %}
-                    <a href="{% url 'order_create' %}" class="action-card">
-                        <div class="action-card-content">
-                            <div class="action-icon"><i class="fas fa-plus-circle"></i></div>
-                            <div class="action-details">
-                                <h4>Yangi buyurtma</h4>
-                                <p>Yangi buyurtma yaratish</p>
+                {% if not is_observer and "omborchi" not in request.user.username|lower %}
+                    {% if not is_observer and "omborchi" not in request.user.username|lower %}
+                        <div class="admin-panel">
+                            <div class="admin-header">
+                                <div class="admin-icon">
+                                    <i class="fas fa-cogs"></i>
+                                </div>
+                                <h2 class="admin-title">Admin va Hisobotlar</h2>
+                            </div>
+                            
+                            <div class="action-grid">
+                                
+                                {# FAQAT ASOSIY ADMINLAR UCHUN TUGMALAR #}
+                                {% if is_glavniy_admin %}
+                                    <a href="{% url 'order_create' %}" class="action-card">
+                                        <div class="action-card-content">
+                                            <div class="action-icon"><i class="fas fa-plus-circle"></i></div>
+                                            <div class="action-details">
+                                                <h4>Yangi buyurtma</h4>
+                                                <p>Yangi buyurtma yaratish</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                    
+                                    <a href="{% url 'sales_report_view' %}" class="action-card">
+                                        <div class="action-card-content">
+                                            <div class="action-icon"><i class="fas fa-chart-bar"></i></div>
+                                            <div class="action-details">
+                                                <h4>Sotuv hisoboti</h4>
+                                                <p>Vaqt oralig'i bo'yicha sotuvlar</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                    
+                                    <a href="{% url 'worker_activity_report' %}" class="action-card">
+                                        <div class="action-card-content">
+                                            <div class="action-icon"><i class="fas fa-users-cog"></i></div>
+                                            <div class="action-details">
+                                                <h4>Ustalar hisoboti</h4>
+                                                <p>Ustalar faolligi monitoringi</p>
+                                            </div>
+                                        </div>
+                                    </a>
+
+                                    <a href="{% url 'material_report' %}" class="action-card">
+                                        <div class="action-card-content">
+                                            <div class="action-icon"><i class="fas fa-clipboard-list"></i></div>
+                                            <div class="action-details">
+                                                <h4>List va siryo</h4>
+                                                <p>Materiallar sarfi hisobotlari</p>
+                                            </div>
+                                        </div>
+                                    </a>
+
+                                    <a href="{% url 'debt_report' %}" class="btn-debt-report">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                        <span>Qarzlar Hisoboti</span>
+                                        {% if debts_count and debts_count > 0 %}
+                                            <span class="badge-count">{{ debts_count }}</span>
+                                        {% endif %}
+                                    </a>
+
+                                    <a href="{% url 'customer_rating' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                                        <i class="fas fa-crown"></i>
+                                        <span>Mijozlar Reytingi</span>
+                                        {% if customers_count and customers_count > 0 %}
+                                            <span class="badge-count">{{ customers_count }}</span>
+                                        {% endif %}
+                                    </a>
+
+                                    <a href="{% url 'warehouse_dashboard' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                                        <i class="fas fa-warehouse"></i>
+                                        <span>Sklad</span>
+                                    </a>
+
+                                    <a href="{% url 'guard_dashboard' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                                        <i class="fas fa-shield-alt"></i>
+                                        <span>Qorovul Paneli</span>
+                                    </a>
+                                {% endif %}
+
+                                {# PATRUL TUGMASI: Ham Admin, ham Qorovul ko'radi #}
+                                {% if is_glavniy_admin or request.user.username == "Qorovul" %}
+                                    <a href="{% url 'guard_patrol' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); width: 100%;">
+                                        <i class="fas fa-walking"></i>
+                                        <span>Patrul Nazorati</span>
+                                    </a>
+                                {% endif %}
+
+                                <a href="{% url 'order_archive' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
+                                    <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+                                        <i class="fas fa-archive" style="font-size: 14px;"></i>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Arxivlanganlar</h4>
+                                        <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8); white-space: nowrap;">
+                                            {% if is_worker %} ({{ archived_count }}) {% else %} Barcha ({{ archived_count }}) {% endif %}
+                                        </p>
+                                    </div>
+                                </a>
+
+                                {% if is_glavniy_admin or is_manager %}
+                                <a href="{% url 'order_calculator_list' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
+                                    <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+                                        <i class="fas fa-calculator"></i>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Kalkulyatsiya</h4>
+                                        <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8);">Hisob-kitob paneli</p>
+                                    </div>
+                                </a>
+                                {% endif %}
+
+                                {% if is_glavniy_admin or is_manager %}
+                                <a href="{% url 'chizma' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
+                                    <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+                                        <i class="fas fa-drafting-compass"></i>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Chizma Konstruksiya</h4>
+                                        <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8);">3D konstruktor</p>
+                                    </div>
+                                </a>
+                                {% endif %}
+
                             </div>
                         </div>
-                    </a>
-                    
-                    <a href="{% url 'sales_report_view' %}" class="action-card">
-                        <div class="action-card-content">
-                            <div class="action-icon"><i class="fas fa-chart-bar"></i></div>
-                            <div class="action-details">
-                                <h4>Sotuv hisoboti</h4>
-                                <p>Vaqt oralig'i bo'yicha sotuvlar</p>
-                            </div>
-                        </div>
-                    </a>
-                    
-                    <a href="{% url 'worker_activity_report' %}" class="action-card">
-                        <div class="action-card-content">
-                            <div class="action-icon"><i class="fas fa-users-cog"></i></div>
-                            <div class="action-details">
-                                <h4>Ustalar hisoboti</h4>
-                                <p>Ustalar faolligi monitoringi</p>
-                            </div>
-                        </div>
-                    </a>
-
-                    <a href="{% url 'material_report' %}" class="action-card">
-                        <div class="action-card-content">
-                            <div class="action-icon"><i class="fas fa-clipboard-list"></i></div>
-                            <div class="action-details">
-                                <h4>List va siryo</h4>
-                                <p>Materiallar sarfi hisobotlari</p>
-                            </div>
-                        </div>
-                    </a>
-
-                    <a href="{% url 'debt_report' %}" class="btn-debt-report">
-                        <i class="fas fa-hand-holding-usd"></i>
-                        <span>Qarzlar Hisoboti</span>
-                        {% if debts_count and debts_count > 0 %}
-                            <span class="badge-count">{{ debts_count }}</span>
-                        {% endif %}
-                    </a>
-
-                    <a href="{% url 'customer_rating' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                        <i class="fas fa-crown"></i>
-                        <span>Mijozlar Reytingi</span>
-                        {% if customers_count and customers_count > 0 %}
-                            <span class="badge-count">{{ customers_count }}</span>
-                        {% endif %}
-                    </a>
-
-                    <a href="{% url 'warehouse_dashboard' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                        <i class="fas fa-crown"></i>
-                        <span>Sklad</span>
-                    </a>
-
-                    <a href="{% url 'guard_dashboard' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                        <i class="fas fa-crown"></i>
-                        <span>Qorovul Paneli</span>
-                    </a>
+                    {% endif %}
                 {% endif %}
-
-                {# PATRUL TUGMASI: Ham Admin, ham Qorovul ko'radi #}
-                {% if is_glavniy_admin or request.user.username == "Qorovul" %}
-                    <a href="{% url 'guard_patrol' %}" class="btn-debt-report" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); width: 100%;">
-                        <i class="fas fa-walking"></i>
-                        <span>Patrul Nazorati</span>
-                    </a>
-                {% endif %}
-
-    
-    <a href="{% url 'order_archive' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
-        <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
-            <i class="fas fa-archive" style="font-size: 14px;"></i>
-        </div>
-        <div>
-            <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Arxivlanganlar</h4>
-            <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8); white-space: nowrap;">
-                {% if is_worker %} ({{ archived_count }}) {% else %} Barcha ({{ archived_count }}) {% endif %}
-            </p>
-        </div>
-    </a>
-
-    {% if is_glavniy_admin or is_manager %}
-    <a href="{% url 'order_calculator_list' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
-        <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
-            <i class="fas fa-calculator-alt" style="font-size: 14px;"></i>
-        </div>
-        <div>
-            <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Kalkulyatsiya</h4>
-            <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8);">Hisob-kitob paneli</p>
-        </div>
-    </a>
-    {% endif %}
-
-    
-    {% if is_glavniy_admin or is_manager %}
-    <a href="{% url 'chizma' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
-        <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
-            <i class="fas fa-calculator-alt" style="font-size: 14px;"></i>
-        </div>
-        <div>
-            <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Chizma Konstiruksiya</h4>
-        </div>
-    </a>
-    {% endif %}
-
-            </div>
-        </div>
-    {% endif %}
-{% endif %}
                 
                 <!-- Main Orders Section -->
                 {% if not "omborchi" in request.user.username|lower and not "qorovul" in request.user.username|lower and not "guard" in request.user.username|lower %}
@@ -1741,56 +1848,44 @@
                             </div>
                         </div>
                     </div>
-                        <div class="row mb-4">
-    <div class="col-md-8 mx-auto">
-        <form method="GET" action="{% url 'order_list' %}" 
-              class="input-group shadow-sm bg-white p-1" 
-              style="border-radius: 50px; border: 1px solid #e0e0e0;">
-            
-            <input type="hidden" name="filter" value="{{ filter_type }}">
-            
-            <input type="text" name="q" 
-                   class="form-control form-control-lg border-0 ps-4" 
-                   placeholder="Buyurtma ID, mijoz ismi yoki mahsulot..." 
-                   value="{{ search_query|default:'' }}"
-                   style="border-radius: 50px 0 0 50px; font-size: 0.95rem; box-shadow: none;">
-            
-            <div class="input-group-append d-flex align-items-center pe-1">
-                {% if search_query %}
-                    <a href="{% url 'order_list' %}?filter={{ filter_type }}" 
-                       class="btn btn-link text-muted text-decoration-none px-3 me-2" 
-                       style="font-size: 0.9rem;">
-                        <i class="fas fa-times"></i>
-                    </a>
-                {% endif %}
-                
-                <button class="btn px-4 py-2 text-white shadow-sm" 
-                        type="submit" 
-                        style="background-color: #2ecc71; border-radius: 50px; font-weight: 500; transition: all 0.3s;">
-                    <i class="fas fa-search me-2"></i> Qidirish
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
+                    
+                    <!-- Qidiruv formasi -->
+                    <div class="row mb-4">
+                        <div class="col-md-8 mx-auto">
+                            <form method="GET" action="{% url 'order_list' %}" 
+                                  class="input-group shadow-sm bg-white p-1" 
+                                  style="border-radius: 50px; border: 1px solid #e0e0e0;">
+                                
+                                <input type="hidden" name="filter" value="{{ filter_type }}">
+                                
+                                <input type="text" name="q" 
+                                       class="form-control form-control-lg border-0 ps-4" 
+                                       placeholder="Buyurtma ID, mijoz ismi yoki mahsulot..." 
+                                       value="{{ search_query|default:'' }}"
+                                       style="border-radius: 50px 0 0 50px; font-size: 0.95rem; box-shadow: none;">
+                                
+                                <div class="input-group-append d-flex align-items-center pe-1">
+                                    {% if search_query %}
+                                        <a href="{% url 'order_list' %}?filter={{ filter_type }}" 
+                                           class="btn btn-link text-muted text-decoration-none px-3 me-2" 
+                                           style="font-size: 0.9rem;">
+                                            <i class="fas fa-times"></i>
+                                        </a>
+                                    {% endif %}
+                                    
+                                    <button class="btn px-4 py-2 text-white shadow-sm" 
+                                            type="submit" 
+                                            style="background-color: #2ecc71; border-radius: 50px; font-weight: 500; transition: all 0.3s;">
+                                        <i class="fas fa-search me-2"></i> Qidirish
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
 
-<style>
-    /* Tugma ustiga borganda rang biroz to'qlashishi uchun */
-    #search-form button:hover {
-        background-color: #27ae60 !important;
-        transform: translateY(-1px);
-    }
-    
-    /* Inputga fokus berganda cheti ko'rinmasligi uchun */
-    .form-control:focus {
-        background-color: transparent;
-    }
-</style>
                     <!-- Filter Tabs -->
                     <div class="filter-tabs-container">
-
-
-                           <a href="?filter=all" class="filter-tab {% if filter_type == 'all' %}active{% endif %}">
+                        <a href="?filter=all" class="filter-tab {% if filter_type == 'all' %}active{% endif %}">
                             <i class="fas fa-list"></i>
                             <span>Barchasi</span>
                             {% if not is_worker %}<span class="filter-count">{{ total_orders }}</span>{% endif %}
@@ -1802,7 +1897,6 @@
                             {% if not is_worker %}<span class="filter-count">{{ in_progress_orders }}</span>{% endif %}
                         </a>
 
-                     
                         <a href="?filter=completed" class="filter-tab {% if filter_type == 'completed' %}active{% endif %}">
                             <i class="fas fa-check-circle"></i>
                             <span>Tayyor</span>
@@ -2175,7 +2269,7 @@
                 {% endif %}
 
                 <!-- Child Orders Section -->
-                 {% if is_glavniy_admin or is_manager or is_production_boss or is_worker or is_observer %}
+                {% if is_glavniy_admin or is_manager or is_production_boss or is_worker or is_observer %}
                 <div id="child-orders" class="child-orders-section">
                     <!-- Panel Child Orders -->
                     <div class="child-category-section">
@@ -2552,13 +2646,6 @@
                                 </div>
                             </div>
                             {% endwith %}
-                            {% empty %}
-                            <div class="empty-state">
-                                <div class="empty-state-icon">
-                                    <i class="fas fa-th-large"></i>
-                                </div>
-                                <h3 class="empty-state-title">Hozircha panel buyurtmalari mavjud emas</h3>
-                            </div>
                             {% endfor %}
                         </div>
                         {% endif %}
@@ -2944,6 +3031,7 @@
                     </div>
                     {% endif %}
                 </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
