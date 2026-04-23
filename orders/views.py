@@ -230,6 +230,7 @@ def order_list(request):
     is_manager = is_in_group(user, 'Menejer/Tasdiqlovchi')
     is_worker = is_in_group(user, 'Usta')
     is_observer = is_in_group(user, 'Kuzatuvchi')
+    is_sales_manager = is_in_group(user, 'Sales Manager') or user.username.lower() == 'sales_manager'  # <-- YANGI QATOR
     
     # ================================================================
     # 2. FILTR PARAMETRLARI
@@ -451,6 +452,7 @@ def order_list(request):
         'is_production_boss': is_production_boss,
         'is_worker': is_worker,
         'is_observer': is_observer,
+        'is_sales_manager': is_sales_manager,  # <-- YANGI QATOR
         'is_storekeeper': user.username.lower() == 'omborchi' or 'store' in user.username.lower(),
         'can_view_orders': any([is_glavniy_admin, is_production_boss, is_manager, is_worker, is_observer]),
         
