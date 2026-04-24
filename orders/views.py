@@ -3449,26 +3449,136 @@ def export_audit_log_csv(request):
 from django.db.models import F
 
 from django.db.models import F, Q
+from django.db.models import F, Q, Sum, DecimalField, ExpressionWrapper, Value
+from django.db.models.functions import Coalesce
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+
+import io
+import pandas as pd
+from django.db.models import F, Q, Sum, DecimalField, ExpressionWrapper, Value
+from django.db.models.functions import Coalesce
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.http import HttpResponse
 
 @login_required
 def debt_report(request):
-    # Shartlar: 
-    # 1. Jami pul to'langan puldan (zalogdan) katta bo'lsin (Qarz bor degani)
-    # 2. Status bekor qilinmagan bo'lishi shart
-    debts = Order.objects.filter(
-        total_price__gt=F('prepayment')
-    ).exclude(status='BEKOR_QILINDI').order_by('-created_at')
+    # 1. Ruxsatlarni tekshirish
+    user = request.user
+    is_admin = user.is_superuser or is_in_group(user, 'Glavniy Admin')
+    is_manager = is_in_group(user, 'Menejer/Tasdiqlovchi')
+    
+    if not (is_admin or is_manager):
+        messages.error(request, "Sizga bu sahifani ko'rishga ruxsat yo'q!")
+        return redirect('order_list')
+    
+    # 2. Parametrlarni olish
+    search_query = request.GET.get('q', '').strip()
+    sort_by = request.GET.get('sort', 'debt_desc')
+    
+    # 3. Asosiy QuerySet - Hisob-kitobni SQL darajasida qilish
+    debts = Order.objects.annotate(
+        calculated_debt=ExpressionWrapper(
+            Coalesce(F('total_price'), Value(0, output_field=DecimalField())) - 
+            Coalesce(F('prepayment'), Value(0, output_field=DecimalField())),
+            output_field=DecimalField()
+        )
+    ).filter(
+        calculated_debt__gt=0
+    ).exclude(
+        status__in=['BEKOR_QILINDI', 'RAD_ETILDI']
+    ).select_related('parent_order')
 
-    # Umumiy qarz summasini hisoblash
-    # remaining_amount modeldagi property yoki metod bo'lishi kerak
-    total_debt = sum(order.remaining_amount for order in debts)
+    # 4. Qidiruv
+    if search_query:
+        debts = debts.filter(
+            Q(order_number__icontains=search_query) |
+            Q(customer_name__icontains=search_query) |
+            Q(customer_unique_id__icontains=search_query) |
+            Q(product_name__icontains=search_query)
+        )
+    
+    # 5. Saralash
+    sort_dict = {
+        'debt_desc': '-calculated_debt',
+        'debt_asc': 'calculated_debt',
+        'date_desc': '-created_at',
+        'date_asc': 'created_at',
+        'name_asc': 'customer_name'
+    }
+    debts = debts.order_by(sort_dict.get(sort_by, '-calculated_debt'))
+    
+    # 6. Excel Export - Professional Formatlash bilan
+    if request.GET.get('export') == 'excel':
+        export_data = []
+        for order in debts:
+            export_data.append({
+                'Buyurtma №': order.order_number,
+                'Mijoz nomi': order.customer_name,
+                'Mijoz ID': order.customer_unique_id,
+                'Mahsulot': order.product_name,
+                'Umumiy summa ($)': float(order.total_price or 0),
+                'To\'langan ($)': float(order.prepayment or 0),
+                'Qoldiq qarz ($)': float(order.calculated_debt),
+                'Holat': order.get_status_display(),
+                'Sana': order.created_at.strftime('%d.%m.%Y') if order.created_at else '-',
+            })
+        
+        df = pd.DataFrame(export_data)
+        output = io.BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        df.to_excel(writer, index=False, sheet_name='Qarzlar Ro\'yxati')
+        
+        workbook  = writer.book
+        worksheet = writer.sheets['Qarzlar Ro\'yxati']
+
+        # Formatlar
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#27ae60', 'font_color': 'white', 'border': 1})
+        money_fmt = workbook.add_format({'num_format': '#,##0.00', 'border': 1})
+        border_fmt = workbook.add_format({'border': 1})
+
+        # Sarlavhalarni formatlash va kenglikni sozlash
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_fmt)
+            column_len = max(df[value].astype(str).str.len().max(), len(value)) + 5
+            worksheet.set_column(col_num, col_num, column_len, border_fmt)
+
+        # Pul ustunlariga (E, F, G) format berish
+        worksheet.set_column('E:G', 18, money_fmt)
+        writer.close()
+        output.seek(0)
+
+        response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename=Ecoprom_Qarzlar_{request.user.username}.xlsx'
+        return response
+
+    # 7. Statistika va Paginatsiya
+    stats = debts.aggregate(
+        total_debt_sum=Sum('calculated_debt'),
+        total_rev=Sum('total_price'),
+        total_paid_sum=Sum('prepayment')
+    )
+    
+    paginator = Paginator(debts, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
 
     context = {
-        'debts': debts,
-        'total_debt': total_debt,
+        'page_obj': page_obj,
+        'total_debt': stats['total_debt_sum'] or 0,
+        'total_orders_count': debts.count(),
+        'total_revenue': stats['total_rev'] or 0,
+        'total_paid': stats['total_paid_sum'] or 0,
+        'debt_customers_count': debts.values('customer_unique_id').distinct().count(),
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'is_admin': is_admin,
     }
     return render(request, 'orders/debt_report.html', context)
-
 
 def add_prepayment(request, order_id):
     if request.method == 'POST':
@@ -3569,7 +3679,8 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from .models import Order
-
+from django.db.models import DecimalField, Value, Sum, Q
+from django.db.models.functions import Coalesce
 def customer_rating(request):
     """
     To'liq biznes analitika: Mijozlar reytingi, Mahsulotlar tahlili, 
@@ -3608,7 +3719,7 @@ def customer_rating(request):
             'customer_id': customer_id
         })
 
-    # ======================== 2. MIJOZLAR REYTINGI (Annotate) ========================
+    # ======================== 2. MIJOZLAR REYTINGI ========================
     ratings_query = Order.objects.filter(parent_order__isnull=True).values('customer_unique_id').annotate(
         display_name=Max('customer_name'),
         order_count=Count('id'),
@@ -3634,9 +3745,9 @@ def customer_rating(request):
     )
 
     m2_ratings = list(ratings_query.order_by('-total_m2')[:15])
-    sum_ratings = list(ratings_query.order_by('-total_paid')[:15])
+    sum_ratings = list(ratings_query.order_by('-total_billed')[:15])  # total_paid emas, total_billed
     order_count_ratings = list(ratings_query.order_by('-order_count')[:10])
-    loyal_customers = list(ratings_query.filter(loyalty_score='A').order_by('-total_paid')[:10])
+    loyal_customers = list(ratings_query.filter(loyalty_score='A').order_by('-total_billed')[:10])
 
     # ======================== 3. UMUMIY STATISTIKA ========================
     base_aggregate = Order.objects.filter(parent_order__isnull=True).aggregate(
@@ -3654,7 +3765,11 @@ def customer_rating(request):
     else:
         overall_stats['avg_prepayment_ratio'] = 0
 
-    completed_orders = Order.objects.filter(parent_order__isnull=True, status__in=['completed', 'delivered']).count()
+    # TO'G'RILANGAN QISM - status nomlarini tekshiring
+    completed_orders = Order.objects.filter(
+        parent_order__isnull=True, 
+        status__in=['BAJARILDI', 'TAYYOR']  # 'completed' emas, 'delivered' emas
+    ).count()
     overall_stats['completion_rate'] = (completed_orders * 100 / overall_stats['total_orders']) if overall_stats['total_orders'] > 0 else 0
 
     # ======================== 4. PANEL QALINLIGI STATISTIKASI ========================
@@ -3668,10 +3783,8 @@ def customer_rating(request):
         eshik_types=Count('product_name', distinct=True)
     ).order_by('panel_thickness')
 
-  # ... (oldingi hisob-kitoblar) ...
-
     # ======================== 5. PIR PANELLAR TAHLILI ========================
-    pir_all = Order.objects.filter(panel_type__icontains='PIR')
+    pir_all = Order.objects.filter(Q(panel_type__icontains='PIR') | Q(product_name__icontains='PIR'))
     
     pir_stats = pir_all.values('panel_type').annotate(
         count=Count('id'),
@@ -3680,19 +3793,24 @@ def customer_rating(request):
     ).order_by('-total_m2')
 
     pir_details = {
-        'total_pir': pir_all.count(),
-        'total_area': pir_all.aggregate(s=Sum('panel_kvadrat'))['s'] or 0,
-        'tom_panels': pir_all.filter(Q(panel_subtype__icontains='TOM') | Q(product_name__icontains='TOM')).count(),
-        'secret_panels': pir_all.filter(Q(panel_subtype__icontains='SECRET') | Q(product_name__icontains='SECRET')).count(),
-        'sovut_panels': pir_all.filter(Q(panel_subtype__icontains='SOVUT') | Q(product_name__icontains='SOVUT')).count(),
-    }
+    'total_pir': pir_all.count(),
+    'total_area': pir_all.aggregate(
+        s=Coalesce(
+            Sum('panel_kvadrat'), 
+            Value(0, output_field=DecimalField()) # Mana bu yerda output_field qo'shildi
+        )
+    )['s'],
+    'tom_panels': pir_all.filter(Q(panel_subtype__icontains='TOM') | Q(product_name__icontains='TOM')).count(),
+    'secret_panels': pir_all.filter(Q(panel_subtype__icontains='SECRET') | Q(product_name__icontains='SECRET')).count(),
+    'sovut_panels': pir_all.filter(Q(panel_subtype__icontains='SOVUT') | Q(product_name__icontains='SOVUT')).count(),
+}
 
     # ======================== 6. ESHIKLAR TAHLILI ========================
     eshik_stat = Order.objects.filter(parent_order__isnull=True).exclude(
         Q(eshik_turi__isnull=True) | Q(eshik_turi='')
     ).values('eshik_turi').annotate(
         eshik_soni=Count('id'),
-        total_revenue=Sum('total_price')
+        total_revenue=Coalesce(Sum('total_price'), Value(0, output_field=DecimalField()))
     ).order_by('-eshik_soni')
 
     # ======================== 7. MASHHUR MAHSULOTLAR ========================
@@ -3702,27 +3820,27 @@ def customer_rating(request):
         total_revenue=Coalesce(Sum('total_price'), Value(0, output_field=DecimalField()))
     ).order_by('-order_count')[:15]
 
-    if product_rankings:
-        max_orders = max(p['order_count'] for p in product_rankings)
-        for p in product_rankings:
+    product_rankings_list = list(product_rankings)
+    if product_rankings_list:
+        max_orders = max(p['order_count'] for p in product_rankings_list)
+        for p in product_rankings_list:
             p['popularity_score'] = (p['order_count'] * 100) / max_orders if max_orders > 0 else 0
 
-    # ======================== 8. CONTEXT (TO'G'IRLANGAN) ========================
-    # DIQQAT: Bu yerda context = {} deb yangidan ochmang, hamma o'zgaruvchini shu yerga jamlang
+    # ======================== 8. CONTEXT ========================
     context = {
         'm2_ratings': m2_ratings,
         'sum_ratings': sum_ratings,
         'order_count_ratings': order_count_ratings,
         'loyal_customers': loyal_customers,
         'overall_stats': overall_stats,
-        'product_rankings': list(product_rankings),
+        'product_rankings': product_rankings_list,
         'thickness_stat': list(thickness_stat),
         'pir_stats': list(pir_stats),
-        'pir_details': pir_details,  # <--- BU ENDI O'CHIB KETMAYDI
+        'pir_details': pir_details,
         'eshik_stat': list(eshik_stat),
         'json_data': {
-            'm2_ratings': json.dumps(list(m2_ratings), default=str),
-            'sum_ratings': json.dumps(list(sum_ratings), default=str),
+            'm2_ratings': json.dumps(m2_ratings, default=str),
+            'sum_ratings': json.dumps(sum_ratings, default=str),
         }
     }
 
