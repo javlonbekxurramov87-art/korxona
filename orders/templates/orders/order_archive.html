@@ -9,7 +9,7 @@
             <div class="hero-content">
                 <div class="hero-left">
                     <div class="hero-icon">
-                        <i class="fas fa-check-circle"></i>
+                        <i class="fas fa-archive"></i>
                     </div>
                     <div class="hero-text">
                         <h1 class="hero-title">
@@ -17,91 +17,265 @@
                         </h1>
                         <p class="hero-subtitle">
                             {% if is_worker %}
-                                Siz muvaffaqiyatli yakunlagan <span class="highlight">{{ main_orders_count }}</span> ta buyurtma
+                                Yakunlangan <span class="highlight">{{ main_orders_count }}</span> ta buyurtma
                             {% else %}
-                                Tizimdagi barcha yakunlangan buyurtmalar arxivi
+                                Barcha yakunlangan buyurtmalar: <span class="highlight">{{ main_orders_count }}</span> ta
                             {% endif %}
                         </p>
                     </div>
                 </div>
                 <a href="{% url 'order_list' %}" class="back-button">
                     <i class="fas fa-arrow-left"></i>
-                    <span>Orqaga</span>
+                    <span>Orqaga qaytish</span>
                 </a>
             </div>
         </div>
     </div>
 
     <div class="container">
-        <!-- Search Section -->
-        <div class="search-section">
+        <!-- Search & Filter Section -->
+        <div class="search-filter-section">
+            <!-- Main Search Card -->
             <div class="search-card">
-                <form method="GET" class="search-form">
+                <form method="GET" action="{% url 'order_archive' %}" id="mainSearchForm" onsubmit="return submitSearchForm()">
                     <div class="search-wrapper">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" name="q" class="search-input" 
-                               placeholder="Buyurtma raqami, mijoz nomi yoki mahsulot bo'yicha qidirish..." 
+                        <input type="text" 
+                               name="q" 
+                               id="searchInput"
+                               class="search-input" 
+                               placeholder="Buyurtma raqami, mijoz nomi yoki mahsulot qidirish..." 
                                value="{{ search_query }}">
-                        {% if worker_filter %}
-                        <input type="hidden" name="worker_type" value="{{ worker_filter }}">
-                        {% endif %}
+                        
+                        <!-- Hidden inputs -->
+                        <input type="hidden" name="worker_type" id="hiddenWorkerType" value="{{ worker_filter }}">
+                        <input type="hidden" name="date_from" id="hiddenDateFrom" value="{{ date_from }}">
+                        <input type="hidden" name="date_to" id="hiddenDateTo" value="{{ date_to }}">
+                        <input type="hidden" name="custom_period" id="hiddenCustomPeriod" value="{{ selected_custom_date }}">
+                        
                         <button type="submit" class="search-btn">
                             <i class="fas fa-search"></i>
                             <span>Qidirish</span>
                         </button>
                     </div>
                 </form>
-                {% if search_query or worker_filter %}
-                <div class="search-clear">
-                    <a href="?">
-                        <i class="fas fa-times"></i> Filtrlarni tozalash
+                
+                <!-- Active Filters Tags -->
+                <div class="active-filters" id="activeFilters">
+                    {% if search_query %}
+                    <span class="active-filter-tag">
+                        <i class="fas fa-search"></i> "{{ search_query }}"
+                        <a href="javascript:void(0)" onclick="clearFilter('q')" title="Olib tashlash">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </span>
+                    {% endif %}
+                    
+                    {% if worker_filter %}
+                    <span class="active-filter-tag">
+                        <i class="fas fa-user-cog"></i> {{ worker_filter|title }} Usta
+                        <a href="javascript:void(0)" onclick="clearFilter('worker_type')" title="Olib tashlash">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </span>
+                    {% endif %}
+                    
+                    {% if date_from and not selected_custom_date %}
+                    <span class="active-filter-tag">
+                        <i class="far fa-calendar-alt"></i> {{ date_from }} dan
+                        <a href="javascript:void(0)" onclick="clearFilter('date_from')" title="Olib tashlash">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </span>
+                    {% endif %}
+                    
+                    {% if date_to and not selected_custom_date %}
+                    <span class="active-filter-tag">
+                        <i class="far fa-calendar-check"></i> {{ date_to }} gacha
+                        <a href="javascript:void(0)" onclick="clearFilter('date_to')" title="Olib tashlash">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </span>
+                    {% endif %}
+                    
+                    {% if selected_custom_date %}
+                    <span class="active-filter-tag">
+                        <i class="far fa-clock"></i> 
+                        {% if selected_custom_date == 'today' %}Bugun
+                        {% elif selected_custom_date == 'yesterday' %}Kecha
+                        {% elif selected_custom_date == 'week' %}Shu hafta
+                        {% elif selected_custom_date == 'month' %}Shu oy
+                        {% elif selected_custom_date == 'year' %}Shu yil
+                        {% elif selected_custom_date == 'last_week' %}O'tgan hafta
+                        {% elif selected_custom_date == 'last_month' %}O'tgan oy
+                        {% endif %}
+                        <a href="javascript:void(0)" onclick="clearFilter('custom_period')" title="Olib tashlash">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </span>
+                    {% endif %}
+                    
+                    {% if search_query or worker_filter or date_from or date_to or selected_custom_date %}
+                    <a href="{% url 'order_archive' %}" class="clear-all-filters">
+                        <i class="fas fa-times-circle"></i> Barchasini tozalash
                     </a>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
-        </div>
 
-        <!-- Filter Section -->
-        {% if not is_worker %}
-        <div class="filter-section">
-            <div class="filter-header">
-                <i class="fas fa-sliders-h"></i>
-                <span>Usta turi bo'yicha filtr</span>
-            </div>
-            <div class="filter-grid">
-                <a href="?{% if search_query %}q={{ search_query }}{% endif %}" 
-                   class="filter-chip {% if not worker_filter %}active{% endif %}">
-                    <i class="fas fa-users"></i>
-                    <span>Barchasi</span>
-                    <span class="chip-count">{{ main_orders_count }}</span>
-                </a>
-                <a href="?worker_type=list{% if search_query %}&q={{ search_query }}{% endif %}" 
-                   class="filter-chip {% if worker_filter == 'list' %}active{% endif %}">
-                    <i class="fas fa-list-ul"></i>
-                    <span>List Usta</span>
-                    <span class="chip-count">{{ worker_stats.list|default:0 }}</span>
-                </a>
-                <a href="?worker_type=panel{% if search_query %}&q={{ search_query }}{% endif %}" 
-                   class="filter-chip {% if worker_filter == 'panel' %}active{% endif %}">
-                    <i class="fas fa-th-large"></i>
-                    <span>Panel Usta</span>
-                    <span class="chip-count">{{ worker_stats.panel|default:0 }}</span>
-                </a>
-                <a href="?worker_type=eshik{% if search_query %}&q={{ search_query }}{% endif %}" 
-                   class="filter-chip {% if worker_filter == 'eshik' %}active{% endif %}">
-                    <i class="fas fa-door-open"></i>
-                    <span>Eshik Ustasi</span>
-                    <span class="chip-count">{{ worker_stats.eshik|default:0 }}</span>
-                </a>
-                <a href="?worker_type=ugol{% if search_query %}&q={{ search_query }}{% endif %}" 
-                   class="filter-chip {% if worker_filter == 'ugol' %}active{% endif %}">
-                    <i class="fas fa-cube"></i>
-                    <span>Ugol Usta</span>
-                    <span class="chip-count">{{ worker_stats.ugol|default:0 }}</span>
-                </a>
+            <!-- Advanced Filters Card -->
+            <div class="advanced-filters-card">
+                <div class="filters-header" onclick="toggleFilters()">
+                    <div class="filters-title">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>Kengaytirilgan filtrlar</span>
+                        <span class="active-filters-indicator" id="activeFiltersIndicator"></span>
+                    </div>
+                    <i class="fas fa-chevron-down toggle-icon" id="toggleIcon"></i>
+                </div>
+
+                <div class="filters-body" id="filtersBody">
+                    <!-- Worker Type Filter -->
+                    {% if not is_worker %}
+                    <div class="filter-group">
+                        <label class="filter-group-label">
+                            <i class="fas fa-users-cog"></i> Usta turi bo'yicha
+                        </label>
+                        <div class="filter-chips">
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('worker_type', '')"
+                               class="filter-chip {% if not worker_filter %}active{% endif %}">
+                                <i class="fas fa-users"></i>
+                                <span>Barchasi</span>
+                                <span class="chip-badge">{{ main_orders_count }}</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('worker_type', 'list')"
+                               class="filter-chip {% if worker_filter == 'list' %}active{% endif %}">
+                                <i class="fas fa-list-ul"></i>
+                                <span>List Usta</span>
+                                <span class="chip-badge">{{ worker_stats.list|default:0 }}</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('worker_type', 'panel')"
+                               class="filter-chip {% if worker_filter == 'panel' %}active{% endif %}">
+                                <i class="fas fa-th-large"></i>
+                                <span>Panel Usta</span>
+                                <span class="chip-badge">{{ worker_stats.panel|default:0 }}</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('worker_type', 'eshik')"
+                               class="filter-chip {% if worker_filter == 'eshik' %}active{% endif %}">
+                                <i class="fas fa-door-open"></i>
+                                <span>Eshik Ustasi</span>
+                                <span class="chip-badge">{{ worker_stats.eshik|default:0 }}</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('worker_type', 'ugol')"
+                               class="filter-chip {% if worker_filter == 'ugol' %}active{% endif %}">
+                                <i class="fas fa-cube"></i>
+                                <span>Ugol Usta</span>
+                                <span class="chip-badge">{{ worker_stats.ugol|default:0 }}</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Quick Date Periods -->
+                    <div class="filter-group">
+                        <label class="filter-group-label">
+                            <i class="far fa-clock"></i> Tayyor davr
+                        </label>
+                        <div class="filter-chips">
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'today')"
+                               class="filter-chip {% if selected_custom_date == 'today' %}active{% endif %}">
+                                <i class="fas fa-sun"></i>
+                                <span>Bugun</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'yesterday')"
+                               class="filter-chip {% if selected_custom_date == 'yesterday' %}active{% endif %}">
+                                <i class="fas fa-moon"></i>
+                                <span>Kecha</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'week')"
+                               class="filter-chip {% if selected_custom_date == 'week' %}active{% endif %}">
+                                <i class="fas fa-calendar-week"></i>
+                                <span>Shu hafta</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'month')"
+                               class="filter-chip {% if selected_custom_date == 'month' %}active{% endif %}">
+                                <i class="fas fa-calendar-alt"></i>
+                                <span>Shu oy</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'year')"
+                               class="filter-chip {% if selected_custom_date == 'year' %}active{% endif %}">
+                                <i class="fas fa-calendar"></i>
+                                <span>Shu yil</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'last_week')"
+                               class="filter-chip {% if selected_custom_date == 'last_week' %}active{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                                <span>O'tgan hafta</span>
+                            </a>
+                            <a href="javascript:void(0)" 
+                               onclick="updateFilter('custom_period', 'last_month')"
+                               class="filter-chip {% if selected_custom_date == 'last_month' %}active{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                                <span>O'tgan oy</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Date Range -->
+                    <div class="filter-group">
+                        <label class="filter-group-label">
+                            <i class="fas fa-calendar-check"></i> Maxsus sana oralig'i
+                        </label>
+                        <div class="date-range-picker">
+                            <div class="date-input-group">
+                                <label class="date-label">
+                                    <i class="far fa-calendar-alt"></i> Sanadan
+                                </label>
+                                <input type="date" 
+                                       id="dateFromInput" 
+                                       class="date-input" 
+                                       value="{{ date_from }}"
+                                       onchange="handleDateChange()">
+                            </div>
+                            <div class="date-separator">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                            <div class="date-input-group">
+                                <label class="date-label">
+                                    <i class="far fa-calendar-check"></i> Sanagacha
+                                </label>
+                                <input type="date" 
+                                       id="dateToInput" 
+                                       class="date-input" 
+                                       value="{{ date_to }}"
+                                       onchange="handleDateChange()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Action Buttons -->
+                    <div class="filter-actions">
+                        <button type="button" class="btn-apply-filters" onclick="applyDateFilters()">
+                            <i class="fas fa-check"></i> Sana filtrini qo'llash
+                        </button>
+                        <button type="button" class="btn-reset-filters" onclick="resetAllFilters()">
+                            <i class="fas fa-redo"></i> Barcha filtrlarni tozalash
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-        {% endif %}
 
         <!-- Stats Cards -->
         {% if is_worker and personal_stats %}
@@ -109,12 +283,12 @@
             <div class="stat-card-mini">
                 <div class="stat-icon-mini green"><i class="fas fa-check-circle"></i></div>
                 <div class="stat-info-mini">
-                    <span class="stat-label-mini">Jami tugatilgan</span>
+                    <span class="stat-label-mini">Jami</span>
                     <span class="stat-value-mini">{{ personal_stats.total }}</span>
                 </div>
             </div>
             <div class="stat-card-mini">
-                <div class="stat-icon-mini teal"><i class="fas fa-clipboard-list"></i></div>
+                <div class="stat-icon-mini teal"><i class="fas fa-clipboard-check"></i></div>
                 <div class="stat-info-mini">
                     <span class="stat-label-mini">BAJARILDI</span>
                     <span class="stat-value-mini">{{ personal_stats.bajarildi }}</span>
@@ -139,13 +313,20 @@
 
         <!-- Orders Grid -->
         {% if main_orders %}
+        <div class="orders-info-bar">
+            <span><i class="fas fa-list"></i> Jami: <strong>{{ main_orders_count }}</strong> ta arxivlangan buyurtma</span>
+            {% if main_orders.paginator.num_pages > 1 %}
+            <span><i class="fas fa-file-alt"></i> Sahifa: <strong>{{ main_orders.number }}</strong> / {{ main_orders.paginator.num_pages }}</span>
+            {% endif %}
+        </div>
+
         <div class="orders-grid">
             {% for order in main_orders %}
             <div class="order-card">
                 <div class="order-card-header">
                     <div class="order-number">
                         <i class="fas fa-hashtag"></i>
-                        <span>{{ order.order_number }}</span>
+                        <span>№ {{ order.order_number }}</span>
                     </div>
                     <div class="order-status status-{{ order.status|lower }}">
                         <i class="fas {% if order.status == 'BAJARILDI' %}fa-check-circle{% elif order.status == 'USTA_TUGATDI' %}fa-tools{% else %}fa-check-double{% endif %}"></i>
@@ -154,18 +335,16 @@
                 </div>
                 
                 <div class="order-card-body">
-                    <!-- Customer -->
                     <div class="customer-row">
                         <div class="customer-avatar">
                             {{ order.customer_name|slice:":1"|upper }}
                         </div>
                         <div class="customer-info">
-                            <h4 class="customer-name">{{ order.customer_name|default:"Noma'lum mijoz" }}</h4>
-                            <span class="customer-id"><i class="fas fa-id-card"></i> ID: {{ order.customer_unique_id|default:"-" }}</span>
+                            <h4 class="customer-name">{{ order.customer_name|default:"Noma'lum" }}</h4>
+                            <span class="customer-id"><i class="fas fa-id-card"></i> {{ order.customer_unique_id|default:"-" }}</span>
                         </div>
                     </div>
 
-                    <!-- Details Grid -->
                     <div class="details-grid">
                         <div class="detail-item">
                             <span class="detail-label"><i class="fas fa-box"></i> Mahsulot</span>
@@ -176,7 +355,7 @@
                             <span class="detail-value highlight">{{ order.panel_kvadrat|default:"0" }} m²</span>
                         </div>
                         <div class="detail-item">
-                            <span class="detail-label"><i class="fas fa-door-open"></i> Eshik turi</span>
+                            <span class="detail-label"><i class="fas fa-door-open"></i> Eshik</span>
                             <span class="detail-value">{{ order.eshik_turi|default:"-" }}</span>
                         </div>
                         <div class="detail-item">
@@ -185,7 +364,6 @@
                         </div>
                     </div>
 
-                    <!-- Dimensions -->
                     <div class="dimensions-row">
                         <div class="dimension-chip">
                             <i class="fas fa-arrow-up"></i>
@@ -204,7 +382,6 @@
                         </div>
                     </div>
 
-                    <!-- Payment (admin only) -->
                     {% if not is_worker %}
                     <div class="payment-row-mini">
                         <div class="payment-item">
@@ -224,14 +401,11 @@
                     </div>
                     {% endif %}
 
-                    <!-- Workers -->
                     {% if order.assigned_workers.all %}
                     <div class="workers-row">
                         <i class="fas fa-users"></i>
                         {% for worker in order.assigned_workers.all %}
-                        <span class="worker-chip">
-                            {{ worker.user.get_full_name|default:worker.user.username }}
-                        </span>
+                        <span class="worker-chip">{{ worker.user.get_full_name|default:worker.user.username }}</span>
                         {% endfor %}
                     </div>
                     {% endif %}
@@ -261,14 +435,15 @@
         {% if main_orders.has_other_pages %}
         <div class="pagination">
             {% if main_orders.has_previous %}
-            <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}" class="page-btn">
+            <a href="?page={{ main_orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}{% if date_from and not selected_custom_date %}&date_from={{ date_from }}{% endif %}{% if date_to and not selected_custom_date %}&date_to={{ date_to }}{% endif %}{% if selected_custom_date %}&custom_period={{ selected_custom_date }}{% endif %}" 
+               class="page-btn">
                 <i class="fas fa-chevron-left"></i>
             </a>
             {% endif %}
             
             {% for i in main_orders.paginator.page_range %}
-                {% if main_orders.number|add:-2 <= i and i <= main_orders.number|add:2 %}
-                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}" 
+                {% if main_orders.number|add:-3 <= i and i <= main_orders.number|add:3 %}
+                    <a href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}{% if date_from and not selected_custom_date %}&date_from={{ date_from }}{% endif %}{% if date_to and not selected_custom_date %}&date_to={{ date_to }}{% endif %}{% if selected_custom_date %}&custom_period={{ selected_custom_date }}{% endif %}" 
                        class="page-btn {% if main_orders.number == i %}active{% endif %}">
                         {{ i }}
                     </a>
@@ -276,7 +451,8 @@
             {% endfor %}
             
             {% if main_orders.has_next %}
-            <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}" class="page-btn">
+            <a href="?page={{ main_orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if worker_filter %}&worker_type={{ worker_filter }}{% endif %}{% if date_from and not selected_custom_date %}&date_from={{ date_from }}{% endif %}{% if date_to and not selected_custom_date %}&date_to={{ date_to }}{% endif %}{% if selected_custom_date %}&custom_period={{ selected_custom_date }}{% endif %}" 
+               class="page-btn">
                 <i class="fas fa-chevron-right"></i>
             </a>
             {% endif %}
@@ -291,14 +467,16 @@
             </div>
             <h3>Arxiv bo'sh</h3>
             <p>
-                {% if is_worker %}
+                {% if search_query or worker_filter or date_from or date_to or selected_custom_date %}
+                    Tanlangan filtrlar bo'yicha hech qanday buyurtma topilmadi.
+                {% elif is_worker %}
                     Siz hali hech qanday buyurtmani tugatmagan ko'rinasiz.
                 {% else %}
                     Hozircha arxivlangan buyurtmalar mavjud emas.
                 {% endif %}
             </p>
-            <a href="{% url 'order_list' %}" class="empty-btn">
-                <i class="fas fa-arrow-left"></i> Asosiy sahifaga qaytish
+            <a href="{% url 'order_archive' %}" class="empty-btn">
+                <i class="fas fa-redo"></i> Barcha filtrlarni tozalash
             </a>
         </div>
         {% endif %}
@@ -306,7 +484,10 @@
 </div>
 
 <style>
-/* BASE */
+/* =============================================
+   ARXIV SAHIFASI - TO'LIQ CSS
+   ============================================= */
+
 * {
     margin: 0;
     padding: 0;
@@ -316,6 +497,8 @@
 body {
     background: #f0fdf4;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .container {
@@ -324,12 +507,12 @@ body {
     padding: 0 1.5rem;
 }
 
-/* HERO SECTION */
+/* HERO */
 .hero-section {
     background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-    padding: 2.5rem 0;
-    margin-bottom: 2rem;
-    border-radius: 0 0 2rem 2rem;
+    padding: 2rem 0;
+    margin-bottom: 1.5rem;
+    border-radius: 0 0 1.5rem 1.5rem;
 }
 
 .hero-content {
@@ -343,50 +526,51 @@ body {
 .hero-left {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: 1rem;
 }
 
 .hero-icon {
-    width: 60px;
-    height: 60px;
+    width: 52px;
+    height: 52px;
     background: rgba(255,255,255,0.2);
-    border-radius: 18px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     color: white;
 }
 
 .hero-title {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     font-weight: 700;
     color: white;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
 }
 
 .hero-subtitle {
     color: rgba(255,255,255,0.9);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
 }
 
 .hero-subtitle .highlight {
     background: rgba(255,255,255,0.2);
-    padding: 0.2rem 0.6rem;
-    border-radius: 20px;
+    padding: 0.15rem 0.5rem;
+    border-radius: 16px;
     font-weight: 600;
 }
 
 .back-button {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1.25rem;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
     background: rgba(255,255,255,0.15);
-    border-radius: 40px;
+    border-radius: 32px;
     color: white;
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.82rem;
     transition: all 0.2s;
 }
 
@@ -396,17 +580,18 @@ body {
     color: white;
 }
 
-/* SEARCH SECTION */
-.search-section {
-    margin-bottom: 2rem;
+/* SEARCH & FILTER */
+.search-filter-section {
+    margin-bottom: 1.5rem;
 }
 
 .search-card {
     background: white;
     border-radius: 1rem;
     padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     border: 1px solid #e5e7eb;
+    margin-bottom: 0.75rem;
 }
 
 .search-wrapper {
@@ -419,15 +604,15 @@ body {
     position: absolute;
     left: 1rem;
     color: #10b981;
-    font-size: 1rem;
+    font-size: 0.9rem;
 }
 
 .search-input {
     width: 100%;
-    padding: 0.85rem 1rem 0.85rem 2.75rem;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     background: #fafafa;
     transition: all 0.2s;
 }
@@ -441,92 +626,191 @@ body {
 
 .search-btn {
     position: absolute;
-    right: 0.5rem;
-    padding: 0.5rem 1.25rem;
+    right: 0.4rem;
+    padding: 0.45rem 1rem;
     background: #10b981;
     border: none;
     border-radius: 0.6rem;
     color: white;
     font-weight: 500;
+    font-size: 0.82rem;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     transition: all 0.2s;
 }
 
 .search-btn:hover {
     background: #059669;
-    transform: translateY(-1px);
 }
 
-.search-clear {
-    text-align: center;
+/* Active Filters */
+.active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-top: 0.75rem;
+    align-items: center;
 }
 
-.search-clear a {
-    color: #10b981;
+.active-filter-tag {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 24px;
+    font-size: 0.72rem;
+    color: #059669;
+    font-weight: 500;
+}
+
+.active-filter-tag a {
+    color: #059669;
     text-decoration: none;
-    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
 }
 
-/* FILTER SECTION */
-.filter-section {
+.active-filter-tag a:hover {
+    color: #dc2626;
+}
+
+.clear-all-filters {
+    font-size: 0.72rem;
+    color: #ef4444;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-left: auto;
+    font-weight: 500;
+}
+
+.clear-all-filters:hover {
+    color: #dc2626;
+    text-decoration: underline;
+}
+
+/* ADVANCED FILTERS */
+.advanced-filters-card {
     background: white;
     border-radius: 1rem;
-    padding: 1rem 1.25rem;
-    margin-bottom: 2rem;
     border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    overflow: hidden;
 }
 
-.filter-header {
+.filters-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 1.25rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+    background: #fafafa;
+}
+
+.filters-header:hover {
+    background: #f3f4f6;
+}
+
+.filters-title {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     font-size: 0.85rem;
     font-weight: 600;
     color: #374151;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e5e7eb;
 }
 
-.filter-header i {
+.filters-title i {
     color: #10b981;
 }
 
-.filter-grid {
+.active-filters-indicator {
+    background: #10b981;
+    color: white;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+    display: none;
+}
+
+.active-filters-indicator.show {
+    display: inline-block;
+}
+
+.toggle-icon {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    transition: transform 0.3s;
+}
+
+.toggle-icon.open {
+    transform: rotate(180deg);
+}
+
+.filters-body {
+    display: none;
+    padding: 0 1.25rem 1.25rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.filters-body.show {
+    display: block;
+}
+
+.filter-group {
+    margin-bottom: 1.25rem;
+    padding-top: 1.25rem;
+}
+
+.filter-group:last-child {
+    margin-bottom: 0.5rem;
+}
+
+.filter-group-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.filter-group-label i {
+    color: #10b981;
+}
+
+.filter-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .filter-chip {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
     background: #f9fafb;
-    border-radius: 40px;
+    border-radius: 24px;
     color: #4b5563;
     text-decoration: none;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 500;
     border: 1px solid #e5e7eb;
     transition: all 0.2s;
-}
-
-.filter-chip i {
-    font-size: 0.85rem;
-    color: #9ca3af;
-}
-
-.filter-chip .chip-count {
-    background: #e5e7eb;
-    padding: 0.15rem 0.5rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
+    cursor: pointer;
 }
 
 .filter-chip:hover {
@@ -544,26 +828,142 @@ body {
     color: white;
 }
 
-.filter-chip.active .chip-count {
+.filter-chip .chip-badge {
+    background: #e5e7eb;
+    padding: 0.1rem 0.5rem;
+    border-radius: 16px;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+.filter-chip.active .chip-badge {
     background: rgba(255,255,255,0.2);
     color: white;
 }
 
-/* STATS ROW */
+/* Date Range */
+.date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.date-input-group {
+    flex: 1;
+    min-width: 160px;
+}
+
+.date-label {
+    font-size: 0.72rem;
+    color: #6b7280;
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.date-input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.82rem;
+    color: #374151;
+    background: #fafafa;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: #10b981;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+}
+
+.date-separator {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    padding-top: 1.2rem;
+}
+
+/* Filter Actions */
+.filter-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.btn-apply-filters,
+.btn-reset-filters {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+}
+
+.btn-apply-filters {
+    background: #10b981;
+    color: white;
+}
+
+.btn-apply-filters:hover {
+    background: #059669;
+}
+
+.btn-reset-filters {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.btn-reset-filters:hover {
+    background: #e5e7eb;
+}
+
+/* ORDERS INFO BAR */
+.orders-info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: white;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    color: #4b5563;
+}
+
+.orders-info-bar i {
+    color: #10b981;
+    margin-right: 0.25rem;
+}
+
+/* STATS */
 .stats-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 2rem;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
 }
 
 .stat-card-mini {
     background: white;
-    border-radius: 1rem;
-    padding: 1rem;
+    border-radius: 0.75rem;
+    padding: 0.85rem;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     border: 1px solid #e5e7eb;
     transition: all 0.2s;
 }
@@ -574,13 +974,13 @@ body {
 }
 
 .stat-icon-mini {
-    width: 45px;
-    height: 45px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
 }
 
 .stat-icon-mini.green { background: #ecfdf5; color: #10b981; }
@@ -589,13 +989,13 @@ body {
 .stat-icon-mini.blue { background: #eff6ff; color: #3b82f6; }
 
 .stat-label-mini {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #6b7280;
     display: block;
 }
 
 .stat-value-mini {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: #1f2937;
 }
@@ -603,17 +1003,17 @@ body {
 /* ORDERS GRID */
 .orders-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.25rem;
 }
 
-/* ORDER CARD */
 .order-card {
     background: white;
-    border-radius: 1rem;
+    border-radius: 0.75rem;
     overflow: hidden;
     border: 1px solid #e5e7eb;
     transition: all 0.3s;
+    animation: fadeInUp 0.3s ease backwards;
 }
 
 .order-card:hover {
@@ -623,7 +1023,7 @@ body {
 }
 
 .order-card-header {
-    padding: 1rem 1.25rem;
+    padding: 0.85rem 1rem;
     background: #f9fafb;
     display: flex;
     justify-content: space-between;
@@ -632,30 +1032,24 @@ body {
 }
 
 .order-number {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
     font-weight: 600;
     color: #1f2937;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
 }
 
 .order-number i {
     color: #10b981;
+    margin-right: 0.25rem;
 }
 
 .order-status {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0.8rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.65rem;
     font-weight: 600;
-}
-
-.order-status i {
-    font-size: 0.7rem;
 }
 
 .status-bajarildi { background: #ecfdf5; color: #059669; }
@@ -663,76 +1057,70 @@ body {
 .status-tayyor { background: #eff6ff; color: #2563eb; }
 
 .order-card-body {
-    padding: 1.25rem;
+    padding: 1rem;
 }
 
-/* Customer Row */
 .customer-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-    padding-bottom: 1rem;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
     border-bottom: 1px solid #f0fdf4;
 }
 
 .customer-avatar {
-    width: 45px;
-    height: 45px;
+    width: 38px;
+    height: 38px;
     background: #ecfdf5;
-    border-radius: 14px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #10b981;
 }
 
 .customer-name {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: #1f2937;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.15rem;
 }
 
 .customer-id {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #6b7280;
 }
 
-.customer-id i {
-    margin-right: 0.2rem;
-}
-
-/* Details Grid */
 .details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
 }
 
 .detail-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.4rem 0;
+    padding: 0.3rem 0;
     border-bottom: 1px dashed #e5e7eb;
 }
 
 .detail-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #6b7280;
 }
 
 .detail-label i {
-    margin-right: 0.3rem;
-    width: 16px;
+    margin-right: 0.25rem;
+    width: 14px;
 }
 
 .detail-value {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 500;
     color: #374151;
 }
@@ -742,14 +1130,13 @@ body {
     font-weight: 600;
 }
 
-/* Dimensions Row */
 .dimensions-row {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.6rem;
     background: #f9fafb;
-    padding: 0.75rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1rem;
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    margin-bottom: 0.85rem;
 }
 
 .dimension-chip {
@@ -758,33 +1145,32 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 0.2rem;
+    gap: 0.15rem;
 }
 
 .dimension-chip i {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: #10b981;
 }
 
 .dimension-chip span {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #1f2937;
 }
 
 .dimension-chip small {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     color: #6b7280;
 }
 
-/* Payment Row */
 .payment-row-mini {
     display: flex;
     justify-content: space-between;
     background: #f9fafb;
-    padding: 0.75rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1rem;
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    margin-bottom: 0.85rem;
 }
 
 .payment-item {
@@ -792,52 +1178,46 @@ body {
 }
 
 .payment-item span {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: #6b7280;
     display: block;
 }
 
 .payment-item strong {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 700;
 }
 
 .text-green { color: #10b981; }
 .text-red { color: #ef4444; }
 
-/* Workers Row */
 .workers-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    font-size: 0.7rem;
+    gap: 0.4rem;
+    font-size: 0.65rem;
     color: #6b7280;
-}
-
-.workers-row i {
-    color: #10b981;
 }
 
 .worker-chip {
     background: #ecfdf5;
-    padding: 0.2rem 0.6rem;
-    border-radius: 30px;
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
     color: #059669;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
 }
 
-/* Card Footer */
 .order-card-footer {
-    padding: 1rem 1.25rem;
+    padding: 0.85rem 1rem;
     background: #f9fafb;
     border-top: 1px solid #e5e7eb;
 }
 
 .footer-buttons {
     display: flex;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
 }
 
 .btn-pdf-mini, .btn-detail-mini {
@@ -845,10 +1225,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
+    gap: 0.3rem;
+    padding: 0.4rem;
+    border-radius: 0.4rem;
+    font-size: 0.7rem;
     font-weight: 500;
     text-decoration: none;
     transition: all 0.2s;
@@ -859,34 +1239,26 @@ body {
     color: #dc2626;
 }
 
-.btn-pdf-mini:hover {
-    background: #fee2e2;
-}
+.btn-pdf-mini:hover { background: #fee2e2; }
 
 .btn-detail-mini {
     background: #10b981;
     color: white;
 }
 
-.btn-detail-mini:hover {
-    background: #059669;
-}
+.btn-detail-mini:hover { background: #059669; }
 
 .completion-date-mini {
     text-align: center;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: #9ca3af;
 }
 
-.completion-date-mini i {
-    margin-right: 0.3rem;
-}
-
-/* Pagination */
+/* PAGINATION */
 .pagination {
     display: flex;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     margin-top: 2rem;
 }
 
@@ -894,15 +1266,16 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 38px;
-    height: 38px;
-    padding: 0 0.75rem;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 0.6rem;
     background: white;
     border: 1px solid #e5e7eb;
-    border-radius: 10px;
+    border-radius: 8px;
     color: #4b5563;
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.8rem;
     transition: all 0.2s;
 }
 
@@ -917,73 +1290,60 @@ body {
     color: white;
 }
 
-/* Empty State */
+/* EMPTY STATE */
 .empty-state {
     text-align: center;
-    padding: 4rem 2rem;
+    padding: 3rem 2rem;
     background: white;
     border-radius: 1rem;
     border: 1px solid #e5e7eb;
 }
 
 .empty-icon {
-    width: 80px;
-    height: 80px;
+    width: 70px;
+    height: 70px;
     background: #ecfdf5;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 1rem;
-}
-
-.empty-icon i {
-    font-size: 2rem;
+    margin: 0 auto 0.75rem;
+    font-size: 1.8rem;
     color: #10b981;
 }
 
 .empty-state h3 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 600;
     color: #1f2937;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
 }
 
 .empty-state p {
     color: #6b7280;
-    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
 }
 
 .empty-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1.5rem;
+    gap: 0.4rem;
+    padding: 0.55rem 1.25rem;
     background: #10b981;
-    border-radius: 40px;
+    border-radius: 32px;
     color: white;
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.82rem;
 }
 
-.empty-btn:hover {
-    background: #059669;
-}
+.empty-btn:hover { background: #059669; display: inline-flex; color: white; text-decoration: none; }
 
-/* Animations */
-.order-card {
-    animation: fadeInUp 0.3s ease backwards;
-}
-
+/* ANIMATIONS */
 @keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(15px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .order-card:nth-child(1) { animation-delay: 0.02s; }
@@ -992,70 +1352,184 @@ body {
 .order-card:nth-child(4) { animation-delay: 0.08s; }
 .order-card:nth-child(5) { animation-delay: 0.1s; }
 
-/* Responsive */
+/* RESPONSIVE */
+@media (max-width: 992px) {
+    .orders-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+}
+
 @media (max-width: 768px) {
-    .container {
-        padding: 0 1rem;
-    }
-    
-    .hero-left {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .hero-content {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .stats-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .orders-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .details-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .dimensions-row {
-        flex-direction: column;
-    }
-    
-    .payment-row-mini {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
+    .container { padding: 0 1rem; }
+    .hero-left { flex-direction: column; text-align: center; }
+    .hero-content { flex-direction: column; text-align: center; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .orders-grid { grid-template-columns: 1fr; }
+    .details-grid { grid-template-columns: 1fr; }
+    .dimensions-row { flex-direction: column; }
+    .payment-row-mini { flex-direction: column; gap: 0.5rem; }
+    .date-range-picker { flex-direction: column; }
+    .date-separator { display: none; }
+    .filter-actions { flex-direction: column; }
 }
 
 @media (max-width: 480px) {
-    .stats-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .filter-grid {
-        flex-direction: column;
-    }
-    
-    .filter-chip {
-        justify-content: center;
-    }
+    .stats-row { grid-template-columns: 1fr; }
+    .filter-chips { flex-direction: column; }
+    .filter-chip { justify-content: center; }
+    .search-btn span { display: none; }
+    .search-btn { padding: 0.45rem 0.6rem; }
 }
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const cards = document.querySelectorAll('.order-card');
-        cards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-4px)';
-            });
-            card.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(0)';
-            });
-        });
+/**
+ * ARXIV SAHIFASI - JAVASCRIPT
+ */
+
+// Build clean URL without empty parameters
+function buildCleanUrl() {
+    const baseUrl = '/orders/archive/';  // To'g'ridan-to'g'ri yozilgan
+    const params = [];
+    
+    const searchInput = document.getElementById('searchInput');
+    const q = searchInput ? searchInput.value.trim() : '';
+    const workerType = document.getElementById('hiddenWorkerType').value;
+    const dateFrom = document.getElementById('hiddenDateFrom').value;
+    const dateTo = document.getElementById('hiddenDateTo').value;
+    const customPeriod = document.getElementById('hiddenCustomPeriod').value;
+    
+    if (q) params.push('q=' + encodeURIComponent(q));
+    if (workerType) params.push('worker_type=' + encodeURIComponent(workerType));
+    if (dateFrom && !customPeriod) params.push('date_from=' + encodeURIComponent(dateFrom));
+    if (dateTo && !customPeriod) params.push('date_to=' + encodeURIComponent(dateTo));
+    if (customPeriod) params.push('custom_period=' + encodeURIComponent(customPeriod));
+    
+    return baseUrl + (params.length ? '?' + params.join('&') : '');
+}
+
+// Submit search form with clean URL
+function submitSearchForm() {
+    window.location.href = buildCleanUrl();
+    return false;
+}
+
+// Toggle filters panel
+function toggleFilters() {
+    const body = document.getElementById('filtersBody');
+    const icon = document.getElementById('toggleIcon');
+    
+    body.classList.toggle('show');
+    icon.classList.toggle('open');
+    
+    localStorage.setItem('archive_filters_open', body.classList.contains('show'));
+}
+
+// Update filter and navigate
+function updateFilter(filterType, value) {
+    if (filterType === 'worker_type') {
+        document.getElementById('hiddenWorkerType').value = value;
+    } else if (filterType === 'custom_period') {
+        document.getElementById('hiddenCustomPeriod').value = value;
+        // Clear date inputs when custom period selected
+        document.getElementById('hiddenDateFrom').value = '';
+        document.getElementById('hiddenDateTo').value = '';
+        document.getElementById('dateFromInput').value = '';
+        document.getElementById('dateToInput').value = '';
+    }
+    
+    window.location.href = buildCleanUrl();
+}
+
+// Handle date input changes
+function handleDateChange() {
+    // Clear custom period when manual date selected
+    document.getElementById('hiddenCustomPeriod').value = '';
+    
+    const dateFrom = document.getElementById('dateFromInput').value;
+    const dateTo = document.getElementById('dateToInput').value;
+    
+    document.getElementById('hiddenDateFrom').value = dateFrom;
+    document.getElementById('hiddenDateTo').value = dateTo;
+}
+
+// Apply date filters
+// Sana filtrini qo'llash - to'g'rilangan
+function applyDateFilters() {
+    // To'g'ridan-to'g'ri input qiymatlarini olish
+    let dateFrom = document.getElementById('dateFromInput').value;
+    let dateTo = document.getElementById('dateToInput').value;
+    
+    // Agar brauzer formatni o'zgartirsa, tuzatish
+    // HTML5 date input har doim yyyy-mm-dd formatda qiymat beradi
+    // Faqat ko'rsatish formati brauzerga bog'liq
+    
+    console.log("applyDateFilters - dateFrom:", dateFrom);
+    console.log("applyDateFilters - dateTo:", dateTo);
+    
+    // Custom periodni tozalash
+    document.getElementById('hiddenCustomPeriod').value = '';
+    
+    // Hidden inputlarga qiymatlarni o'rnatish
+    document.getElementById('hiddenDateFrom').value = dateFrom;
+    document.getElementById('hiddenDateTo').value = dateTo;
+    
+    // To'g'ridan-to'g'ri URL yasash va o'tish
+    let url = '/orders/archive/';
+    let params = [];
+    
+    if (dateFrom) params.push('date_from=' + encodeURIComponent(dateFrom));
+    if (dateTo) params.push('date_to=' + encodeURIComponent(dateTo));
+    
+    url += params.length ? '?' + params.join('&') : '';
+    
+    console.log("applyDateFilters - URL:", url);
+    
+    window.location.href = url;
+}
+// Clear single filter
+function clearFilter(filterType) {
+    if (filterType === 'q') {
+        document.getElementById('searchInput').value = '';
+    } else if (filterType === 'worker_type') {
+        document.getElementById('hiddenWorkerType').value = '';
+    } else if (filterType === 'date_from') {
+        document.getElementById('hiddenDateFrom').value = '';
+        document.getElementById('dateFromInput').value = '';
+    } else if (filterType === 'date_to') {
+        document.getElementById('hiddenDateTo').value = '';
+        document.getElementById('dateToInput').value = '';
+    } else if (filterType === 'custom_period') {
+        document.getElementById('hiddenCustomPeriod').value = '';
+    }
+    
+    window.location.href = buildCleanUrl();
+}
+
+// Reset all filters
+function resetAllFilters() {
+    window.location.href = '{% url "order_archive" %}';
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Restore filters panel state from localStorage
+    if (localStorage.getItem('archive_filters_open') === 'true') {
+        document.getElementById('filtersBody').classList.add('show');
+        document.getElementById('toggleIcon').classList.add('open');
+    }
+    
+    // Show active filters count
+    const activeTags = document.querySelectorAll('.active-filter-tag');
+    const indicator = document.getElementById('activeFiltersIndicator');
+    if (activeTags.length > 0 && indicator) {
+        indicator.textContent = activeTags.length;
+        indicator.classList.add('show');
+    }
+    
+    // Card hover effects
+    document.querySelectorAll('.order-card').forEach(card => {
+        card.addEventListener('mouseenter', () => card.style.transform = 'translateY(-3px)');
+        card.addEventListener('mouseleave', () => card.style.transform = 'translateY(0)');
     });
+});
 </script>
 {% endblock %}
