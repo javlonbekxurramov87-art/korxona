@@ -495,20 +495,28 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from .models import Order  # ChildOrder ni bu yerdan olib tashladik
 
-# Agar is_in_group funksiyasi boshqa joyda bo'lsa, uni import qiling yoki shu yerga yozing
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db.models import Q
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib.auth.models import User
+from datetime import datetime, timedelta, date
+from django.utils import timezone
+
+
 def is_in_group(user, group_name):
+    """Foydalanuvchi berilgan guruhga tegishli ekanligini tekshiradi"""
     return user.groups.filter(name=group_name).exists()
+
 
 @login_required
 def order_archive(request):
     """Arxivlangan (bajarilgan) buyurtmalar ro'yxati"""
     
-    # Foydalanuvchi rollari
     is_glavniy_admin = request.user.is_superuser or is_in_group(request.user, 'Glavniy Admin')
     is_manager = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
     is_worker = is_in_group(request.user, 'Usta') or is_in_group(request.user, 'Eshik Ustasi')
     
-    # Arxivlangan statuslar
     archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
     
     # Asosiy queryset
@@ -516,38 +524,90 @@ def order_archive(request):
         status__in=archived_statuses
     ).order_by('-worker_finished_at', '-created_at')
     
-    # Filtrlar
-    search_query = request.GET.get('q', '')
-    worker_filter = request.GET.get('worker_type', '')  # list, panel, eshik, ugol
+    # ==================== FILTRLAR ====================
+    search_query = request.GET.get('q', '').strip()
+    worker_filter = request.GET.get('worker_type', '').strip()
+    date_from_str = request.GET.get('date_from', '').strip()
+    date_to_str = request.GET.get('date_to', '').strip()
+    custom_period = request.GET.get('custom_period', '').strip()
     
-    # USTA TURI BO'YICHA FILTR (userlar bo'yicha)
-    if not is_worker and worker_filter:
-        # Usta username'larini aniqlash
-        worker_usernames = {
-            'list': 'list_usta',
-            'panel': 'panel_usta',
-            'eshik': 'eshik_usta',
-            'ugol': 'ugol_usta'
-        }
+    date_from = None
+    date_to = None
+    
+    if custom_period:
+        today = timezone.now().date()
         
-        if worker_filter in worker_usernames:
-            username = worker_usernames[worker_filter]
-            from django.contrib.auth.models import User
+        if custom_period == 'today':
+            date_from = today
+            date_to = today
+        elif custom_period == 'yesterday':
+            yesterday = today - timedelta(days=1)
+            date_from = yesterday
+            date_to = yesterday
+        elif custom_period == 'week':
+            date_from = today - timedelta(days=today.weekday())
+            date_to = today
+        elif custom_period == 'month':
+            date_from = today.replace(day=1)
+            date_to = today
+        elif custom_period == 'year':
+            date_from = today.replace(month=1, day=1)
+            date_to = today
+        elif custom_period == 'last_week':
+            date_from = today - timedelta(days=today.weekday() + 7)
+            date_to = date_from + timedelta(days=6)
+        elif custom_period == 'last_month':
+            first_day_of_month = today.replace(day=1)
+            last_day_of_last_month = first_day_of_month - timedelta(days=1)
+            date_from = last_day_of_last_month.replace(day=1)
+            date_to = last_day_of_last_month
+    else:
+        if date_from_str:
             try:
-                worker_user = User.objects.get(username=username)
+                date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                date_from = None
+        
+        if date_to_str:
+            try:
+                date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                date_to = None
+    
+    # --- SANA FILTRI (worker_finished_at NULL bo'lsa created_at ishlatiladi) ---
+    if date_from:
+        main_orders = main_orders.filter(
+            Q(worker_finished_at__date__gte=date_from) |
+            Q(worker_finished_at__isnull=True, created_at__date__gte=date_from)
+        )
+    
+    if date_to:
+        main_orders = main_orders.filter(
+            Q(worker_finished_at__date__lte=date_to) |
+            Q(worker_finished_at__isnull=True, created_at__date__lte=date_to)
+        )
+    
+    # --- USTA TURI FILTRI ---
+    if not is_worker and worker_filter:
+        worker_usernames = {
+            'list': 'list_usta', 'panel': 'panel_usta',
+            'eshik': 'eshik_usta', 'ugol': 'ugol_usta'
+        }
+        if worker_filter in worker_usernames:
+            try:
+                worker_user = User.objects.get(username=worker_usernames[worker_filter])
                 main_orders = main_orders.filter(
                     assigned_workers__user=worker_user
                 ).distinct()
             except User.DoesNotExist:
                 main_orders = main_orders.none()
     
-    # USTA UCHUN FILTR - o'z orderlari
     elif is_worker and not (is_glavniy_admin or is_manager):
         main_orders = main_orders.filter(
             assigned_workers__user=request.user
         ).distinct()
     
-    # Qidiruv
+    # --- QIDIRUV ---
     if search_query:
         main_orders = main_orders.filter(
             Q(order_number__icontains=search_query) |
@@ -556,20 +616,25 @@ def order_archive(request):
             Q(customer_unique_id__icontains=search_query)
         )
     
-    # Pagination
-    paginator = Paginator(main_orders, 12)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    total_count = main_orders.count()
     
-    # STATISTIKA (admin/menejer uchun) - userlar bo'yicha
+    # PAGINATION
+    paginator = Paginator(main_orders, 12)
+    page_number = request.GET.get('page', '1')
+    
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    
+    # STATISTIKA
     worker_stats = {'list': 0, 'panel': 0, 'eshik': 0, 'ugol': 0}
     if not is_worker:
-        from django.contrib.auth.models import User
         worker_usernames = {
-            'list': 'list_usta',
-            'panel': 'panel_usta',
-            'eshik': 'eshik_usta',
-            'ugol': 'ugol_usta'
+            'list': 'list_usta', 'panel': 'panel_usta',
+            'eshik': 'eshik_usta', 'ugol': 'ugol_usta'
         }
         for key, username in worker_usernames.items():
             try:
@@ -582,7 +647,6 @@ def order_archive(request):
             except User.DoesNotExist:
                 worker_stats[key] = 0
     
-    # USTA STATISTIKASI
     personal_stats = {}
     if is_worker:
         worker_orders = Order.objects.filter(
@@ -598,9 +662,12 @@ def order_archive(request):
     
     context = {
         'main_orders': page_obj,
-        'main_orders_count': main_orders.count(),
+        'main_orders_count': total_count,
         'search_query': search_query,
         'worker_filter': worker_filter,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
+        'selected_custom_date': custom_period,
         'is_worker': is_worker,
         'is_manager': is_manager,
         'is_glavniy_admin': is_glavniy_admin,
