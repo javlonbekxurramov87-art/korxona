@@ -5563,3 +5563,137 @@ def api_project_detail(request, pk):
     }
     
     return JsonResponse(data)
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from io import BytesIO
+import qrcode
+
+from reportlab.lib.units import mm
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, SimpleDocTemplate, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+
+@login_required
+def order_receipt(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    
+    PAGE_WIDTH = 80 * mm  
+    PAGE_HEIGHT = 190 * mm  
+    
+    buffer = BytesIO()
+    
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=(PAGE_WIDTH, PAGE_HEIGHT),
+        leftMargin=4 * mm,
+        rightMargin=4 * mm,
+        topMargin=5 * mm,
+        bottomMargin=5 * mm
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    style_center_bold = ParagraphStyle('CenterBold', parent=styles['Normal'], alignment=TA_CENTER, fontName='Helvetica-Bold', fontSize=12, leading=14)
+    style_center = ParagraphStyle('Center', parent=styles['Normal'], alignment=TA_CENTER, fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#222222'))
+    style_left = ParagraphStyle('Left', parent=styles['Normal'], alignment=TA_LEFT, fontName='Helvetica', fontSize=8, leading=11)
+    style_right = ParagraphStyle('Right', parent=styles['Normal'], alignment=TA_RIGHT, fontName='Helvetica', fontSize=8, leading=11)
+    style_left_bold = ParagraphStyle('LeftBold', parent=styles['Normal'], alignment=TA_LEFT, fontName='Helvetica-Bold', fontSize=8, leading=11)
+    
+    story = []
+    printable_width = PAGE_WIDTH - 8 * mm 
+    
+    story.append(Paragraph("ECO PROM", style_center_bold))
+    story.append(Spacer(1, 1 * mm))
+    story.append(Paragraph("Sovutish kameralari va panel<br/>ishlab chiqarish do'koni", style_center))
+    story.append(Paragraph("+998(78)555-86-16<br/>+998(98)707-86-16<br/>+998(97)926-86-16", style_center))
+    story.append(Paragraph("<b>www.ecopromuz.uz</b>", style_center))
+    story.append(Spacer(1, 2 * mm))
+    
+    line_style = TableStyle([
+        ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor('#333333')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
+        ('TOPPADDING', (0,0), (-1,-1), 1)
+    ])
+    t_line = Table([[""]], colWidths=[printable_width])
+    t_line.setStyle(line_style)
+    
+    kassa_no = f"Kassa №{order.id % 10 + 1:02d}"
+    chek_no = f"PRODAJA №{order.order_number}"
+    sana_vaqt = timezone.now().strftime('%d.%m.%Y %H:%M:%S')
+    sotuvchi = f"SOTUVCHI: {request.user.username}".upper()
+    
+    meta_data = [
+        [Paragraph(kassa_no, style_left), Paragraph(chek_no, style_right)],
+        [Paragraph(sana_vaqt, style_left), Paragraph("", style_right)]
+    ]
+    t_meta = Table(meta_data, colWidths=[printable_width/2, printable_width/2])
+    story.append(t_meta)
+    story.append(Spacer(1, 1 * mm))
+    story.append(Paragraph(sotuvchi, style_left_bold))
+    story.append(t_line)
+    story.append(Spacer(1, 2 * mm))
+    
+    story.append(Paragraph(f"Mijoz: {order.customer_name} (ID: {order.customer_unique_id})", style_left))
+    story.append(Spacer(1, 2 * mm))
+    
+    remaining = order.total_price - order.prepayment
+    qqs_summa = float(order.total_price) * 12 / 112
+    
+    calc_data = [
+        [Paragraph("Summa 12% QQS bilan:", style_left), Paragraph(f"{qqs_summa:,.2f}", style_right)],
+        [Paragraph("<b>Jami:</b>", ParagraphStyle('J', parent=style_left, fontSize=11)), Paragraph(f"<b>{order.total_price:,.0f}</b>", ParagraphStyle('JR', parent=style_right, fontSize=11))],
+        [Paragraph("To'landi (Zalog):", style_left), Paragraph(f"{order.prepayment:,.0f}", style_right)],
+        [Paragraph("Qoldiq (Qarz):", style_left), Paragraph(f"{remaining:,.0f}", style_right)]
+    ]
+    t_calc = Table(calc_data, colWidths=[printable_width*0.6, printable_width*0.4])
+    t_calc.setStyle(TableStyle([
+        ('LINEBELOW', (0,0), (-1,0), 0.5, colors.HexColor('#666666')),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    story.append(t_calc)
+    story.append(Spacer(1, 1 * mm))
+    
+    story.append(Paragraph("To'lov turi: PayMe / Naqd", style_left))
+    story.append(Spacer(1, 2 * mm))
+    
+    if remaining > 0:
+        story.append(Paragraph("■ DIQQAT: QARZDORLIK MAVJUD!", ParagraphStyle('W', parent=style_center_bold, fontSize=9)))
+    else:
+        story.append(Paragraph("✓ TO'LOV TO'LIQ QABUL QILINDI", ParagraphStyle('S', parent=style_center_bold, fontSize=9)))
+        
+    story.append(Spacer(1, 2 * mm))
+    story.append(Paragraph("Xaridingiz uchun rahmat!!!", ParagraphStyle('Rahmat', parent=style_center_bold, fontName='Helvetica-Oblique', fontSize=11)))
+    story.append(Spacer(1, 2 * mm))
+    
+    qr_link = f"https://taplink.cc/ecopromuz?order={order.order_number}"
+    qr = qrcode.QRCode(version=1, box_size=5, border=1)
+    qr.add_data(qr_link)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    
+    qr_buffer = BytesIO()
+    qr_img.save(qr_buffer, format='PNG')
+    qr_buffer.seek(0)
+    
+    qr_size = 32 * mm
+    real_qr_image = RLImage(qr_buffer, width=qr_size, height=qr_size)
+    
+    t_qr = Table([[real_qr_image]], colWidths=[printable_width])
+    t_qr.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0)
+    ]))
+    story.append(t_qr)
+    
+    doc.build(story)
+    
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="receipt_{order.order_number}.pdf"'
+    return response
