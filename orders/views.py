@@ -218,6 +218,7 @@ class CustomLoginView(LoginView):
 # ASOSIY SAHIFA / RO'YXAT
 # ----------------------------------------------------------------------
 @login_required 
+@login_required 
 def order_list(request):
     user = request.user
     now = timezone.now()
@@ -230,7 +231,7 @@ def order_list(request):
     is_manager = is_in_group(user, 'Menejer/Tasdiqlovchi')
     is_worker = is_in_group(user, 'Usta')
     is_observer = is_in_group(user, 'Kuzatuvchi')
-    is_sales_manager = is_in_group(user, 'Sales Manager') or user.username.lower() == 'sales_manager'  # <-- YANGI QATOR
+    is_sales_manager = is_in_group(user, 'Sales Manager') or user.username.lower() == 'sales_manager'
     
     # ================================================================
     # 2. FILTR PARAMETRLARI
@@ -240,8 +241,182 @@ def order_list(request):
     page_number = request.GET.get('page', 1)
     
     # ================================================================
-    # 3. ARXIV BUYURTMALAR (OPTIMALLASHTIRILGAN)
+    # 3. USTA UCHUN MAXSUS LOGIKA
     # ================================================================
+    if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
+        # ============================================================
+        # A. MAIN ORDERLAR - FAQAT KO'RISH UCHUN (BARCHA MAIN ORDERLAR)
+        # ============================================================
+        main_orders_qs = Order.objects.select_related('parent_order').prefetch_related(
+            'assigned_workers__user'
+        ).filter(
+            parent_order__isnull=True  # MAIN ORDERLAR
+        ).exclude(
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
+        ).order_by('-created_at')
+        
+        # Qidiruv
+        if search_query:
+            search_filter = (
+                Q(order_number__icontains=search_query) |
+                Q(customer_name__icontains=search_query) |
+                Q(product_name__icontains=search_query) |
+                Q(customer_unique_id__icontains=search_query)
+            )
+            main_orders_qs = main_orders_qs.filter(search_filter)
+        
+        # Filtr turlari
+        if filter_type == 'completed':
+            main_orders_qs = main_orders_qs.filter(status__in=['TAYYOR', 'BAJARILDI'])
+        elif filter_type == 'in_progress':
+            main_orders_qs = main_orders_qs.filter(
+                ~Q(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']) & 
+                (Q(deadline__isnull=True) | Q(deadline__gte=now))
+            )
+        elif filter_type == 'overdue':
+            main_orders_qs = main_orders_qs.filter(
+                Q(deadline__lt=now) & 
+                ~Q(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR'])
+            )
+        
+        # Pagination MAIN orderlar uchun
+        from django.core.paginator import Paginator
+        main_paginator = Paginator(main_orders_qs, 50)
+        main_page_obj = main_paginator.get_page(page_number)
+        
+        # ============================================================
+        # B. CHILD ORDERLAR - USTA O'ZIGA BIRIKTIRILGANLARI BILAN ISHLAYDI
+        # ============================================================
+        child_orders_qs = Order.objects.select_related('parent_order').prefetch_related(
+            'assigned_workers__user'
+        ).filter(
+            parent_order__isnull=False,  # CHILD ORDERLAR
+            assigned_workers__user=user  # FAQAT O'ZIGA BIRIKTIRILGANLAR
+        ).exclude(
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
+        ).order_by('-created_at')
+        
+        # Child orderlarni guruhlash
+        panel_child_orders = []
+        ugul_child_orders = []
+        other_child_orders = []
+        
+        for order in child_orders_qs:
+            product_lower = order.product_name.lower() if order.product_name else ''
+            if 'panel' in product_lower or 'панель' in product_lower or 'панел' in product_lower:
+                panel_child_orders.append(order)
+            elif 'ugul' in product_lower or 'угол' in product_lower or 'уголь' in product_lower:
+                ugul_child_orders.append(order)
+            else:
+                other_child_orders.append(order)
+        
+        # ============================================================
+        # C. STATISTIKA (MAIN ORDERLAR UCHUN)
+        # ============================================================
+        total_orders = main_orders_qs.count()
+        completed_orders = main_orders_qs.filter(status__in=['TAYYOR', 'BAJARILDI']).count()
+        in_progress_orders = main_orders_qs.filter(
+            ~Q(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']) & 
+            (Q(deadline__isnull=True) | Q(deadline__gte=now))
+        ).count()
+        overdue_orders_count = main_orders_qs.filter(
+            Q(deadline__lt=now) & ~Q(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR'])
+        ).count()
+        
+        # ============================================================
+        # D. CHILD ORDERLAR STATISTIKASI
+        # ============================================================
+        panel_child_count = len(panel_child_orders)
+        ugul_child_count = len(ugul_child_orders)
+        other_child_count = len(other_child_orders)
+        
+        panel_completed = sum(1 for o in panel_child_orders if o.status in ['TAYYOR', 'BAJARILDI'])
+        ugul_completed = sum(1 for o in ugul_child_orders if o.status in ['TAYYOR', 'BAJARILDI'])
+        
+        panel_in_progress = panel_child_count - panel_completed
+        ugul_in_progress = ugul_child_count - ugul_completed
+        
+        panel_progress_percentage = (panel_completed / panel_child_count * 100) if panel_child_count > 0 else 0
+        ugul_progress_percentage = (ugul_completed / ugul_child_count * 100) if ugul_child_count > 0 else 0
+        
+        # ============================================================
+        # E. ARXIV BUYURTMALAR
+        # ============================================================
+        archived_orders_qs = Order.objects.filter(
+            status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR'],
+            assigned_workers__user=user
+        ).select_related('parent_order').distinct()
+        archived_count = archived_orders_qs.count()
+        
+        # ============================================================
+        # F. NOTIFICATIONLAR
+        # ============================================================
+        user_notifications = Notification.objects.filter(user=user, is_read=False)[:5]
+        
+        # ============================================================
+        # G. CONTEXT (USTA UCHUN)
+        # ============================================================
+        context = {
+            # MAIN orderlar (faqat ko'rish)
+            'main_orders': main_page_obj,
+            'page_obj': main_page_obj,
+            
+            # CHILD orderlar (ishlash uchun)
+            'panel_child_orders': panel_child_orders,
+            'ugul_child_orders': ugul_child_orders,
+            'other_child_orders': other_child_orders,
+            
+            # Child orderlar soni
+            'panel_child_count': panel_child_count,
+            'ugul_child_count': ugul_child_count,
+            'other_child_count': other_child_count,
+            
+            # Child orderlar statistikasi
+            'panel_completed': panel_completed,
+            'ugul_completed': ugul_completed,
+            'panel_in_progress': panel_in_progress,
+            'ugul_in_progress': ugul_in_progress,
+            'panel_progress_percentage': round(panel_progress_percentage, 1),
+            'ugul_progress_percentage': round(ugul_progress_percentage, 1),
+            
+            # MAIN statistika
+            'total_orders': total_orders,
+            'completed_orders': completed_orders,
+            'in_progress_orders': in_progress_orders,
+            'overdue_orders_count': overdue_orders_count,
+            
+            # Arxiv
+            'archived_count': archived_count,
+            'archived_orders': archived_orders_qs[:100],
+            
+            # Rollar
+            'is_glavniy_admin': is_glavniy_admin,
+            'is_manager': is_manager,
+            'is_production_boss': is_production_boss,
+            'is_worker': is_worker,
+            'is_observer': is_observer,
+            'is_sales_manager': is_sales_manager,
+            'is_storekeeper': False,
+            'can_view_orders': True,
+            
+            # Filtrlar
+            'search_query': search_query,
+            'filter_type': filter_type,
+            'now': now,
+            
+            # Boshqa
+            'notifications': user_notifications,
+            'customers_count': 0,
+            'unpaid_orders_count': 0,
+            'total_unpaid_amount': 0,
+        }
+        
+        return render(request, 'orders/order_list.html', context)
+    
+    # ================================================================
+    # 4. BOSHQA ROLLAR UCHUN (ADMIN, MANAGER, OBSERVER)
+    # ================================================================
+    # ARXIV BUYURTMALAR
     archived_orders_qs = Order.objects.filter(
         status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
     ).select_related('customer').prefetch_related('assigned_workers__user')
@@ -251,16 +426,12 @@ def order_list(request):
     
     archived_count = archived_orders_qs.count()
     
-    # ================================================================
-    # 4. FAOL BUYURTMALAR - SELECT_RELATED VA PREFETCH_RELATED
-    # ================================================================
+    # FAOL BUYURTMALAR
     base_qs = Order.objects.select_related('parent_order').prefetch_related(
         'assigned_workers__user'
     ).exclude(status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR'])
     
-    # ================================================================
-    # 5. QIDIRUV FILTRI
-    # ================================================================
+    # Qidiruv
     if search_query:
         search_filter = (
             Q(order_number__icontains=search_query) |
@@ -270,15 +441,11 @@ def order_list(request):
         )
         base_qs = base_qs.filter(search_filter)
     
-    # ================================================================
-    # 6. ROL BO'YICHA FILTR (AGENT UCHUN)
-    # ================================================================
+    # Rol bo'yicha filtr
     if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
         base_qs = base_qs.filter(assigned_workers__user=user).exclude(status='RAD_ETILDI').distinct()
     
-    # ================================================================
-    # 7. ORDER TIPINI ANNOTATSIYA QILISH (BIR SO'ROVDA)
-    # ================================================================
+    # Order tipini aniqlash
     from django.db.models import Case, When, Value, CharField
     
     orders_with_type = base_qs.annotate(
@@ -301,9 +468,7 @@ def order_list(request):
         )
     ).order_by('-created_at')
     
-    # ================================================================
-    # 8. FILTRLASH TURLARI (BIR MARTA QO'LLASH)
-    # ================================================================
+    # Filtr turlari
     filter_conditions = {
         'completed': Q(status__in=['TAYYOR', 'BAJARILDI']),
         'in_progress': ~Q(status__in=['TAYYOR', 'BAJARILDI', 'RAD_ETILDI']) & (Q(deadline__isnull=True) | Q(deadline__gte=now)),
@@ -313,16 +478,12 @@ def order_list(request):
     if filter_type in filter_conditions:
         orders_with_type = orders_with_type.filter(filter_conditions[filter_type])
     
-    # ================================================================
-    # 9. PAGINATION (50 TA)
-    # ================================================================
+    # Pagination
     from django.core.paginator import Paginator
     paginator = Paginator(orders_with_type, 50)
     page_obj = paginator.get_page(page_number)
     
-    # ================================================================
-    # 10. GURUHLASH (PYTHON DA - TEZ)
-    # ================================================================
+    # Guruhlash
     main_orders = []
     panel_child_orders = []
     ugul_child_orders = []
@@ -338,9 +499,7 @@ def order_list(request):
         else:
             other_child_orders.append(order)
     
-    # ================================================================
-    # 11. STATISTIKA (BIR AGGREGATE SO'ROV)
-    # ================================================================
+    # Statistika
     from django.db.models import Count, Sum, F
     
     main_qs = Order.objects.filter(parent_order__isnull=True)
@@ -357,9 +516,7 @@ def order_list(request):
         overdue_orders_count=Count('id', filter=Q(deadline__lt=now) & ~Q(status__in=['BAJARILDI', 'RAD_ETILDI', 'TAYYOR'])),
     )
     
-    # ================================================================
-    # 12. CHILD ORDERLAR STATISTIKASI (BIR SO'ROV)
-    # ================================================================
+    # Child statistika
     child_stats = Order.objects.filter(parent_order__isnull=False).aggregate(
         all_child_orders_count=Count('id'),
         panel_child_count=Count('id', filter=Q(product_name__icontains='panel') | Q(product_name__icontains='панель') | Q(product_name__icontains='панел')),
@@ -368,9 +525,7 @@ def order_list(request):
         ugul_completed=Count('id', filter=(Q(product_name__icontains='ugul') | Q(product_name__icontains='угол') | Q(product_name__icontains='уголь')) & Q(status__in=['TAYYOR', 'BAJARILDI'])),
     )
     
-    # ================================================================
-    # 13. TO'LANMAGAN BUYURTMALAR (DATABASE DA HISOBLASH)
-    # ================================================================
+    # To'lanmaganlar
     unpaid_orders = Order.objects.none()
     total_unpaid_amount = 0
     unpaid_orders_count = 0
@@ -380,94 +535,65 @@ def order_list(request):
             parent_order__isnull=True,
             total_price__gt=F('prepayment')
         ).exclude(status='BEKOR_QILINDI').only('order_number', 'customer_name', 'total_price', 'prepayment')
-        
-        if is_worker and not is_glavniy_admin and not is_manager:
-            unpaid_orders = Order.objects.none()
-        else:
-            unpaid_orders_count = unpaid_orders.count()
-            total_unpaid_amount = unpaid_orders.aggregate(
-                total=Sum(F('total_price') - F('prepayment'))
-            )['total'] or 0
+        unpaid_orders_count = unpaid_orders.count()
+        total_unpaid_amount = unpaid_orders.aggregate(
+            total=Sum(F('total_price') - F('prepayment'))
+        )['total'] or 0
     
-    # ================================================================
-    # 14. NOTIFICATIONLAR
-    # ================================================================
+    # Notifikatsiyalar
     user_notifications = Notification.objects.filter(user=user, is_read=False)[:5]
     
-    # ================================================================
-    # 15. MUDDAT BUZILISHINI TEKSHIRISH (FAQAT ADMINLAR UCHUN)
-    # ================================================================
+    # Muddati o'tganlarni tekshirish
     if is_glavniy_admin or is_production_boss:
-        overdue_check_orders = main_orders[:20]  # Faqat 20 tasini tekshirish
+        overdue_check_orders = main_orders[:20]
         for order in overdue_check_orders:
             if order.deadline and order.deadline < now and order.status not in ['BAJARILDI', 'RAD_ETILDI', 'TAYYOR']:
                 check_and_create_overdue_alerts(order)
     
-    # ================================================================
-    # 16. MIJOZLAR SONI (KESH YOKI BIR SO'ROV)
-    # ================================================================
+    # Mijozlar soni
     customers_count = Order.objects.values('customer_unique_id').distinct().count()
     
-    # ================================================================
-    # 17. PROGRESS FOIZLARI
-    # ================================================================
+    # Progress foizlari
     panel_progress_percentage = 0
-    other_progress_percentage = 0
+    ugul_progress_percentage = 0
     panel_in_progress = 0
-    other_in_progress = 0
+    ugul_in_progress = 0
     
     if child_stats['panel_child_count'] > 0:
         panel_progress_percentage = (child_stats['panel_completed'] / child_stats['panel_child_count']) * 100
         panel_in_progress = child_stats['panel_child_count'] - child_stats['panel_completed']
     
     if child_stats['ugul_child_count'] > 0:
-        other_progress_percentage = (child_stats['ugul_completed'] / child_stats['ugul_child_count']) * 100
-        other_in_progress = child_stats['ugul_child_count'] - child_stats['ugul_completed']
+        ugul_progress_percentage = (child_stats['ugul_completed'] / child_stats['ugul_child_count']) * 100
+        ugul_in_progress = child_stats['ugul_child_count'] - child_stats['ugul_completed']
     
-    # ================================================================
-    # 18. CONTEXT
-    # ================================================================
+    # Context (admin/manager/observer)
     context = {
-        # Pagination
         'page_obj': page_obj,
         'orders': page_obj,
-        
-        # Guruhlangan orderlar
         'main_orders': main_orders,
         'panel_child_orders': panel_child_orders,
         'ugul_child_orders': ugul_child_orders,
         'other_child_orders': other_child_orders,
-        
-        # Arxiv
         'archived_count': archived_count,
         'archived_orders': archived_orders_qs[:100],
-        
-        # To'lanmaganlar
         'unpaid_orders_count': unpaid_orders_count,
         'total_unpaid_amount': total_unpaid_amount,
-        
-        # Rollar
         'is_glavniy_admin': is_glavniy_admin,
         'is_manager': is_manager,
         'is_production_boss': is_production_boss,
         'is_worker': is_worker,
         'is_observer': is_observer,
-        'is_sales_manager': is_sales_manager,  # <-- YANGI QATOR
+        'is_sales_manager': is_sales_manager,
         'is_storekeeper': user.username.lower() == 'omborchi' or 'store' in user.username.lower(),
         'can_view_orders': any([is_glavniy_admin, is_production_boss, is_manager, is_worker, is_observer]),
-        
-        # Filtrlar
         'search_query': search_query,
         'filter_type': filter_type,
         'now': now,
-        
-        # Statistikalar
         'total_orders': stats['total_orders'],
         'completed_orders': stats['completed_orders'],
         'in_progress_orders': stats['in_progress_orders'],
         'overdue_orders_count': stats['overdue_orders_count'],
-        
-        # Child statistikalar
         'all_child_orders_count': child_stats['all_child_orders_count'],
         'panel_child_count': child_stats['panel_child_count'],
         'ugul_child_count': child_stats['ugul_child_count'],
@@ -475,16 +601,15 @@ def order_list(request):
         'panel_completed': child_stats['panel_completed'],
         'ugul_completed': child_stats['ugul_completed'],
         'panel_in_progress': panel_in_progress,
-        'other_in_progress': other_in_progress,
+        'ugul_in_progress': ugul_in_progress,
         'panel_progress_percentage': round(panel_progress_percentage, 1),
-        'other_progress_percentage': round(other_progress_percentage, 1),
-        
-        # Boshqa
+        'ugul_progress_percentage': round(ugul_progress_percentage, 1),
         'customers_count': customers_count,
         'notifications': user_notifications,
     }
     
     return render(request, 'orders/order_list.html', context)
+
 
 
 
