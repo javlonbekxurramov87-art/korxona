@@ -10,416 +10,365 @@
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: #f8fafc; min-height: 100vh; padding: 24px; color: #0f172a; }
-        .container { max-width: 1440px; margin: 0 auto; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9edf2 100%);
+            min-height: 100vh; 
+            padding: 24px; 
+            color: #1e293b; 
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
         
         /* Header */
-        .header { background: white; border-radius: 24px; padding: 24px 32px; margin-bottom: 28px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
+        .header { 
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 28px; 
+            padding: 20px 32px; 
+            margin-bottom: 28px; 
+            border: 1px solid rgba(59,130,246,0.2);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
         .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
-        .header h1 { font-size: 28px; font-weight: 700; color: #0f172a; margin: 0; }
-        .header h1 i { color: #3b82f6; margin-right: 12px; }
+        .header h1 { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #1e293b, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; }
+        .header h1 i { background: none; -webkit-text-fill-color: #3b82f6; margin-right: 12px; }
         
-        /* Stats Cards */
+        /* Stats Cards - fixed height */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 28px; }
-        .stat-card { background: white; border-radius: 20px; padding: 24px; border: 1px solid #e2e8f0; transition: 0.3s; }
-        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.15); }
-        .stat-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-        .stat-title { font-size: 14px; color: #64748b; margin-bottom: 8px; }
-        .stat-value { font-size: 32px; font-weight: 800; color: #0f172a; }
-        .stat-sub { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+        .stat-card { background: white; border-radius: 24px; padding: 24px; border: 1px solid #e2e8f0; transition: all 0.3s; position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(135deg, #3b82f6, #10b981); }
+        .stat-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15); }
+        .stat-icon { width: 56px; height: 56px; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+        .stat-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
+        .stat-value { font-size: 36px; font-weight: 800; color: #0f172a; letter-spacing: -1px; }
+        .stat-sub { font-size: 12px; color: #94a3b8; margin-top: 8px; display: flex; align-items: center; gap: 6px; }
 
-        /* Categories Grid */
-        .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: #0f172a;
-        }
-        .section-title i {
-            color: #3b82f6;
-            margin-right: 8px;
-        }
-        .categories-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-        .category-card {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            border: 1px solid #e2e8f0;
-            cursor: pointer;
-            transition: all 0.3s ease;
+        /* Categories Section - Scrollable */
+        .categories-section {
+            margin-bottom: 28px;
             position: relative;
         }
-        .category-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.15);
-            border-color: #3b82f6;
-        }
-        .category-card.active {
-            border-color: #3b82f6;
-            background: #eff6ff;
-        }
-        .category-icon {
-            width: 48px;
-            height: 48px;
-            background: #eff6ff;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
-        }
-        .category-icon i {
-            font-size: 24px;
-            color: #3b82f6;
-        }
-        .category-name {
-            font-size: 18px;
+        .section-title {
+            font-size: 20px;
             font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 8px;
-        }
-        .category-stats {
-            display: flex;
-            gap: 16px;
-            margin-top: 12px;
-            font-size: 13px;
-            color: #64748b;
-        }
-        .category-stats span i {
-            margin-right: 4px;
-        }
-        .category-badge {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: #e2e8f0;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #475569;
-        }
-
-        /* QR and Print Styles */
-        .qr-thumb {
-            width: 45px;
-            height: 45px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .qr-thumb:hover { transform: scale(1.2); border-color: #3b82f6; }
-
-        /* Table */
-        .card { background: white; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; }
-        .card-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid #e2e8f0;
-            background: #fafbfc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-        .card-header h3 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #0f172a;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8fafc; padding: 16px 20px; text-align: left; font-size: 12px; font-weight: 700; color: #475569; border-bottom: 1px solid #e2e8f0; text-transform: uppercase; }
-        td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 14px; vertical-align: middle; }
-        
-        .badge { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
-        .badge-success { background: #d1fae5; color: #065f46; }
-        .badge-danger { background: #fee2e2; color: #991b1b; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-info { background: #e0f2fe; color: #0369a1; }
-
-        /* Buttons */
-        .btn { text-decoration: none; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; border: none; cursor: pointer; }
-        .btn-primary { background: #eff6ff; color: #3b82f6; }
-        .btn-success { background: #10b981; color: white; }
-        .btn-warning { background: #f59e0b; color: white; }
-        .btn-danger { background: #ef4444; color: white; }
-        .btn-outline { background: transparent; border: 1px solid #e2e8f0; color: #475569; }
-        .btn-sm { padding: 6px 12px; font-size: 12px; }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-
-        /* Filter section */
-        .filter-section { background: white; border-radius: 20px; padding: 24px; margin-bottom: 28px; border: 1px solid #e2e8f0; }
-        .filter-row { display: flex; gap: 16px; flex-wrap: wrap; }
-        .filter-group { flex: 1; min-width: 200px; }
-        .filter-group label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px; }
-        .filter-group input, .filter-group select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 14px; }
-        
-        .clear-filter {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: #f1f5f9;
-            padding: 8px 16px;
-            border-radius: 12px;
-            font-size: 13px;
-            color: #475569;
-            text-decoration: none;
-        }
-        .clear-filter:hover { background: #e2e8f0; }
-
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #94a3b8;
-        }
-        .empty-state i {
-            font-size: 64px;
             margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        /* Pagination */
-        .pagination {
+            color: #0f172a;
             display: flex;
-            justify-content: center;
-            gap: 8px;
-            padding: 20px;
-            border-top: 1px solid #e2e8f0;
+            align-items: center;
+            justify-content: space-between;
+            padding-right: 8px;
         }
-        .pagination a, .pagination span {
-            padding: 8px 14px;
+        .section-title i { color: #3b82f6; margin-right: 10px; }
+        
+        /* Horizontal scroll for categories */
+        .categories-wrapper {
+            position: relative;
+            margin: 0 -10px;
+        }
+        .categories-grid { 
+            display: flex;
+            gap: 16px;
+            overflow-x: auto;
+            overflow-y: visible;
+            padding: 4px 10px 12px 10px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        .categories-grid::-webkit-scrollbar {
+            height: 6px;
+        }
+        .categories-grid::-webkit-scrollbar-track {
+            background: #e2e8f0;
             border-radius: 10px;
-            text-decoration: none;
-            color: #475569;
-            background: #f1f5f9;
         }
-        .pagination .current {
+        .categories-grid::-webkit-scrollbar-thumb {
             background: #3b82f6;
-            color: white;
+            border-radius: 10px;
         }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
+        .categories-grid::-webkit-scrollbar-thumb:hover {
+            background: #2563eb;
+        }
+        
+        .category-card { 
+            flex: 0 0 280px;
+            background: white; 
+            border-radius: 20px; 
+            padding: 20px; 
+            border: 1px solid #e2e8f0; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            position: relative;
+            overflow: hidden;
+        }
+        .category-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
             left: 0;
             width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #10b981);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
         }
-        .modal-content {
-            background: white;
-            border-radius: 24px;
-            padding: 32px;
-            width: 90%;
-            max-width: 500px;
-        }
-        .modal-content h3 {
-            margin-bottom: 20px;
-        }
-        .modal-content input, .modal-content select {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 16px;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-        }
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        /* Import Modal specific styles */
-        .import-dropzone {
-            border: 2px dashed #d1d5db;
-            border-radius: 8px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .import-dropzone:hover {
-            border-color: #10b981;
-            background: #f0fdf4;
-        }
-
-        /* Toast notification */
-        .toast-notification {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: white;
-            border-radius: 12px;
-            padding: 16px 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 1100;
-            animation: slideIn 0.3s ease;
-            border-left: 4px solid;
-        }
-        .toast-success { border-left-color: #10b981; }
-        .toast-error { border-left-color: #ef4444; }
-        .toast-warning { border-left-color: #f59e0b; }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        /* Print styles */
-        @media print {
-            body * { display: none !important; }
-            .print-container, .print-container * { display: block !important; visibility: visible !important; }
-            .print-container { position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 0; }
-            @page { size: 58mm auto; margin: 0; }
-            .print-label { page-break-inside: avoid; page-break-after: avoid; border: none !important; }
-        }
-
-        .print-label {
-            width: 54mm;
-            max-width: 54mm;
-            padding: 4mm 3mm;
-            font-family: 'Inter', monospace;
-            text-align: center;
-            background: white;
-            margin: 0 auto;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .print-label .qr-image {
-            width: 42mm;
-            height: 42mm;
-            margin: 2mm auto;
-            display: block;
-        }
-        .print-label .product-name {
-            font-size: 12px;
-            font-weight: bold;
-            margin: 3mm 0 2mm;
-            word-break: break-word;
-            line-height: 1.4;
-            text-align: center;
-        }
-        .print-label .product-details {
-            font-size: 9px;
-            color: #333;
-            margin: 1mm 0;
-        }
-        .print-hr {
-            border-top: 1px dashed #aaa;
-            margin: 2mm 0;
-            width: 90%;
-        }
-        .print-header {
-            font-size: 8px;
-            color: #666;
-            margin-bottom: 2mm;
-            text-transform: uppercase;
-        }
-        .print-footer {
-            font-size: 7px;
-            color: #888;
-            margin-top: 2mm;
-            border-top: 1px dotted #ccc;
-            padding-top: 1.5mm;
-        }
-
-        /* Loading spinner */
-        .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #10b981;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .category-card:hover::after { transform: scaleX(1); }
+        .category-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -12px rgba(0,0,0,0.15); border-color: #3b82f6; }
+        .category-card.active { border-color: #3b82f6; background: linear-gradient(135deg, #eff6ff, #ffffff); }
+        .category-icon { width: 52px; height: 52px; background: linear-gradient(135deg, #e0f2fe, #dbeafe); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+        .category-icon i { font-size: 24px; color: #3b82f6; }
+        .category-name { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .category-stats { display: flex; gap: 16px; margin-top: 12px; font-size: 11px; color: #64748b; }
+        .category-stats span i { margin-right: 4px; width: 12px; }
+        .category-badge { 
+            position: absolute; 
+            top: 12px; 
+            right: 12px; 
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            padding: 3px 10px; 
+            border-radius: 20px; 
+            font-size: 10px; 
+            font-weight: 600; 
+            color: #475569; 
         }
         
-        .btn-loading {
-            opacity: 0.7;
-            pointer-events: none;
+        /* Scroll buttons */
+        .scroll-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+        .scroll-btn:hover {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .scroll-left {
+            left: 0;
+        }
+        .scroll-right {
+            right: 0;
+        }
+
+        /* Card (table) with proper height */
+        .card { 
+            background: white; 
+            border-radius: 24px; 
+            overflow: hidden; 
+            border: 1px solid #e2e8f0; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            max-height: 60vh;
+        }
+        .card-header { 
+            padding: 20px 24px; 
+            border-bottom: 1px solid #e2e8f0; 
+            background: #fafbfc; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            flex-wrap: wrap; 
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .card-header h3 { font-size: 18px; font-weight: 600; color: #0f172a; }
+        
+        /* Table with scroll */
+        .table-wrapper {
+            overflow-x: auto;
+            overflow-y: auto;
+            flex: 1;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th { 
+            background: #f8fafc; 
+            padding: 14px 16px; 
+            text-align: left; 
+            font-size: 12px; 
+            font-weight: 700; 
+            color: #475569; 
+            border-bottom: 1px solid #e2e8f0; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            background: #f8fafc;
+            z-index: 5;
+        }
+        td { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; vertical-align: middle; transition: background 0.2s; }
+        tr:hover td { background: #f8fafc; }
+        
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
+        .badge-success { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; }
+        .badge-danger { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; }
+        .badge-info { background: linear-gradient(135deg, #e0f2fe, #bae6fd); color: #0369a1; }
+
+        .btn { text-decoration: none; padding: 8px 18px; border-radius: 12px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease; border: none; cursor: pointer; }
+        .btn-primary { background: #eff6ff; color: #3b82f6; border: 1px solid #dbeafe; }
+        .btn-primary:hover { background: #dbeafe; transform: translateY(-2px); }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); color: white; box-shadow: 0 2px 8px rgba(16,185,129,0.3); }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,185,129,0.4); }
+        .btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+        .btn-warning:hover { transform: translateY(-2px); }
+        .btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+        .btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 8px; }
+
+        /* Filter section - fixed */
+        .filter-section { 
+            background: white; 
+            border-radius: 20px; 
+            padding: 16px 20px; 
+            margin-bottom: 24px; 
+            border: 1px solid #e2e8f0;
+            position: sticky;
+            top: 85px;
+            z-index: 99;
+            background: rgba(255,255,255,0.98);
+            backdrop-filter: blur(8px);
+        }
+        .filter-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+        .filter-group { flex: 1; min-width: 180px; }
+        .filter-group label { display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .filter-group input, .filter-group select { width: 100%; padding: 8px 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 13px; transition: all 0.2s; }
+        .filter-group input:focus, .filter-group select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        
+        .clear-filter { display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.2s; }
+        .clear-filter:hover { background: #e2e8f0; transform: translateY(-1px); }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 28px; padding: 28px; width: 90%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: modalFadeIn 0.3s ease; max-height: 90vh; overflow-y: auto; }
+        @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .modal-content h3 { margin-bottom: 20px; font-size: 20px; font-weight: 700; color: #0f172a; }
+        .modal-content input, .modal-content select { width: 100%; padding: 10px 12px; margin-bottom: 14px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; }
+        .modal-content input:focus, .modal-content select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+
+        .import-dropzone { border: 2px dashed #cbd5e1; border-radius: 14px; padding: 30px; text-align: center; margin-bottom: 20px; cursor: pointer; transition: all 0.3s; background: #fafbfc; }
+        .import-dropzone:hover { border-color: #10b981; background: #f0fdf4; }
+
+        .toast-notification { position: fixed; bottom: 30px; right: 30px; background: white; border-radius: 14px; padding: 14px 20px; box-shadow: 0 20px 40px -12px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 10px; z-index: 1100; animation: slideInRight 0.3s ease; border-left: 4px solid; font-weight: 500; font-size: 14px; }
+        .toast-success { border-left-color: #10b981; background: linear-gradient(135deg, #ffffff, #f0fdf4); }
+        .toast-error { border-left-color: #ef4444; background: linear-gradient(135deg, #ffffff, #fef2f2); }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #e2e8f0; border-top-color: #10b981; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+        
+        .qr-thumb { width: 38px; height: 38px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; transition: all 0.2s; object-fit: cover; }
+        .qr-thumb:hover { transform: scale(1.1); border-color: #3b82f6; }
+
+        @media print { 
+            body * { display: none !important; } 
+            .print-container, .print-container * { display: block !important; } 
+            .print-container { position: absolute; top: 0; left: 0; width: 100%; } 
+            @page { size: 58mm auto; margin: 0; } 
+        }
+        .print-label { width: 54mm; padding: 4mm 3mm; text-align: center; background: white; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+        .print-label .qr-image { width: 42mm; height: 42mm; margin: 2mm auto; }
+        .print-label .product-name { font-size: 11px; font-weight: bold; margin: 3mm 0; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <!-- Header -->
     <div class="header">
         <div class="header-top">
             <div>
-                <h1><i class="fas fa-cubes"></i> Omborxona Tizimi</h1>
-                <p style="margin-top: 8px;"><i class="fas fa-clock"></i> <span id="current-time"></span></p>
+                <h1><i class="fas fa-cubes"></i> EcoProm Omborxona</h1>
+                <p style="margin-top: 6px; font-size: 12px; color: #64748b;">
+                    <i class="fas fa-calendar-alt"></i> <span id="current-date"></span>
+                    <span style="margin: 0 6px">•</span>
+                    <i class="fas fa-clock"></i> <span id="current-time"></span>
+                </p>
             </div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="openImportModal()" class="btn" style="background: #10b981; color: white;">
-                    <i class="fas fa-file-excel"></i> Excel import
+                <button onclick="openImportModal()" class="btn" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                    <i class="fas fa-file-excel"></i> Import
                 </button>
                 <a href="{% url 'order_list' %}" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> Buyurtmalar</a>
                 <a href="{% url 'output_history' %}" class="btn btn-primary"><i class="fas fa-history"></i> Tarix</a>
-                <a href="#" onclick="openAddMaterialModal(event)" class="btn btn-success"><i class="fas fa-plus"></i> Yangi material</a>
+                <a href="{% url 'add_material' %}" class="btn btn-success"><i class="fas fa-plus"></i> Yangi</a>
                 <a href="{% url 'material_output' %}" class="btn btn-warning"><i class="fas fa-sign-out-alt"></i> Chiqarish</a>
-                <a href="{% url 'export_inventory_excel' %}" class="btn" style="background: #3b82f6; color: white;"><i class="fas fa-file-download"></i> Hisobot</a>
+                <a href="{% url 'export_inventory_excel' %}" class="btn" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;"><i class="fas fa-download"></i> Hisobot</a>
             </div>
         </div>
     </div>
     
-    <!-- STATISTIKA KARTALARI -->
+    <!-- Statistik Kartalar -->
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #eff6ff;"><i class="fas fa-folder" style="color: #3b82f6;"></i></div>
+            <div class="stat-icon" style="background: linear-gradient(135deg, #e0f2fe, #dbeafe);"><i class="fas fa-folder" style="color: #3b82f6; font-size: 22px;"></i></div>
             <div class="stat-title">Kategoriyalar</div>
-            <div class="stat-value" id="stat-categories">{{ total_categories|default:0 }}</div>
-            <div class="stat-sub"><i class="fas fa-box"></i> <span id="stat-materials">{{ total_materials|default:0 }}</span> ta material</div>
+            <div class="stat-value" id="stat-categories">0</div>
+            <div class="stat-sub"><i class="fas fa-box"></i> <span id="stat-materials">0</span> ta material</div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #fee2e2;"><i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i></div>
+            <div class="stat-icon" style="background: linear-gradient(135deg, #fee2e2, #fecaca);"><i class="fas fa-exclamation-triangle" style="color: #ef4444; font-size: 22px;"></i></div>
             <div class="stat-title">Kam qolgan</div>
-            <div class="stat-value" id="low-stock-count">{{ low_stock_count|default:0 }}</div>
+            <div class="stat-value" id="low-stock-count">0</div>
             <div class="stat-sub"><i class="fas fa-clock"></i> Zudlik bilan to'ldirish kerak</div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #dbeafe;"><i class="fas fa-chart-simple" style="color: #3b82f6;"></i></div>
+            <div class="stat-icon" style="background: linear-gradient(135deg, #dbeafe, #c7d2fe);"><i class="fas fa-chart-line" style="color: #3b82f6; font-size: 22px;"></i></div>
             <div class="stat-title">Jami miqdor</div>
-            <div class="stat-value" id="total-quantity">{{ total_quantity|floatformat:0|default:0 }}</div>
-            <div class="stat-sub"><i class="fas fa-chart-line"></i> Barcha materiallar</div>
+            <div class="stat-value" id="total-quantity">0</div>
+            <div class="stat-sub"><i class="fas fa-chart-simple"></i> Barcha materiallar</div>
         </div>
     </div>
 
-    <!-- KATEGORIYALAR GRIDI -->
-    <div class="section-title">
-        <i class="fas fa-tags"></i> Kategoriyalar 
-        <span style="font-size: 14px; color: #64748b; font-weight: normal;">(<span id="category-count">{{ total_categories|default:0 }}</span> ta)</span>
-    </div>
-    <div class="categories-grid" id="categories-grid">
-        <!-- Categories will be loaded via AJAX -->
+    <!-- Kategoriyalar - Horizontal Scroll -->
+    <div class="categories-section">
+        <div class="section-title">
+            <span><i class="fas fa-tags"></i> Kategoriyalar</span>
+            <span style="font-size: 13px; font-weight: 500; color: #64748b;">(<span id="category-count">0</span> ta)</span>
+        </div>
+        <div class="categories-wrapper">
+            <div class="scroll-btn scroll-left" onclick="scrollCategories(-280)">
+                <i class="fas fa-chevron-left"></i>
+            </div>
+            <div class="scroll-btn scroll-right" onclick="scrollCategories(280)">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+            <div class="categories-grid" id="categories-grid">
+                <div class="category-card" onclick="selectCategory('')">
+                    <div class="category-icon"><i class="fas fa-layer-group"></i></div>
+                    <div class="category-name">Barcha materiallar</div>
+                    <div class="category-stats">
+                        <span><i class="fas fa-box"></i> <span id="total-materials-count">0</span> ta</span>
+                        <span><i class="fas fa-chart-simple"></i> <span id="total-materials-quantity">0</span> birlik</span>
+                    </div>
+                    <div class="category-badge">Umumiy</div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- FILTR VA QIDIRUV -->
+    <!-- Filter -->
     <div class="filter-section">
         <div class="filter-row">
             <div class="filter-group">
                 <label><i class="fas fa-search"></i> Qidiruv</label>
-                <input type="text" id="search-input" placeholder="Material nomi..." value="{{ search_query|default:'' }}">
+                <input type="text" id="search-input" placeholder="Material nomi...">
             </div>
             <div class="filter-group">
                 <label><i class="fas fa-filter"></i> Holat</label>
@@ -429,324 +378,153 @@
                     <option value="success">Yetarli</option>
                 </select>
             </div>
-            <div class="filter-group" style="display: flex; align-items: flex-end;">
-                <button onclick="clearAllFilters()" class="clear-filter" id="clear-filters-btn" style="display: {% if selected_category or search_query or status_filter %}flex{% else %}none{% endif %};">
-                    <i class="fas fa-times"></i> Filtrlarni tozalash
+            <div class="filter-group" style="flex: 0.2;">
+                <label>&nbsp;</label>
+                <button onclick="clearFilters()" class="clear-filter" id="clear-filters-btn" style="display: none;">
+                    <i class="fas fa-times"></i> Tozalash
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- MATERIALLAR JADVALI -->
+    <!-- Materiallar Jadvali -->
     <div class="card">
         <div class="card-header">
-            <h3>
-                <i class="fas fa-list"></i> 
-                <span id="section-title-text">
-                    {% if selected_category %}
-                        {{ selected_category }} - Materiallar
-                    {% else %}
-                        Barcha materiallar
-                    {% endif %}
-                </span>
-                <span style="font-size: 13px; color: #64748b;">(<span id="materials-count">{{ materials|length }}</span> ta)</span>
-            </h3>
+            <h3><i class="fas fa-list"></i> <span id="section-title-text">Barcha materiallar</span></h3>
+            <span style="font-size: 12px; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 20px;">
+                <i class="fas fa-database"></i> <span id="materials-count">0</span> ta
+            </span>
         </div>
-        
-        <div style="overflow-x: auto;">
+        <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 70px; text-align: center;"><i class="fas fa-qrcode"></i> QR</th>
-                        <th><i class="fas fa-tag"></i> Material nomi</th>
-                        <th><i class="fas fa-folder"></i> Kategoriya</th>
-                        <th><i class="fas fa-database"></i> Qoldiq</th>
-                        <th><i class="fas fa-ruler"></i> Birlik</th>
-                        <th><i class="fas fa-chart-line"></i> Minimal limit</th>
-                        <th><i class="fas fa-info-circle"></i> Holat</th>
-                        <th style="width: 140px; text-align: center;"><i class="fas fa-cog"></i> Amallar</th>
+                        <th style="width: 60px;">QR</th>
+                        <th>Material</th>
+                        <th>Kategoriya</th>
+                        <th>Qoldiq</th>
+                        <th>Birlik</th>
+                        <th>Limit</th>
+                        <th>Holat</th>
+                        <th style="width: 120px;">Amallar</th>
                     </tr>
                 </thead>
                 <tbody id="material-tbody">
-                    {% for m in materials %}
-                    <tr data-id="{{ m.id }}" data-name="{{ m.name }}" data-quantity="{{ m.quantity|floatformat:3 }}" data-unit="{{ m.unit }}" data-min-stock="{{ m.min_stock_level|floatformat:1 }}" data-category="{{ m.category.name|default:'' }}">
-                        <td style="text-align: center;">
-                            {% if m.qr_code %}
-                                <img src="{{ m.qr_code.url }}" class="qr-thumb" onclick="window.open(this.src)" style="width: 40px; height: 40px;">
-                            {% else %}
-                                <i class="fas fa-qrcode" style="color: #cbd5e1; font-size: 24px;"></i>
-                            {% endif %}
-                        </td>
-                        <td><strong>{{ m.name }}</strong></td>
-                        <td>
-                            <span class="badge badge-info" style="background: #f1f5f9;">
-                                {{ m.category.name|default:"Kategoriyasiz" }}
-                            </span>
-                        </td>
-                        <td><strong style="font-size: 16px;">{{ m.quantity|floatformat:3 }}</strong></td>
-                        <td>{{ m.unit|upper }}</td>
-                        <td>{{ m.min_stock_level|floatformat:1 }}</td>
-                        <td>
-                            {% if m.quantity <= m.min_stock_level %}
-                                <span class="badge badge-danger"><i class="fas fa-exclamation-circle"></i> Kam qoldi</span>
-                            {% else %}
-                                <span class="badge badge-success"><i class="fas fa-check-circle"></i> Yetarli</span>
-                            {% endif %}
-                        </td>
-                        <td style="text-align: center;">
-                            <div style="display: flex; gap: 6px; justify-content: center;">
-                                <button class="btn btn-primary btn-sm" onclick="openEditModal({{ m.id }})" title="Tahrirlash">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteMaterial({{ m.id }}, '{{ m.name|escapejs }}')" title="O'chirish">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                                <button class="btn btn-warning btn-sm" onclick="printQRCode({{ m.id }}, '{{ m.name|escapejs }}', '{{ m.category.name|default:''|escapejs }}', '{{ m.qr_code.url|default:'' }}', '{{ m.quantity|floatformat:2 }}', '{{ m.unit|upper }}')" title="QR kodni chop etish">
-                                    <i class="fas fa-print"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <i class="fas fa-box-open"></i>
-                            <h3>Materiallar topilmadi</h3>
-                            <p>Omborxona bo'sh. Yangi material qo'shing!</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    <tr><td colspan="8" class="empty-state"><i class="fas fa-spinner fa-spin"></i><h4>Yuklanmoqda...</h4></td></tr>
                 </tbody>
             </table>
         </div>
-        
-        <!-- PAGINATION -->
-        {% if page_obj.has_other_pages %}
-        <div class="pagination">
-            {% if page_obj.has_previous %}
-                <a href="?page=1{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"><i class="fas fa-angle-double-left"></i></a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"><i class="fas fa-angle-left"></i></a>
-            {% endif %}
-            
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                    <span class="current">{{ num }}</span>
-                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                    <a href="?page={{ num }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
-                {% endif %}
-            {% endfor %}
-            
-            {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"><i class="fas fa-angle-right"></i></a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"><i class="fas fa-angle-double-right"></i></a>
-            {% endif %}
-        </div>
-        {% endif %}
     </div>
 </div>
 
-<!-- ADD MATERIAL MODAL -->
-<div id="addMaterialModal" class="modal">
-    <div class="modal-content">
-        <h3><i class="fas fa-plus-circle"></i> Yangi material qo'shish</h3>
-        <form id="addMaterialForm">
-            {% csrf_token %}
-            <div>
-                <label><i class="fas fa-tag"></i> Material nomi</label>
-                <input type="text" id="add_name" name="name" required placeholder="Masalan: PVX panel">
-            </div>
-            <div>
-                <label><i class="fas fa-folder"></i> Kategoriya</label>
-                <select id="add_category" name="category_id">
-                    <option value="">-- Kategoriya tanlang --</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat.id }}">{{ cat.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label><i class="fas fa-database"></i> Miqdori</label>
-                <input type="number" step="0.001" id="add_quantity" name="quantity" required placeholder="0.000">
-            </div>
-            <div>
-                <label><i class="fas fa-ruler"></i> Birlik</label>
-                <select id="add_unit" name="unit">
-                    <option value="kg">kg</option>
-                    <option value="m2">m²</option>
-                    <option value="dona">dona</option>
-                    <option value="m">metr</option>
-                    <option value="litr">litr</option>
-                </select>
-            </div>
-            <div>
-                <label><i class="fas fa-chart-line"></i> Minimal limit</label>
-                <input type="number" step="0.001" id="add_min_stock" name="min_stock_level" placeholder="0">
-            </div>
-            <div class="modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeAddMaterialModal()"><i class="fas fa-times"></i> Bekor qilish</button>
-                <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Saqlash</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- EDIT MODAL -->
+<!-- Modal: Tahrirlash -->
 <div id="editModal" class="modal">
     <div class="modal-content">
-        <h3><i class="fas fa-edit"></i> Materialni tahrirlash</h3>
+        <h3><i class="fas fa-edit" style="color: #f59e0b;"></i> Materialni tahrirlash</h3>
         <form id="editForm">
             {% csrf_token %}
             <input type="hidden" id="edit_id" name="material_id">
-            <div>
-                <label><i class="fas fa-tag"></i> Material nomi</label>
-                <input type="text" id="edit_name" name="name" required>
-            </div>
-            <div>
-                <label><i class="fas fa-folder"></i> Kategoriya</label>
-                <select id="edit_category" name="category_id">
-                    <option value="">-- Kategoriya tanlang --</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat.id }}">{{ cat.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label><i class="fas fa-database"></i> Miqdori</label>
-                <input type="number" step="0.001" id="edit_quantity" name="quantity" required>
-            </div>
-            <div>
-                <label><i class="fas fa-ruler"></i> Birlik</label>
-                <select id="edit_unit" name="unit">
-                    <option value="kg">kg</option>
-                    <option value="m2">m²</option>
-                    <option value="dona">dona</option>
-                    <option value="m">metr</option>
-                    <option value="litr">litr</option>
-                </select>
-            </div>
-            <div>
-                <label><i class="fas fa-chart-line"></i> Minimal limit</label>
-                <input type="number" step="0.001" id="edit_min_stock" name="min_stock_level">
-            </div>
+            <input type="text" id="edit_name" name="name" placeholder="Material nomi" required>
+            <select id="edit_category" name="category_id">
+                <option value="">-- Kategoriya tanlang --</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" step="0.001" id="edit_quantity" name="quantity" placeholder="Miqdori" required>
+            <select id="edit_unit" name="unit">
+                <option value="kg">kg</option>
+                <option value="m2">m²</option>
+                <option value="dona">dona</option>
+                <option value="m">metr</option>
+                <option value="litr">litr</option>
+            </select>
+            <input type="number" step="0.001" id="edit_min_stock" name="min_stock_level" placeholder="Minimal limit">
             <div class="modal-buttons">
-                <button type="button" class="btn btn-primary" onclick="closeEditModal()"><i class="fas fa-times"></i> Bekor qilish</button>
+                <button type="button" class="btn btn-primary" onclick="closeEditModal()"><i class="fas fa-times"></i> Bekor</button>
                 <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Saqlash</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- IMPORT EXCEL MODAL -->
+<!-- Modal: Import Excel -->
 <div id="importModal" class="modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="margin: 0;"><i class="fas fa-upload" style="color: #10b981;"></i> Excel fayl import qilish</h3>
-            <button onclick="closeImportModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+    <div class="modal-content" style="max-width: 480px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;"><i class="fas fa-upload" style="color: #10b981;"></i> Excel import</h3>
+            <button onclick="closeImportModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #94a3b8;">&times;</button>
         </div>
-        
         <form id="importForm" enctype="multipart/form-data">
             {% csrf_token %}
-            
             <div class="import-dropzone" onclick="document.getElementById('excelFile').click()">
                 <input type="file" id="excelFile" name="excel_file" accept=".xlsx, .xls" style="display: none;" onchange="showFileName(this)">
-                <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: #10b981; margin-bottom: 10px;"></i>
-                <p style="margin: 10px 0; color: #374151;" id="fileLabel">Excel faylni tanlang yoki sudrab keltiring</p>
-                <p style="margin: 0; color: #6b7280; font-size: 12px;">.xlsx yoki .xls formatdagi fayllar</p>
+                <i class="fas fa-cloud-upload-alt" style="font-size: 40px; color: #10b981; margin-bottom: 8px;"></i>
+                <p style="margin: 6px 0; color: #374151; font-size: 13px;" id="fileLabel">Faylni tanlang</p>
+                <p style="margin: 0; color: #94a3b8; font-size: 11px;">.xlsx yoki .xls format</p>
             </div>
-            
-            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
-                <p style="margin: 0; color: #92400e; font-size: 14px;">
-                    <i class="fas fa-info-circle"></i> 
-                    <strong>Eslatma:</strong> Agar material bazada mavjud bo'lsa, uning miqdori qo'shiladi. Yangi materiallar avtomatik yaratiladi.
-                </p>
-            </div>
-            
-            <div id="importProgress" style="display: none; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fas fa-spinner fa-spin" style="color: #10b981;"></i>
-                    <span>Import qilinmoqda...</span>
-                </div>
-                <div style="background: #e5e7eb; height: 8px; border-radius: 4px; margin-top: 10px;">
-                    <div id="progressBar" style="background: #10b981; height: 100%; width: 0%; border-radius: 4px; transition: width 0.3s;"></div>
-                </div>
-            </div>
-            
-            <div id="importResult" style="display: none; margin-bottom: 20px; padding: 12px; border-radius: 8px;"></div>
-            
             <div class="modal-buttons">
-                <button type="button" onclick="closeImportModal()" class="btn btn-primary"><i class="fas fa-times"></i> Bekor qilish</button>
-                <button type="button" onclick="importExcel()" id="importBtn" class="btn btn-success">
-                    <i class="fas fa-upload"></i> Import qilish
-                </button>
+                <button type="button" onclick="closeImportModal()" class="btn btn-primary">Bekor</button>
+                <button type="button" onclick="importExcel()" id="importBtn" class="btn btn-success">Import</button>
             </div>
         </form>
+        <div id="importProgress" style="display: none; margin-top: 16px; text-align: center;">
+            <div class="loading-spinner"></div> <span style="margin-left: 8px;">Import qilinmoqda...</span>
+        </div>
     </div>
 </div>
 
 <script>
+    let currentCategory = '';
     let currentScrollPosition = 0;
     
-    // Save scroll position before any operation
-    function saveScrollPosition() {
-        currentScrollPosition = window.scrollY;
+    function saveScrollPosition() { currentScrollPosition = window.scrollY; }
+    function restoreScrollPosition() { setTimeout(() => window.scrollTo({ top: currentScrollPosition, behavior: 'auto' }), 50); }
+    
+    function scrollCategories(distance) {
+        const container = document.querySelector('.categories-grid');
+        if (container) {
+            container.scrollBy({ left: distance, behavior: 'smooth' });
+        }
     }
     
-    // Restore scroll position after operation
-    function restoreScrollPosition() {
-        setTimeout(() => {
-            window.scrollTo({
-                top: currentScrollPosition,
-                behavior: 'instant'
-            });
-        }, 50);
-    }
-    
-    // Show toast notification
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         toast.className = `toast-notification toast-${type}`;
-        
-        const icon = type === 'success' ? '<i class="fas fa-check-circle" style="color: #10b981;"></i>' :
-                     type === 'error' ? '<i class="fas fa-exclamation-circle" style="color: #ef4444;"></i>' :
-                     '<i class="fas fa-info-circle" style="color: #f59e0b;"></i>';
-        
-        toast.innerHTML = `${icon}<span>${message}</span>`;
+        toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i><span>${message}</span>`;
         document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.style.animation = 'slideIn 0.3s ease reverse';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        setTimeout(() => { toast.style.animation = 'slideInRight 0.3s ease reverse'; setTimeout(() => toast.remove(), 300); }, 3000);
     }
     
-    // Update statistics via AJAX
+    function updateDateTime() {
+        const now = new Date();
+        document.getElementById('current-date').textContent = now.toLocaleDateString('uz-UZ');
+        document.getElementById('current-time').textContent = now.toLocaleTimeString('uz-UZ');
+    }
+    setInterval(updateDateTime, 1000);
+    updateDateTime();
+    
     async function updateStatistics() {
         try {
             const response = await fetch('/orders/api/statistics/');
             const data = await response.json();
-            
-            document.getElementById('stat-categories').textContent = data.total_categories || 0;
-            document.getElementById('stat-materials').textContent = data.total_materials || 0;
-            document.getElementById('low-stock-count').textContent = data.low_stock_count || 0;
-            document.getElementById('total-quantity').textContent = (data.total_quantity || 0).toFixed(2);
-            document.getElementById('category-count').textContent = data.total_categories || 0;
-        } catch (error) {
-            console.error('Error updating statistics:', error);
-        }
+            if (data.success) {
+                document.getElementById('stat-categories').innerHTML = data.total_categories || 0;
+                document.getElementById('stat-materials').innerHTML = data.total_materials || 0;
+                document.getElementById('low-stock-count').innerHTML = data.low_stock_count || 0;
+                document.getElementById('total-quantity').innerHTML = (data.total_quantity || 0).toFixed(2);
+                document.getElementById('category-count').innerHTML = data.total_categories || 0;
+            }
+        } catch (error) { console.error(error); }
     }
     
-    // Load categories via AJAX
     async function loadCategories() {
         try {
             const response = await fetch('/orders/api/categories/');
             const data = await response.json();
-            const container = document.getElementById('categories-grid');
-            if (!container) return;
-            
-            const selectedCategory = '{{ selected_category|default:"" }}';
-            
-            let html = `
-                <div class="category-card ${!selectedCategory ? 'active' : ''}" onclick="navigateToCategory('')">
+            if (data.success) {
+                const container = document.getElementById('categories-grid');
+                let html = `<div class="category-card ${!currentCategory ? 'active' : ''}" onclick="selectCategory('')">
                     <div class="category-icon"><i class="fas fa-layer-group"></i></div>
                     <div class="category-name">Barcha materiallar</div>
                     <div class="category-stats">
@@ -754,520 +532,214 @@
                         <span><i class="fas fa-chart-simple"></i> ${(data.total_quantity || 0).toFixed(2)} birlik</span>
                     </div>
                     <div class="category-badge">Umumiy</div>
-                </div>
-            `;
-            
-            for (const cat of data.categories || []) {
-                const isActive = selectedCategory === cat.name;
-                html += `
-                    <div class="category-card ${isActive ? 'active' : ''}" onclick="navigateToCategory('${encodeURIComponent(cat.name)}')">
-                        <div class="category-icon">
-                            <i class="fas ${cat.icon || 'fa-tag'}"></i>
-                        </div>
-                        <div class="category-name">${escapeHtml(cat.name)}</div>
+                </div>`;
+                for (const cat of data.categories) {
+                    html += `<div class="category-card ${currentCategory === cat.name ? 'active' : ''}" onclick="selectCategory('${encodeURIComponent(cat.name)}')">
+                        <div class="category-icon"><i class="fas fa-tag"></i></div>
+                        <div class="category-name" title="${escapeHtml(cat.name)}">${escapeHtml(cat.name)}</div>
                         <div class="category-stats">
-                            <span><i class="fas fa-box"></i> ${cat.material_count || 0} ta</span>
-                            <span><i class="fas fa-chart-simple"></i> ${(cat.total_quantity || 0).toFixed(2)} birlik</span>
+                            <span><i class="fas fa-box"></i> ${cat.material_count} ta</span>
+                            <span><i class="fas fa-chart-simple"></i> ${cat.total_quantity.toFixed(2)}</span>
                         </div>
-                        <div class="category-badge">${(cat.total_quantity || 0) === 0 ? 'Bo\'sh' : 'Faol'}</div>
-                    </div>
-                `;
+                        <div class="category-badge">${cat.material_count > 0 ? 'Faol' : 'Bo\'sh'}</div>
+                    </div>`;
+                }
+                container.innerHTML = html;
             }
-            
-            container.innerHTML = html;
-        } catch (error) {
-            console.error('Error loading categories:', error);
-        }
+        } catch (error) { console.error(error); }
     }
     
-    function navigateToCategory(categoryName) {
+    function selectCategory(categoryName) {
         saveScrollPosition();
-        if (categoryName) {
-            window.location.href = `{% url 'warehouse_dashboard' %}?category=${encodeURIComponent(categoryName)}`;
-        } else {
-            window.location.href = `{% url 'warehouse_dashboard' %}`;
-        }
+        currentCategory = categoryName;
+        loadCategories();
+        loadMaterials();
+        restoreScrollPosition();
     }
     
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    // Add material via AJAX
-    document.getElementById('addMaterialForm')?.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        saveScrollPosition();
+    async function loadMaterials() {
+        const searchQuery = document.getElementById('search-input')?.value || '';
+        const statusFilter = document.getElementById('status-filter')?.value || '';
         
-        const formData = new FormData(this);
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saqlanmoqda...';
-        submitBtn.disabled = true;
+        let url = `/orders/api/materials/?`;
+        if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;
+        if (statusFilter) url += `status=${statusFilter}&`;
+        if (currentCategory) url += `category=${encodeURIComponent(currentCategory)}&`;
         
         try {
-            const response = await fetch('/orders/api/material/add/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
-                body: formData
-            });
+            const response = await fetch(url);
+            const data = await response.json();
+            const tbody = document.getElementById('material-tbody');
             
-            const result = await response.json();
-            
-            if (result.success) {
-                showToast(result.message, 'success');
-                closeAddMaterialModal();
-                await updateStatistics();
-                await loadCategories();
-                await reloadMaterials();
-                restoreScrollPosition();
+            if (data.success && data.materials.length > 0) {
+                let html = '';
+                for (const m of data.materials) {
+                    const statusBadge = m.is_low ? 
+                        '<span class="badge badge-danger"><i class="fas fa-exclamation-circle"></i> Kam</span>' :
+                        '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Yetarli</span>';
+                    const qrHtml = m.qr_code_url ?
+                        `<img src="${m.qr_code_url}" class="qr-thumb" onclick="window.open(this.src)">` :
+                        '<i class="fas fa-qrcode" style="color: #cbd5e1; font-size: 20px;"></i>';
+                    html += `<tr>
+                        <td style="text-align: center;">${qrHtml}</td>
+                        <td><strong>${escapeHtml(m.name)}</strong></td>
+                        <td><span class="badge badge-info">${escapeHtml(m.category_name)}</span></td>
+                        <td><strong>${m.quantity.toFixed(3)}</strong></td>
+                        <td>${m.unit.toUpperCase()}</td>
+                        <td>${m.min_stock_level.toFixed(1)}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-primary btn-sm" onclick="openEditModal(${m.id})" title="Tahrirlash"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteMaterial(${m.id}, '${escapeHtml(m.name)}')" title="O'chirish"><i class="fas fa-trash"></i></button>
+                                <button class="btn btn-warning btn-sm" onclick="printQRCode(${m.id}, '${escapeHtml(m.name)}', '${escapeHtml(m.category_name)}', '${m.qr_code_url || ''}', '${m.quantity.toFixed(2)}', '${m.unit.toUpperCase()}')" title="Chop etish"><i class="fas fa-print"></i></button>
+                            </div>
+                        </td>
+                    </tr>`;
+                }
+                tbody.innerHTML = html;
+                document.getElementById('materials-count').textContent = data.materials.length;
+                document.getElementById('section-title-text').textContent = currentCategory ? `${currentCategory} - Materiallar` : 'Barcha materiallar';
             } else {
-                showToast(result.message || 'Xatolik yuz berdi', 'error');
+                tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><i class="fas fa-box-open"></i><h4>Materiallar topilmadi</h4><p>Yangi material qo'shing</p></td></tr>`;
+                document.getElementById('materials-count').textContent = '0';
             }
-        } catch (error) {
-            showToast('Server bilan bog\'lanishda xatolik', 'error');
-        } finally {
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
-    });
+        } catch (error) { console.error(error); }
+    }
     
-    // Edit material via AJAX
+    function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    
     async function openEditModal(id) {
-        saveScrollPosition();
         try {
             const response = await fetch(`/orders/api/material/${id}/get/`);
             const data = await response.json();
-            
             if (data.success) {
                 document.getElementById('edit_id').value = data.id;
                 document.getElementById('edit_name').value = data.name;
                 document.getElementById('edit_quantity').value = data.quantity;
                 document.getElementById('edit_unit').value = data.unit;
                 document.getElementById('edit_min_stock').value = data.min_stock_level;
-                
-                if (document.getElementById('edit_category')) {
-                    const catSelect = document.getElementById('edit_category');
-                    for (let i = 0; i < catSelect.options.length; i++) {
-                        if (catSelect.options[i].value == data.category_id) {
-                            catSelect.selectedIndex = i;
-                            break;
-                        }
-                    }
+                const catSelect = document.getElementById('edit_category');
+                for (let i = 0; i < catSelect.options.length; i++) {
+                    if (catSelect.options[i].value == data.category_id) { catSelect.selectedIndex = i; break; }
                 }
-                
                 document.getElementById('editModal').style.display = 'flex';
             }
-        } catch (error) {
-            showToast('Ma\'lumotlarni yuklashda xatolik', 'error');
-        }
+        } catch (error) { showToast('Ma\'lumotlarni yuklashda xatolik', 'error'); }
     }
     
     document.getElementById('editForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
-        saveScrollPosition();
-        
         const id = document.getElementById('edit_id').value;
         const formData = new FormData(this);
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saqlanmoqda...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         submitBtn.disabled = true;
-        
         try {
             const response = await fetch(`/orders/api/material/${id}/edit/`, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
                 body: formData
             });
-            
             const result = await response.json();
-            
             if (result.success) {
                 showToast(result.message, 'success');
                 closeEditModal();
-                await updateStatistics();
-                await loadCategories();
-                await reloadMaterials();
-                restoreScrollPosition();
-            } else {
-                showToast(result.message || 'Xatolik yuz berdi', 'error');
-            }
-        } catch (error) {
-            showToast('Server bilan bog\'lanishda xatolik', 'error');
-        } finally {
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
+                updateStatistics();
+                loadCategories();
+                loadMaterials();
+            } else { showToast(result.message, 'error'); }
+        } catch (error) { showToast('Xatolik yuz berdi', 'error'); }
+        finally { submitBtn.innerHTML = originalText; submitBtn.disabled = false; }
     });
     
-    // Delete material via AJAX
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+    
     async function deleteMaterial(id, name) {
         if (!confirm(`"${name}" materialini o'chirishni tasdiqlaysizmi?`)) return;
-        
-        saveScrollPosition();
-        
         try {
             const response = await fetch(`/orders/api/material/${id}/delete/`, {
                 method: 'DELETE',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                }
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
             });
-            
             const result = await response.json();
-            
             if (result.success) {
                 showToast(result.message, 'success');
-                await updateStatistics();
-                await loadCategories();
-                await reloadMaterials();
-                restoreScrollPosition();
-            } else {
-                showToast(result.message || 'Xatolik yuz berdi', 'error');
-            }
-        } catch (error) {
-            showToast('Server bilan bog\'lanishda xatolik', 'error');
-        }
+                updateStatistics();
+                loadCategories();
+                loadMaterials();
+            } else { showToast(result.message, 'error'); }
+        } catch (error) { showToast('Xatolik yuz berdi', 'error'); }
     }
     
-    // Reload materials table via AJAX
-    async function reloadMaterials() {
-        const searchQuery = document.getElementById('search-input')?.value || '';
-        const statusFilter = document.getElementById('status-filter')?.value || '';
-        const selectedCategory = '{{ selected_category|default:"" }}';
-        
-        try {
-            let url = `/orders/api/materials/?`;
-            if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;
-            if (statusFilter) url += `status=${statusFilter}&`;
-            if (selectedCategory) url += `category=${encodeURIComponent(selectedCategory)}&`;
-            
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            const tbody = document.getElementById('material-tbody');
-            if (!tbody) return;
-            
-            if (data.materials && data.materials.length > 0) {
-                let html = '';
-                for (const m of data.materials) {
-                    const isLow = m.quantity <= m.min_stock_level;
-                    const statusBadge = isLow ? 
-                        '<span class="badge badge-danger"><i class="fas fa-exclamation-circle"></i> Kam qoldi</span>' :
-                        '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Yetarli</span>';
-                    
-                    const qrHtml = m.qr_code_url ?
-                        `<img src="${m.qr_code_url}" class="qr-thumb" onclick="window.open(this.src)" style="width: 40px; height: 40px;">` :
-                        '<i class="fas fa-qrcode" style="color: #cbd5e1; font-size: 24px;"></i>';
-                    
-                    html += `
-                        <tr>
-                            <td style="text-align: center;">${qrHtml}</td>
-                            <td><strong>${escapeHtml(m.name)}</strong></td>
-                            <td><span class="badge badge-info" style="background: #f1f5f9;">${escapeHtml(m.category_name || 'Kategoriyasiz')}</span></td>
-                            <td><strong style="font-size: 16px;">${parseFloat(m.quantity).toFixed(3)}</strong></td>
-                            <td>${m.unit.toUpperCase()}</td>
-                            <td>${parseFloat(m.min_stock_level).toFixed(1)}</td>
-                            <td>${statusBadge}</td>
-                            <td style="text-align: center;">
-                                <div style="display: flex; gap: 6px; justify-content: center;">
-                                    <button class="btn btn-primary btn-sm" onclick="openEditModal(${m.id})" title="Tahrirlash">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteMaterial(${m.id}, '${escapeHtml(m.name)}')" title="O'chirish">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    <button class="btn btn-warning btn-sm" onclick="printQRCode(${m.id}, '${escapeHtml(m.name)}', '${escapeHtml(m.category_name || '')}', '${m.qr_code_url || ''}', '${parseFloat(m.quantity).toFixed(2)}', '${m.unit.toUpperCase()}')" title="QR kodni chop etish">
-                                        <i class="fas fa-print"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                }
-                tbody.innerHTML = html;
-                document.getElementById('materials-count').textContent = data.materials.length;
-            } else {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <i class="fas fa-box-open"></i>
-                            <h3>Materiallar topilmadi</h3>
-                            <p>Omborxona bo'sh. Yangi material qo'shing!</p>
-                        </td>
-                    </tr>
-                `;
-                document.getElementById('materials-count').textContent = '0';
-            }
-        } catch (error) {
-            console.error('Error reloading materials:', error);
-        }
-    }
-    
-    // Filter functions
-    function filterMaterials() {
-        reloadMaterials();
-        updateClearFilterButton();
-    }
-    
+    function filterMaterials() { loadMaterials(); updateClearFilterButton(); }
     function updateClearFilterButton() {
-        const searchQuery = document.getElementById('search-input')?.value || '';
-        const statusFilter = document.getElementById('status-filter')?.value || '';
+        const searchVal = document.getElementById('search-input')?.value || '';
+        const statusVal = document.getElementById('status-filter')?.value || '';
         const btn = document.getElementById('clear-filters-btn');
-        if (btn) {
-            btn.style.display = (searchQuery || statusFilter) ? 'flex' : 'none';
-        }
+        if (btn) btn.style.display = (searchVal || statusVal) ? 'inline-flex' : 'none';
     }
-    
-    function clearAllFilters() {
-        const searchInput = document.getElementById('search-input');
-        const statusFilter = document.getElementById('status-filter');
-        if (searchInput) searchInput.value = '';
-        if (statusFilter) statusFilter.value = '';
+    function clearFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('status-filter').value = '';
         updateClearFilterButton();
-        reloadMaterials();
+        loadMaterials();
     }
     
-    // Modal functions
-    function openAddMaterialModal(e) {
-        if (e) e.preventDefault();
-        saveScrollPosition();
-        document.getElementById('addMaterialModal').style.display = 'flex';
-    }
-    
-    function closeAddMaterialModal() {
-        document.getElementById('addMaterialModal').style.display = 'none';
-        document.getElementById('addMaterialForm').reset();
-    }
-    
-    function closeEditModal() {
-        document.getElementById('editModal').style.display = 'none';
-    }
-    
-    function openImportModal() {
-        saveScrollPosition();
-        document.getElementById('importModal').style.display = 'flex';
-        resetImportForm();
-    }
-    
-    function closeImportModal() {
-        document.getElementById('importModal').style.display = 'none';
-    }
-    
-    function resetImportForm() {
-        const importForm = document.getElementById('importForm');
-        if (importForm) importForm.reset();
-        const fileLabel = document.getElementById('fileLabel');
-        if (fileLabel) fileLabel.innerHTML = 'Excel faylni tanlang yoki sudrab keltiring';
-        const importProgress = document.getElementById('importProgress');
-        if (importProgress) importProgress.style.display = 'none';
-        const importResult = document.getElementById('importResult');
-        if (importResult) importResult.style.display = 'none';
-        const importBtn = document.getElementById('importBtn');
-        if (importBtn) importBtn.disabled = false;
-    }
-    
-    function showFileName(input) {
-        const fileLabel = document.getElementById('fileLabel');
-        if (input.files.length > 0 && fileLabel) {
-            fileLabel.innerHTML = `<i class="fas fa-file-excel" style="color: #10b981;"></i> ${input.files[0].name}`;
-        }
-    }
+    function openImportModal() { document.getElementById('importModal').style.display = 'flex'; }
+    function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
+    function showFileName(input) { document.getElementById('fileLabel').innerHTML = `<i class="fas fa-file-excel"></i> ${input.files[0].name}`; }
     
     async function importExcel() {
-        const fileInput = document.getElementById('excelFile');
-        const file = fileInput.files[0];
-        
-        if (!file) {
-            showToast('Iltimos, Excel faylni tanlang!', 'error');
-            return;
-        }
-        
+        const file = document.getElementById('excelFile').files[0];
+        if (!file) { showToast('Excel faylni tanlang!', 'error'); return; }
         const formData = new FormData();
         formData.append('excel_file', file);
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (csrfToken) formData.append('csrfmiddlewaretoken', csrfToken.value);
-        
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
         document.getElementById('importProgress').style.display = 'block';
-        const importBtn = document.getElementById('importBtn');
-        if (importBtn) importBtn.disabled = true;
-        document.getElementById('importResult').style.display = 'none';
-        
+        document.getElementById('importBtn').disabled = true;
         try {
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 5;
-                if (progress <= 90) {
-                    const progressBar = document.getElementById('progressBar');
-                    if (progressBar) progressBar.style.width = progress + '%';
-                }
-            }, 200);
-            
-            const response = await fetch('/orders/import-excel/', {
-                method: 'POST',
-                body: formData
-            });
-            
-            clearInterval(progressInterval);
-            const progressBar = document.getElementById('progressBar');
-            if (progressBar) progressBar.style.width = '100%';
-            
+            const response = await fetch('/orders/import-excel/', { method: 'POST', body: formData });
             const result = await response.json();
-            
-            setTimeout(() => {
-                const importProgress = document.getElementById('importProgress');
-                if (importProgress) importProgress.style.display = 'none';
-                
-                if (result.success) {
-                    showToast('Import muvaffaqiyatli yakunlandi!', 'success');
-                    closeImportModal();
-                    updateStatistics();
-                    loadCategories();
-                    reloadMaterials();
-                    restoreScrollPosition();
-                } else {
-                    showToast(result.message || 'Import qilishda xatolik yuz berdi', 'error');
-                    if (importBtn) importBtn.disabled = false;
-                }
-            }, 500);
-            
-        } catch (error) {
-            const importProgress = document.getElementById('importProgress');
-            if (importProgress) importProgress.style.display = 'none';
-            showToast('Server bilan bog\'lanishda xatolik: ' + error.message, 'error');
-            if (importBtn) importBtn.disabled = false;
-        }
+            if (result.success) {
+                showToast('Import muvaffaqiyatli yakunlandi!', 'success');
+                closeImportModal();
+                updateStatistics();
+                loadCategories();
+                loadMaterials();
+            } else { showToast(result.message || 'Importda xatolik', 'error'); }
+        } catch (error) { showToast('Server bilan bog\'lanishda xatolik', 'error'); }
+        finally { document.getElementById('importProgress').style.display = 'none'; document.getElementById('importBtn').disabled = false; }
     }
     
-    // Print QR Code function
-    function printQRCode(materialId, materialName, categoryName, qrUrl, quantity, unit) {
-        const existingContainer = document.querySelector('.print-container');
-        if (existingContainer) existingContainer.remove();
-        
-        const printContainer = document.createElement('div');
-        printContainer.className = 'print-container';
-        
-        const label = document.createElement('div');
-        label.className = 'print-label';
-        
-        const header = document.createElement('div');
-        header.className = 'print-header';
-        header.innerHTML = '<i class="fas fa-industry"></i> EcoProm Panel';
-        label.appendChild(header);
-        
-        if (qrUrl && qrUrl !== '') {
-            const qrImg = document.createElement('img');
-            qrImg.className = 'qr-image';
-            qrImg.src = qrUrl;
-            qrImg.alt = 'QR Code';
-            label.appendChild(qrImg);
-        } else {
-            const noQrDiv = document.createElement('div');
-            noQrDiv.style.padding = '15px';
-            noQrDiv.style.textAlign = 'center';
-            noQrDiv.style.background = '#f3f4f6';
-            noQrDiv.style.margin = '5mm 0';
-            noQrDiv.style.borderRadius = '4px';
-            noQrDiv.innerHTML = '<i class="fas fa-qrcode" style="font-size: 24px; color: #9ca3af;"></i><br><span style="font-size: 9px;">QR kod mavjud emas</span>';
-            label.appendChild(noQrDiv);
-        }
-        
-        const hr = document.createElement('div');
-        hr.className = 'print-hr';
-        label.appendChild(hr);
-        
-        const nameElem = document.createElement('div');
-        nameElem.className = 'product-name';
-        nameElem.innerText = materialName;
-        label.appendChild(nameElem);
-        
-        if (quantity && quantity !== '0.00') {
-            const qtyElem = document.createElement('div');
-            qtyElem.className = 'product-details';
-            qtyElem.innerHTML = `<i class="fas fa-box"></i> Miqdor: ${quantity} ${unit || ''}`;
-            label.appendChild(qtyElem);
-        }
-        
-        const footer = document.createElement('div');
-        footer.className = 'print-footer';
-        footer.innerHTML = '<i class="fas fa-print"></i> ' + new Date().toLocaleDateString('uz-UZ');
-        label.appendChild(footer);
-        
-        printContainer.appendChild(label);
-        document.body.appendChild(printContainer);
-        
-        setTimeout(function() {
-            window.print();
-            setTimeout(function() {
-                if (printContainer && printContainer.parentNode) {
-                    printContainer.remove();
-                }
-            }, 1000);
-        }, 300);
+    function printQRCode(id, name, category, qrUrl, quantity, unit) {
+        const container = document.createElement('div');
+        container.className = 'print-container';
+        container.innerHTML = `<div class="print-label">
+            <div class="print-header">EcoProm Panel</div>
+            ${qrUrl ? `<img src="${qrUrl}" class="qr-image">` : '<div style="padding:12px;text-align:center">QR kod mavjud emas</div>'}
+            <div class="product-name">${name}</div>
+            <div class="product-details">Miqdor: ${quantity} ${unit}</div>
+            <div class="print-footer">${new Date().toLocaleDateString()}</div>
+        </div>`;
+        document.body.appendChild(container);
+        setTimeout(() => { window.print(); setTimeout(() => container.remove(), 1000); }, 300);
     }
     
-    // Time update
-    function updateTime() {
-        const timeElem = document.getElementById('current-time');
-        if (timeElem) timeElem.textContent = new Date().toLocaleString('uz-UZ');
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
-    
-    // Event listeners
     document.getElementById('search-input')?.addEventListener('input', filterMaterials);
     document.getElementById('status-filter')?.addEventListener('change', filterMaterials);
     
-    // Modal click outside to close
     window.onclick = function(event) {
-        const addModal = document.getElementById('addMaterialModal');
-        const editModal = document.getElementById('editModal');
-        const importModal = document.getElementById('importModal');
-        if (event.target === addModal) closeAddMaterialModal();
-        if (event.target === editModal) closeEditModal();
-        if (event.target === importModal) closeImportModal();
+        if (event.target === document.getElementById('editModal')) closeEditModal();
+        if (event.target === document.getElementById('importModal')) closeImportModal();
     }
     
-    // Initialize
     document.addEventListener('DOMContentLoaded', function() {
-        loadCategories();
         updateStatistics();
+        loadCategories();
+        loadMaterials();
         updateClearFilterButton();
-        
-        // Drag and drop support
-        const dropZone = document.querySelector('.import-dropzone');
-        if (dropZone) {
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.style.background = '#f0fdf4';
-                dropZone.style.borderColor = '#10b981';
-            });
-            dropZone.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                dropZone.style.background = 'transparent';
-                dropZone.style.borderColor = '#d1d5db';
-            });
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.style.background = 'transparent';
-                dropZone.style.borderColor = '#d1d5db';
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    const fileInput = document.getElementById('excelFile');
-                    if (fileInput) {
-                        fileInput.files = files;
-                        showFileName(fileInput);
-                    }
-                }
-            });
-        }
     });
 </script>
 </body>
