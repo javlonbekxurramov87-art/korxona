@@ -218,7 +218,6 @@ class CustomLoginView(LoginView):
 # ASOSIY SAHIFA / RO'YXAT
 # ----------------------------------------------------------------------
 @login_required 
-@login_required 
 def order_list(request):
     user = request.user
     now = timezone.now()
@@ -612,8 +611,6 @@ def order_list(request):
 
 
 
-
-
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.shortcuts import render
@@ -874,77 +871,297 @@ from django.db.models import Count, Sum, F, Q
 from decimal import Decimal
 from django.core.paginator import Paginator
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import Count, Sum, F, Q, Value, DecimalField
+from django.db.models.functions import Coalesce
+from django.core.paginator import Paginator
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from decimal import Decimal
+import json
+
+from .models import Material, Category
+
+
 @login_required
 @staff_member_required
 def warehouse_dashboard(request):
-    """Ombordagi barcha materiallar qoldig'i - Kategoriyalar bilan"""
+    """Ombordagi barcha materiallar qoldig'i - Asosiy sahifa"""
     
-    # 1. Barcha kategoriyalarni olish (materiallar soni va umumiy qoldiq bilan)
+    # Kategoriyalarni olish
     categories = Category.objects.annotate(
         material_count=Count('material'),
-        total_quantity=Coalesce(Sum('material__quantity'), Decimal('0'))
+        total_quantity=Coalesce(Sum('material__quantity'), Value(Decimal('0'), output_field=DecimalField()))
     ).order_by('name')
     
-    # 2. Tanlangan kategoriya (GET parametridan)
-    selected_category = request.GET.get('category', '')
-    search_query = request.GET.get('search', '')
-    status_filter = request.GET.get('status', '')
-    
-    # 3. Materiallarni olish (select_related bilan optimallashtirilgan)
-    materials = Material.objects.select_related('category').all()
-    
-    # 4. Kategoriya bo'yicha filtr
-    if selected_category:
-        materials = materials.filter(category__name=selected_category)
-    
-    # 5. Qidiruv bo'yicha filtr
-    if search_query:
-        materials = materials.filter(
-            Q(name__icontains=search_query) |
-            Q(category__name__icontains=search_query) |
-            Q(product_name__icontains=search_query)
-        )
-    
-    # 6. Holat bo'yicha filtr (kam qolgan / yetarli)
-    if status_filter == 'danger':
-        materials = materials.filter(quantity__lte=F('min_stock_level'))
-    elif status_filter == 'success':
-        materials = materials.filter(quantity__gt=F('min_stock_level'))
-    
-    # 7. Tartiblash
-    materials = materials.order_by('name')
-    
-    # 8. Pagination (har bir sahifada 20 ta)
-    paginator = Paginator(materials, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # 9. Statistik ma'lumotlar
+    # Statistik ma'lumotlar
     total_materials = Material.objects.count()
-    total_quantity = Material.objects.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+    total_quantity = Material.objects.aggregate(total=Coalesce(Sum('quantity'), Value(Decimal('0'), output_field=DecimalField())))['total']
     low_stock_count = Material.objects.filter(quantity__lte=F('min_stock_level')).count()
     
     context = {
-        # Kategoriyalar
         'categories': categories,
-        'selected_category': selected_category,
         'total_categories': categories.count(),
-        
-        # Materiallar
-        'materials': page_obj,
-        'page_obj': page_obj,
-        
-        # Filtrlar
-        'search_query': search_query,
-        'status_filter': status_filter,
-        
-        # Statistikalar
         'total_materials': total_materials,
-        'total_quantity': total_quantity,
+        'total_quantity': float(total_quantity) if total_quantity else 0,
         'low_stock_count': low_stock_count,
     }
     
     return render(request, 'orders/warehouse_dashboard.html', context)
+
+
+# ==================== API ENDPOINTLAR ====================
+
+@login_required
+@staff_member_required
+def api_statistics(request):
+    """API: Statistika ma'lumotlari (JSON)"""
+    try:
+        total_materials = Material.objects.count()
+        total_quantity = Material.objects.aggregate(
+            total=Coalesce(Sum('quantity'), Value(Decimal('0'), output_field=DecimalField()))
+        )['total']
+        low_stock_count = Material.objects.filter(quantity__lte=F('min_stock_level')).count()
+        total_categories = Category.objects.count()
+        
+        return JsonResponse({
+            'success': True,
+            'total_materials': total_materials,
+            'total_quantity': float(total_quantity) if total_quantity else 0,
+            'low_stock_count': low_stock_count,
+            'total_categories': total_categories,
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@staff_member_required
+def api_categories(request):
+    """API: Kategoriyalar ro'yxati (JSON)"""
+    try:
+        categories = Category.objects.annotate(
+            material_count=Count('material'),
+            total_quantity=Coalesce(Sum('material__quantity'), Value(Decimal('0'), output_field=DecimalField()))
+        ).order_by('name')
+        
+        total_materials = Material.objects.count()
+        total_quantity = Material.objects.aggregate(
+            total=Coalesce(Sum('quantity'), Value(Decimal('0'), output_field=DecimalField()))
+        )['total']
+        
+        data = {
+            'success': True,
+            'total_materials': total_materials,
+            'total_quantity': float(total_quantity) if total_quantity else 0,
+            'categories': []
+        }
+        
+        for cat in categories:
+            data['categories'].append({
+                'id': cat.id,
+                'name': cat.name,
+                'material_count': cat.material_count,
+                'total_quantity': float(cat.total_quantity) if cat.total_quantity else 0,
+                'icon': 'fa-tag'
+            })
+        
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@staff_member_required
+def api_materials(request):
+    """API: Materiallar ro'yxati (filtrlangan)"""
+    try:
+        search_query = request.GET.get('search', '').strip()
+        status_filter = request.GET.get('status', '')
+        category_name = request.GET.get('category', '')
+        
+        materials = Material.objects.select_related('category').all()
+        
+        # Kategoriya bo'yicha filtr
+        if category_name:
+            materials = materials.filter(category__name=category_name)
+        
+        # Qidiruv bo'yicha filtr
+        if search_query:
+            materials = materials.filter(
+                Q(name__icontains=search_query) |
+                Q(category__name__icontains=search_query)
+            )
+        
+        # Holat bo'yicha filtr
+        if status_filter == 'danger':
+            materials = materials.filter(quantity__lte=F('min_stock_level'))
+        elif status_filter == 'success':
+            materials = materials.filter(quantity__gt=F('min_stock_level'))
+        
+        materials = materials.order_by('name')
+        
+        data = {
+            'success': True,
+            'materials': []
+        }
+        
+        for m in materials:
+            is_low = m.quantity <= m.min_stock_level
+            data['materials'].append({
+                'id': m.id,
+                'name': m.name,
+                'category_name': m.category.name if m.category else 'Kategoriyasiz',
+                'category_id': m.category.id if m.category else None,
+                'quantity': float(m.quantity),
+                'unit': m.unit,
+                'min_stock_level': float(m.min_stock_level),
+                'is_low': is_low,
+                'qr_code_url': m.qr_code.url if m.qr_code else None,
+            })
+        
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@staff_member_required
+@require_http_methods(["POST"])
+def api_material_add(request):
+    """API: Yangi material qo'shish"""
+    try:
+        name = request.POST.get('name', '').strip()
+        category_id = request.POST.get('category_id')
+        quantity = float(request.POST.get('quantity', 0))
+        unit = request.POST.get('unit', 'dona')
+        min_stock_level = float(request.POST.get('min_stock_level', 0))
+        
+        if not name:
+            return JsonResponse({'success': False, 'message': 'Material nomi kiritilishi shart!'})
+        
+        # Kategoriya
+        category = None
+        if category_id:
+            try:
+                category = Category.objects.get(id=category_id)
+            except Category.DoesNotExist:
+                pass
+        
+        material = Material.objects.create(
+            name=name,
+            category=category,
+            quantity=quantity,
+            unit=unit,
+            min_stock_level=min_stock_level
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'"{name}" muvaffaqiyatli qo\'shildi!',
+            'material': {
+                'id': material.id,
+                'name': material.name,
+                'category_name': material.category.name if material.category else 'Kategoriyasiz',
+                'quantity': float(material.quantity),
+                'unit': material.unit,
+                'min_stock_level': float(material.min_stock_level),
+                'is_low': material.quantity <= material.min_stock_level,
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'}, status=500)
+
+
+@login_required
+@staff_member_required
+def api_material_get(request, material_id):
+    """API: Bitta material ma'lumotlarini olish"""
+    try:
+        material = get_object_or_404(Material, id=material_id)
+        return JsonResponse({
+            'success': True,
+            'id': material.id,
+            'name': material.name,
+            'category_id': material.category.id if material.category else None,
+            'quantity': float(material.quantity),
+            'unit': material.unit,
+            'min_stock_level': float(material.min_stock_level),
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@staff_member_required
+@require_http_methods(["POST"])
+def api_material_edit(request, material_id):
+    """API: Materialni tahrirlash"""
+    try:
+        material = get_object_or_404(Material, id=material_id)
+        
+        name = request.POST.get('name', '').strip()
+        category_id = request.POST.get('category_id')
+        quantity = float(request.POST.get('quantity', 0))
+        unit = request.POST.get('unit', 'dona')
+        min_stock_level = float(request.POST.get('min_stock_level', 0))
+        
+        if not name:
+            return JsonResponse({'success': False, 'message': 'Material nomi kiritilishi shart!'})
+        
+        # Kategoriya
+        category = None
+        if category_id:
+            try:
+                category = Category.objects.get(id=category_id)
+            except Category.DoesNotExist:
+                pass
+        
+        material.name = name
+        material.category = category
+        material.quantity = quantity
+        material.unit = unit
+        material.min_stock_level = min_stock_level
+        material.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'"{material.name}" muvaffaqiyatli tahrirlandi!',
+            'material': {
+                'id': material.id,
+                'name': material.name,
+                'category_name': material.category.name if material.category else 'Kategoriyasiz',
+                'quantity': float(material.quantity),
+                'unit': material.unit,
+                'min_stock_level': float(material.min_stock_level),
+                'is_low': material.quantity <= material.min_stock_level,
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'}, status=500)
+
+
+@login_required
+@staff_member_required
+@require_http_methods(["DELETE"])
+def api_material_delete(request, material_id):
+    """API: Materialni o'chirish"""
+    try:
+        material = get_object_or_404(Material, id=material_id)
+        material_name = material.name
+        material.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'"{material_name}" muvaffaqiyatli o\'chirildi!'
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'}, status=500)
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -976,7 +1193,7 @@ def edit_material(request, material_id):
         material.save()
         
         messages.success(request, f'"{material.name}" muvaffaqiyatli tahrirlandi!')
-        return redirect('orders:warehouse_dashboard')
+        return redirect('warehouse_dashboard')
     
     return render(request, 'orders/edit_material.html', {'material': material})
 
@@ -992,7 +1209,7 @@ def delete_material(request, material_id):
         material.delete()
         messages.success(request, f'"{material_name}" muvaffaqiyatli o\'chirildi!')
     
-    return redirect('orders:warehouse_dashboard')
+    return redirect('warehouse_dashboard')
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
