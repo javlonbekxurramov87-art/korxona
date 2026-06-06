@@ -11,7 +11,13 @@ urlpatterns = [
     # 2. Logout sahifasi (LogoutView orqali qo'shildi)
     # Tizimdan chiqishni amalga oshiradi va LOGOUT_REDIRECT_URL ga yo'naltiradi.
     path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'), # <--- O'ZGARISH BU YERDA
-
+    path('api/statistics/', views.api_statistics, name='api_statistics'),
+    path('api/categories/', views.api_categories, name='api_categories'),
+    path('api/materials/', views.api_materials, name='api_materials'),
+    path('api/material/add/', views.api_material_add, name='api_material_add'),
+    path('api/material/<int:material_id>/get/', views.api_material_get, name='api_material_get'),
+    path('api/material/<int:material_id>/edit/', views.api_material_edit, name='api_material_edit'),
+    path('api/material/<int:material_id>/delete/', views.api_material_delete, name='api_material_delete'),
     # Asosiy Boshqaruv
     path('', views.order_list, name='order_list'),
     path('warehouse/add/', views.add_material, name='add_material'),
