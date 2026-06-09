@@ -122,7 +122,9 @@ urlpatterns = [
     path('cash/api/transactions/', views.cash_api_transactions, name='cash_api_transactions'),
     path('cash/api/transaction/create/', views.cash_api_transaction_create, name='cash_api_transaction_create'),
     path('cash/api/daily-report/create/', views.cash_api_daily_report_create, name='cash_api_daily_report_create'),
-    
+    # urls.py ga qo'shing
+    path('cash/transaction/<str:transaction_id>/edit/', views.cash_transaction_edit, name='cash_transaction_edit'),
+    path('cash/transaction/<str:transaction_id>/delete/', views.cash_transaction_delete, name='cash_transaction_delete'),
     # Tashqi to'lovlar (Click/Payme)
     path('order/<int:order_id>/payment/click/', views.order_payment_click, name='order_payment_click'),
     path('order/<int:order_id>/payment/payme/', views.order_payment_payme, name='order_payment_payme'),
