@@ -1,4 +1,5 @@
 from email.mime import image
+from urllib import request
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -6039,3 +6040,1351 @@ def order_receipt(request, order_id):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="receipt_{order.order_number}.pdf"'
     return response
+# orders/views.py ga qo'shing
+
+from decimal import Decimal
+import uuid
+from datetime import datetime, timedelta
+from django.db.models import Sum, Q
+from django.core.paginator import Paginator
+from django.http import HttpResponse
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
+
+# ==================== KASSA FUNKSIYALARI ====================
+
+def is_cashier(user):
+    """Kassa operatori ekanligini tekshirish"""
+    if not user.is_authenticated:
+        return False
+    return (user.is_superuser or 
+            is_in_group(user, 'Glavniy Admin') or 
+            is_in_group(user, 'Menejer/Tasdiqlovchi'))
+
+
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_dashboard(request):
+    """Kassa boshqaruv paneli"""
+    
+    # Joriy qoldiq
+    balance, created = CashRegisterBalance.objects.get_or_create(id=1)
+    
+    # Bugungi operatsiyalar
+    today = timezone.now().date()
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    today_transactions = CashTransaction.objects.filter(
+        transaction_date__range=[today_start, today_end],
+        status='COMPLETED'
+    )
+    
+    # Bugungi statistikalar
+    today_stats = {
+        'total_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'total_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'cash_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'],
+            payment_method='CASH'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'cash_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'],
+            payment_method='CASH'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'click_income': today_transactions.filter(
+            payment_method='CLICK', transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'payme_income': today_transactions.filter(
+            payment_method='PAYME', transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+    }
+    
+    today_stats['net_change'] = today_stats['total_income'] - today_stats['total_expense']
+    
+    # So'nggi operatsiyalar
+    recent_transactions = CashTransaction.objects.filter(status='COMPLETED').order_by('-transaction_date')[:20]
+    
+    # Bugungi hisobot mavjudligini tekshirish
+    today_report = DailyCashReport.objects.filter(report_date=today).first()
+    
+    context = {
+        'balance': balance,
+        'today_stats': today_stats,
+        'recent_transactions': recent_transactions,
+        'today_report': today_report,
+        'today': today,
+        'title': 'Kassa Boshqaruvi',
+        'is_cashier': True,
+    }
+    
+    return render(request, 'orders/cash_dashboard.html', context)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_transaction_create(request):
+    """Yangi kassa operatsiyasi yaratish (modal POST dan ishlaydi)"""
+    
+    if request.method == 'POST':
+        # POST dan ma'lumotlarni olish
+        transaction_type = request.POST.get('transaction_type')
+        amount = Decimal(request.POST.get('amount', '0'))
+        customer_name = request.POST.get('customer_name', '').strip()
+        description = request.POST.get('description', '').strip()
+        
+        # Validatsiya
+        if not transaction_type:
+            messages.error(request, "Operatsiya turini tanlang!")
+            return redirect('cash_management')
+        
+        if amount <= 0:
+            messages.error(request, "Summa 0 dan katta bo'lishi kerak!")
+            return redirect('cash_management')
+        
+        if not customer_name:
+            messages.error(request, "Kim oldi/berdi maydonini to'ldiring!")
+            return redirect('cash_management')
+        
+        if not description:
+            messages.error(request, "Izoh maydonini to'ldiring!")
+            return redirect('cash_management')
+        
+        # Tranzaksiyani yaratish
+        transaction = CashTransaction.objects.create(
+            transaction_type=transaction_type,
+            amount=amount,
+            customer_name=customer_name,
+            description=description,
+            payment_method='CASH',  # Default naqd pul
+            status='COMPLETED',
+            performed_by=request.user,
+            transaction_date=timezone.now()
+        )
+        
+        # Kassa qoldig'ini yangilash
+        balance, created = CashRegisterBalance.objects.get_or_create(id=1)
+        if transaction_type == 'INCOME':
+            balance.cash_balance += amount
+        else:  # EXPENSE
+            balance.cash_balance -= amount
+        balance.updated_by = request.user
+        balance.save()
+        
+        messages.success(request, f"✅ Operatsiya muvaffaqiyatli bajarildi! ID: {transaction.transaction_id}")
+        return redirect('cash_management')
+    
+    # GET so'rovi bo'lsa, cash_management sahifasiga qaytarish
+    return redirect('cash_management')
+
+def update_cash_balance(transaction):
+    """Kassa qoldig'ini yangilash"""
+    balance, created = CashRegisterBalance.objects.get_or_create(id=1)
+    
+    if transaction.transaction_type in ['INCOME', 'EXTERNAL_INCOME']:
+        balance.cash_balance += transaction.amount
+    elif transaction.transaction_type in ['EXPENSE', 'EXTERNAL_EXPENSE']:
+        balance.cash_balance -= transaction.amount
+    
+    balance.updated_by = transaction.performed_by
+    balance.save()
+    
+    return balance
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_transaction_list(request):
+    """Kassa operatsiyalari ro'yxati"""
+    
+    # Filtrlar
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    transaction_type = request.GET.get('type', '')
+    category = request.GET.get('category', '')
+    payment_method = request.GET.get('payment_method', '')
+    
+    transactions = CashTransaction.objects.filter(status='COMPLETED')
+    
+    if start_date:
+        transactions = transactions.filter(transaction_date__date__gte=start_date)
+    if end_date:
+        transactions = transactions.filter(transaction_date__date__lte=end_date)
+    if transaction_type:
+        transactions = transactions.filter(transaction_type=transaction_type)
+    if category:
+        transactions = transactions.filter(category=category)
+    if payment_method:
+        transactions = transactions.filter(payment_method=payment_method)
+    
+    # Pagination
+    paginator = Paginator(transactions.order_by('-transaction_date'), 50)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    
+    # Statistikalar
+    stats = transactions.aggregate(
+        total_income=Sum('amount', filter=Q(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'])),
+        total_expense=Sum('amount', filter=Q(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'])),
+        cash_total=Sum('amount', filter=Q(payment_method='CASH')),
+        click_total=Sum('amount', filter=Q(payment_method='CLICK')),
+        payme_total=Sum('amount', filter=Q(payment_method='PAYME')),
+    )
+    
+    context = {
+        'page_obj': page_obj,
+        'stats': stats,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_type': transaction_type,
+        'selected_category': category,
+        'selected_payment': payment_method,
+        'title': 'Kassa Operatsiyalari',
+    }
+    
+    return render(request, 'orders/cash_transaction_list.html', context)
+
+# views.py faylining boshiga import qismiga qo'shing
+from .forms import CashTransactionForm, DailyReportForm
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def daily_report_create(request):
+    """Kunlik hisobot yaratish (modal POST dan ishlaydi)"""
+    
+    if request.method == 'POST':
+        today = timezone.now().date()
+        
+        # Bugungi hisobot mavjudligini tekshirish
+        existing_report = DailyCashReport.objects.filter(report_date=today).first()
+        if existing_report:
+            messages.warning(request, f"{today} uchun hisobot allaqachon mavjud!")
+            return redirect('cash_management')
+        
+        # POST dan ma'lumotlarni olish
+        opening_balance = Decimal(request.POST.get('opening_balance', '0'))
+        actual_balance = Decimal(request.POST.get('actual_balance', '0'))
+        notes = request.POST.get('notes', '')
+        
+        # Bugungi operatsiyalar
+        today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+        today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+        
+        today_transactions = CashTransaction.objects.filter(
+            transaction_date__range=[today_start, today_end],
+            status='COMPLETED'
+        )
+        
+        # Bugungi statistikalar
+        cash_income = today_transactions.filter(
+            transaction_type='INCOME'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        
+        cash_expense = today_transactions.filter(
+            transaction_type='EXPENSE'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        
+        total_income = cash_income
+        total_expense = cash_expense
+        expected_balance = opening_balance + total_income - total_expense
+        difference = actual_balance - expected_balance
+        
+        # Hisobotni yaratish
+        report = DailyCashReport.objects.create(
+            report_date=today,
+            opening_balance=opening_balance,
+            cash_income=cash_income,
+            cash_expense=cash_expense,
+            click_income=Decimal('0'),
+            payme_income=Decimal('0'),
+            bank_income=Decimal('0'),
+            click_expense=Decimal('0'),
+            payme_expense=Decimal('0'),
+            bank_expense=Decimal('0'),
+            total_income=total_income,
+            total_expense=total_expense,
+            expected_balance=expected_balance,
+            actual_balance=actual_balance,
+            difference=difference,
+            notes=notes,
+            created_by=request.user
+        )
+        
+        messages.success(request, f"{today} uchun kunlik hisobot yaratildi!")
+        return redirect('cash_management')
+    
+    # GET so'rovi bo'lsa, cash_management sahifasiga qaytarish
+    return redirect('cash_management')
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def daily_report_detail(request, pk):
+    """Kunlik hisobot tafsilotlari"""
+    
+    report = get_object_or_404(DailyCashReport, pk=pk)
+    
+    # Shu kundagi operatsiyalar
+    start = timezone.make_aware(datetime.combine(report.report_date, datetime.min.time()))
+    end = timezone.make_aware(datetime.combine(report.report_date, datetime.max.time()))
+    
+    transactions = CashTransaction.objects.filter(
+        transaction_date__range=[start, end],
+        status='COMPLETED'
+    ).order_by('transaction_type', '-transaction_date')
+    
+    # Kategoriyalar bo'yicha guruhlash
+    category_groups = {}
+    for cat, _ in CashTransaction.CATEGORY_CHOICES:
+        cat_transactions = transactions.filter(category=cat)
+        if cat_transactions.exists():
+            category_groups[cat] = {
+                'total': cat_transactions.aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+                'count': cat_transactions.count(),
+                'transactions': cat_transactions
+            }
+    
+    context = {
+        'report': report,
+        'transactions': transactions,
+        'category_groups': category_groups,
+        'title': f"Kunlik Hisobot - {report.report_date}",
+    }
+    
+    return render(request, 'orders/daily_report_detail.html', context)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def daily_report_list(request):
+    """Kunlik hisobotlar ro'yxati"""
+    
+    reports = DailyCashReport.objects.all().order_by('-report_date')
+    
+    # Filtr
+    year = request.GET.get('year')
+    month = request.GET.get('month')
+    
+    if year:
+        reports = reports.filter(report_date__year=year)
+    if month:
+        reports = reports.filter(report_date__month=month)
+    
+    paginator = Paginator(reports, 30)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    
+    context = {
+        'page_obj': page_obj,
+        'title': 'Kunlik Hisobotlar',
+        'years': range(2020, timezone.now().year + 1),
+        'months': range(1, 13),
+        'current_year': request.GET.get('year', str(timezone.now().year)),
+        'current_month': request.GET.get('month', ''),
+    }
+    
+    return render(request, 'orders/daily_report_list.html', context)
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def export_cash_report_excel(request):
+    """Kassa hisobotini Excel formatida eksport qilish - PREMIUM DESIGN"""
+    
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    report_type = request.GET.get('type', 'detailed')
+    currency = request.GET.get('currency', 'all')
+    
+    if not start_date or not end_date:
+        messages.error(request, "Iltimos, sana oralig'ini tanlang!")
+        return redirect('cash_transaction_list')
+    
+    # Sana oralig'idagi operatsiyalar
+    start = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
+    end = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+    
+    transactions = CashTransaction.objects.filter(
+        transaction_date__range=[start, end],
+        status='COMPLETED'
+    ).order_by('transaction_date')
+    
+    # Valyuta bo'yicha filtr
+    if currency != 'all':
+        transactions = transactions.filter(currency=currency)
+    
+    # ============ ASOSIY STATISTIKALARNI HISOBLASH ============
+    income_transactions = transactions.filter(
+        transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+    ).order_by('-transaction_date')
+    
+    expense_transactions = transactions.filter(
+        transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']
+    ).order_by('-transaction_date')
+    
+    total_income = income_transactions.aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    total_expense = expense_transactions.aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    net_profit = total_income - total_expense
+    
+    # Valyuta belgisi
+    currency_symbol = 'USD' if currency == 'USD' else 'so\'m' if currency == 'UZS' else ''
+    
+    # ============ EXCEL FAYL YARATISH ============
+    wb = openpyxl.Workbook()
+    
+    # ============ STILLAR ============
+    title_font = Font(name='Segoe UI', size=16, bold=True, color='1a73e8')
+    header_font = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    
+    income_fill = PatternFill(start_color="d1fae5", end_color="d1fae5", fill_type="solid")
+    income_font = Font(color="065f46", bold=True)
+    expense_fill = PatternFill(start_color="fee2e2", end_color="fee2e2", fill_type="solid")
+    expense_font = Font(color="991b1b", bold=True)
+    
+    center_alignment = Alignment(horizontal="center", vertical="center")
+    right_alignment = Alignment(horizontal="right", vertical="center")
+    left_alignment = Alignment(horizontal="left", vertical="center")
+    
+    thin_border = Border(
+        left=Side(style='thin', color='D0D0D0'),
+        right=Side(style='thin', color='D0D0D0'),
+        top=Side(style='thin', color='D0D0D0'),
+        bottom=Side(style='thin', color='D0D0D0')
+    )
+    
+    money_format = '#,##0.00'
+    
+    # To'lov usullari
+    payment_methods = [
+        ('CASH', '💵 Naqd pul'),
+        ('CLICK', '📱 Click'),
+        ('PAYME', '💳 Payme'),
+        ('BANK', '🏦 Bank'),
+    ]
+    
+    if report_type == 'summary':
+        # ============ QISQACHA HISOBOT ============
+        ws = wb.active
+        ws.title = "Kassa Hisoboti"
+        
+        # Sarlavha
+        ws.merge_cells('A1:H1')
+        ws['A1'] = "🏦 KASSA HISOBOTI"
+        ws['A1'].font = Font(bold=True, size=18, color='1a73e8')
+        ws['A1'].alignment = center_alignment
+        
+        ws.merge_cells('A2:H2')
+        ws['A2'] = f"Davr: {start_date} - {end_date}"
+        ws['A2'].font = Font(size=11, color='666666')
+        ws['A2'].alignment = center_alignment
+        
+        # Karta 1: Jami kirim
+        ws.merge_cells('A4:B6')
+        card1 = ws['A4']
+        card1.value = "📈 JAMI KIRIM"
+        card1.font = Font(bold=True, size=10, color='FFFFFF')
+        card1.fill = PatternFill(start_color="10b981", end_color="10b981", fill_type="solid")
+        card1.alignment = center_alignment
+        
+        ws.merge_cells('C4:E6')
+        ws['C4'] = f"{float(total_income):,.2f} {currency_symbol}"
+        ws['C4'].font = Font(bold=True, size=16, color='10b981')
+        ws['C4'].alignment = right_alignment
+        
+        # Karta 2: Jami chiqim
+        ws.merge_cells('F4:G6')
+        ws['F4'] = "📉 JAMI CHIQIM"
+        ws['F4'].font = Font(bold=True, size=10, color='FFFFFF')
+        ws['F4'].fill = PatternFill(start_color="ef4444", end_color="ef4444", fill_type="solid")
+        ws['F4'].alignment = center_alignment
+        
+        ws.merge_cells('H4:J6')
+        ws['H4'] = f"{float(total_expense):,.2f} {currency_symbol}"
+        ws['H4'].font = Font(bold=True, size=16, color='ef4444')
+        ws['H4'].alignment = right_alignment
+        
+        # Karta 3: Sof foyda
+        ws.merge_cells('A7:B9')
+        ws['A7'] = "💰 SOF NATIJA"
+        ws['A7'].font = Font(bold=True, size=10, color='FFFFFF')
+        ws['A7'].fill = PatternFill(start_color="3b82f6", end_color="3b82f6", fill_type="solid")
+        ws['A7'].alignment = center_alignment
+        
+        ws.merge_cells('C7:J9')
+        ws['C7'] = f"{float(net_profit):,.2f} {currency_symbol}"
+        ws['C7'].font = Font(bold=True, size=16, color='1a73e8')
+        ws['C7'].alignment = right_alignment
+        
+        # To'lov usullari bo'yicha
+        ws['A11'] = "💳 TO'LOV USULLARI BO'YICHA"
+        ws['A11'].font = Font(bold=True, size=12, color='1a73e8')
+        
+        payment_headers = ['To\'lov usuli', 'Kirim', 'Chiqim', 'Sof']
+        for col, header in enumerate(payment_headers, 1):
+            cell = ws.cell(row=12, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        row = 13
+        for method_code, method_name in payment_methods:
+            inc_total = income_transactions.filter(payment_method=method_code).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            exp_total = expense_transactions.filter(payment_method=method_code).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            net_total = inc_total - exp_total
+            
+            ws.cell(row=row, column=1, value=method_name)
+            ws.cell(row=row, column=2, value=float(inc_total))
+            ws.cell(row=row, column=3, value=float(exp_total))
+            ws.cell(row=row, column=4, value=float(net_total))
+            
+            for col in range(1, 5):
+                cell = ws.cell(row=row, column=col)
+                cell.border = thin_border
+                if col == 1:
+                    cell.alignment = left_alignment
+                else:
+                    cell.alignment = right_alignment
+                    cell.number_format = money_format
+            row += 1
+        
+        # Kategoriyalar bo'yicha kirim
+        row += 2
+        ws.cell(row=row, column=1, value="📂 KATEGORIYALAR BO'YICHA KIRIM")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12, color='10b981')
+        
+        row += 1
+        cat_headers = ['Kategoriya', 'Summa', 'Operatsiyalar soni']
+        for col, header in enumerate(cat_headers, 1):
+            cell = ws.cell(row=row, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = PatternFill(start_color="10b981", end_color="10b981", fill_type="solid")
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        row += 1
+        for cat_code, cat_name in CashTransaction.CATEGORY_CHOICES:
+            cat_income = income_transactions.filter(category=cat_code).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            cat_count = income_transactions.filter(category=cat_code).count()
+            
+            if cat_income > 0:
+                ws.cell(row=row, column=1, value=cat_name)
+                ws.cell(row=row, column=2, value=float(cat_income))
+                ws.cell(row=row, column=3, value=cat_count)
+                
+                for col in range(1, 4):
+                    cell = ws.cell(row=row, column=col)
+                    cell.border = thin_border
+                    if col == 1:
+                        cell.alignment = left_alignment
+                    elif col == 2:
+                        cell.alignment = right_alignment
+                        cell.number_format = money_format
+                    else:
+                        cell.alignment = center_alignment
+                row += 1
+        
+        # Kategoriyalar bo'yicha chiqim
+        row += 2
+        ws.cell(row=row, column=1, value="📂 KATEGORIYALAR BO'YICHA CHIQIM")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12, color='ef4444')
+        
+        row += 1
+        for col, header in enumerate(cat_headers, 1):
+            cell = ws.cell(row=row, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = PatternFill(start_color="ef4444", end_color="ef4444", fill_type="solid")
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        row += 1
+        for cat_code, cat_name in CashTransaction.CATEGORY_CHOICES:
+            cat_expense = expense_transactions.filter(category=cat_code).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            cat_count = expense_transactions.filter(category=cat_code).count()
+            
+            if cat_expense > 0:
+                ws.cell(row=row, column=1, value=cat_name)
+                ws.cell(row=row, column=2, value=float(cat_expense))
+                ws.cell(row=row, column=3, value=cat_count)
+                
+                for col in range(1, 4):
+                    cell = ws.cell(row=row, column=col)
+                    cell.border = thin_border
+                    if col == 1:
+                        cell.alignment = left_alignment
+                    elif col == 2:
+                        cell.alignment = right_alignment
+                        cell.number_format = money_format
+                    else:
+                        cell.alignment = center_alignment
+                row += 1
+        
+        # Ustun kengliklari
+        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['C'].width = 20
+        
+    else:
+        # ============ BATAFSIL HISOBOT ============
+        
+        # Sheet 1: KIRIMLAR
+        ws_income = wb.active
+        ws_income.title = "Kirimlar"
+        
+        ws_income.merge_cells('A1:H1')
+        ws_income['A1'] = f"KIRIM OPERATSIYALARI ({start_date} - {end_date})"
+        ws_income['A1'].font = Font(bold=True, size=14, color='10b981')
+        ws_income['A1'].alignment = center_alignment
+        
+        income_headers = ['№', 'Sana', 'Operatsiya ID', 'Kategoriya', 'To\'lov usuli', 'Summa', 'Kim oldi', 'Tavsif']
+        for col, header in enumerate(income_headers, 1):
+            cell = ws_income.cell(row=3, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        for idx, trans in enumerate(income_transactions, 1):
+            row = idx + 3
+            ws_income.cell(row=row, column=1, value=idx)
+            ws_income.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
+            ws_income.cell(row=row, column=3, value=trans.transaction_id)
+            ws_income.cell(row=row, column=4, value=trans.get_category_display())
+            ws_income.cell(row=row, column=5, value=trans.get_payment_method_display())
+            ws_income.cell(row=row, column=6, value=float(trans.amount))
+            ws_income.cell(row=row, column=7, value=trans.customer_name or '-')
+            ws_income.cell(row=row, column=8, value=trans.description[:60] if trans.description else '-')
+            
+            for col in range(1, 9):
+                cell = ws_income.cell(row=row, column=col)
+                cell.border = thin_border
+                if col == 6:
+                    cell.alignment = right_alignment
+                    cell.number_format = money_format
+                    cell.font = income_font
+                    cell.fill = income_fill
+                elif col in [1, 5]:
+                    cell.alignment = center_alignment
+                else:
+                    cell.alignment = left_alignment
+        
+        # Jami qator
+        if income_transactions.exists():
+            total_row = len(income_transactions) + 4
+            ws_income.cell(row=total_row, column=5, value="JAMI:")
+            ws_income.cell(row=total_row, column=5).font = Font(bold=True)
+            ws_income.cell(row=total_row, column=6, value=float(total_income))
+            ws_income.cell(row=total_row, column=6).font = Font(bold=True, color='10b981')
+            ws_income.cell(row=total_row, column=6).number_format = money_format
+            
+            for col in range(1, 9):
+                cell = ws_income.cell(row=total_row, column=col)
+                cell.border = thin_border
+                if col == 6:
+                    cell.fill = income_fill
+        
+        # Sheet 2: CHIQIMLAR
+        ws_expense = wb.create_sheet("Chiqimlar")
+        
+        ws_expense.merge_cells('A1:H1')
+        ws_expense['A1'] = f"CHIQIM OPERATSIYALARI ({start_date} - {end_date})"
+        ws_expense['A1'].font = Font(bold=True, size=14, color='ef4444')
+        ws_expense['A1'].alignment = center_alignment
+        
+        expense_headers = ['№', 'Sana', 'Operatsiya ID', 'Kategoriya', 'To\'lov usuli', 'Summa', 'Kim berdi', 'Tavsif']
+        for col, header in enumerate(expense_headers, 1):
+            cell = ws_expense.cell(row=3, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        for idx, trans in enumerate(expense_transactions, 1):
+            row = idx + 3
+            ws_expense.cell(row=row, column=1, value=idx)
+            ws_expense.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
+            ws_expense.cell(row=row, column=3, value=trans.transaction_id)
+            ws_expense.cell(row=row, column=4, value=trans.get_category_display())
+            ws_expense.cell(row=row, column=5, value=trans.get_payment_method_display())
+            ws_expense.cell(row=row, column=6, value=float(trans.amount))
+            ws_expense.cell(row=row, column=7, value=trans.customer_name or '-')
+            ws_expense.cell(row=row, column=8, value=trans.description[:60] if trans.description else '-')
+            
+            for col in range(1, 9):
+                cell = ws_expense.cell(row=row, column=col)
+                cell.border = thin_border
+                if col == 6:
+                    cell.alignment = right_alignment
+                    cell.number_format = money_format
+                    cell.font = expense_font
+                    cell.fill = expense_fill
+                elif col in [1, 5]:
+                    cell.alignment = center_alignment
+                else:
+                    cell.alignment = left_alignment
+        
+        # Jami qator
+        if expense_transactions.exists():
+            total_row_expense = len(expense_transactions) + 4
+            ws_expense.cell(row=total_row_expense, column=5, value="JAMI:")
+            ws_expense.cell(row=total_row_expense, column=5).font = Font(bold=True)
+            ws_expense.cell(row=total_row_expense, column=6, value=float(total_expense))
+            ws_expense.cell(row=total_row_expense, column=6).font = Font(bold=True, color='ef4444')
+            ws_expense.cell(row=total_row_expense, column=6).number_format = money_format
+            
+            for col in range(1, 9):
+                cell = ws_expense.cell(row=total_row_expense, column=col)
+                cell.border = thin_border
+                if col == 6:
+                    cell.fill = expense_fill
+        
+        # Sheet 3: STATISTIKA
+        ws_stats = wb.create_sheet("Statistika")
+        
+        ws_stats['A1'] = "UMUMIY STATISTIKA"
+        ws_stats['A1'].font = Font(bold=True, size=14, color='1a73e8')
+        
+        stats_data = [
+            ['Ko\'rsatkich', 'Qiymat'],
+            ['Jami Kirim', f"{float(total_income):,.2f} {currency_symbol}"],
+            ['Jami Chiqim', f"{float(total_expense):,.2f} {currency_symbol}"],
+            ['Sof Natija', f"{float(net_profit):,.2f} {currency_symbol}"],
+            ['Operatsiyalar soni', transactions.count()],
+            ['Kirimlar soni', income_transactions.count()],
+            ['Chiqimlar soni', expense_transactions.count()],
+        ]
+        
+        row = 3
+        for data in stats_data:
+            ws_stats.cell(row=row, column=1, value=data[0])
+            ws_stats.cell(row=row, column=2, value=data[1])
+            if row == 3:
+                for col in range(1, 3):
+                    cell = ws_stats.cell(row=row, column=col)
+                    cell.font = header_font
+                    cell.fill = header_fill
+            row += 1
+        
+        # To'lov usullari statistikasi
+        row += 2
+        ws_stats.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA")
+        ws_stats.cell(row=row, column=1).font = Font(bold=True, size=12, color='1a73e8')
+        
+        row += 1
+        payment_stats_headers = ['To\'lov usuli', 'Kirim', 'Chiqim', 'Sof']
+        for col, header in enumerate(payment_stats_headers, 1):
+            cell = ws_stats.cell(row=row, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+        
+        row += 1
+        for method_code, method_name in payment_methods:
+            inc_total = income_transactions.filter(payment_method=method_code).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            exp_total = expense_transactions.filter(payment_method=method_code).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+            net_total = inc_total - exp_total
+            
+            ws_stats.cell(row=row, column=1, value=method_name)
+            ws_stats.cell(row=row, column=2, value=float(inc_total))
+            ws_stats.cell(row=row, column=3, value=float(exp_total))
+            ws_stats.cell(row=row, column=4, value=float(net_total))
+            
+            for col in range(2, 5):
+                ws_stats.cell(row=row, column=col).number_format = money_format
+            row += 1
+        
+        # Ustun kengliklari
+        for sheet in [ws_income, ws_expense, ws_stats]:
+            sheet.column_dimensions['A'].width = 6
+            sheet.column_dimensions['B'].width = 18
+            sheet.column_dimensions['C'].width = 22
+            sheet.column_dimensions['D'].width = 20
+            sheet.column_dimensions['E'].width = 14
+            sheet.column_dimensions['F'].width = 16
+            sheet.column_dimensions['G'].width = 20
+            sheet.column_dimensions['H'].width = 40
+    
+    # Faylni yuborish
+    currency_text = "USD" if currency == "USD" else "UZS" if currency == "UZS" else "barcha_valyutalar"
+    filename = f"kassa_hisoboti_{start_date}_{end_date}_{currency_text}.xlsx"
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    
+    return response
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def order_payment_click(request, order_id):
+    """Buyurtma uchun Click orqali to'lov qilish (simulyatsiya)"""
+    
+    order = get_object_or_404(Order, pk=order_id)
+    remaining = order.total_price - order.prepayment
+    
+    if request.method == 'POST':
+        amount = Decimal(request.POST.get('amount', '0'))
+        
+        if amount <= 0:
+            messages.error(request, "To'lov summasi 0 dan katta bo'lishi kerak!")
+        elif amount > remaining:
+            messages.error(request, f"To'lov summasi qarzdan ({remaining:,.0f}) ko'p bo'lishi mumkin emas!")
+        else:
+            # Click to'lov simulyatsiyasi
+            transaction_id = f"CLICK-{uuid.uuid4().hex[:12].upper()}"
+            
+            # Operatsiyani yaratish
+            transaction = CashTransaction.objects.create(
+                transaction_type='EXTERNAL_INCOME',
+                category='CUSTOMER_PAYMENT',
+                amount=amount,
+                payment_method='CLICK',
+                order=order,
+                customer_name=order.customer_name,
+                description=f"Buyurtma #{order.order_number} uchun Click orqali to'lov",
+                external_payment_id=transaction_id,
+                performed_by=request.user,
+                external_payment_data={
+                    'merchant_id': 'ECOPROM',
+                    'order_id': order.order_number,
+                    'payment_type': 'click'
+                }
+            )
+            
+            # Order prepaymentni yangilash
+            order.prepayment += amount
+            order.save()
+            
+            messages.success(request, f"✅ Click orqali {amount:,.0f} so'm to'lov qabul qilindi! Tranzaksiya ID: {transaction_id}")
+            
+            return redirect('order_detail', pk=order.pk)
+    
+    context = {
+        'order': order,
+        'remaining': remaining,
+        'title': f"Click To'lov - #{order.order_number}",
+    }
+    
+    return render(request, 'orders/order_payment_click.html', context)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def order_payment_payme(request, order_id):
+    """Buyurtma uchun Payme orqali to'lov qilish (simulyatsiya)"""
+    
+    order = get_object_or_404(Order, pk=order_id)
+    remaining = order.total_price - order.prepayment
+    
+    if request.method == 'POST':
+        amount = Decimal(request.POST.get('amount', '0'))
+        
+        if amount <= 0:
+            messages.error(request, "To'lov summasi 0 dan katta bo'lishi kerak!")
+        elif amount > remaining:
+            messages.error(request, f"To'lov summasi qarzdan ({remaining:,.0f}) ko'p bo'lishi mumkin emas!")
+        else:
+            # Payme to'lov simulyatsiyasi
+            transaction_id = f"PAYME-{uuid.uuid4().hex[:12].upper()}"
+            
+            transaction = CashTransaction.objects.create(
+                transaction_type='EXTERNAL_INCOME',
+                category='CUSTOMER_PAYMENT',
+                amount=amount,
+                payment_method='PAYME',
+                order=order,
+                customer_name=order.customer_name,
+                description=f"Buyurtma #{order.order_number} uchun Payme orqali to'lov",
+                external_payment_id=transaction_id,
+                performed_by=request.user,
+                external_payment_data={
+                    'merchant_id': 'ECOPROM',
+                    'order_id': order.order_number,
+                    'payment_type': 'payme'
+                }
+            )
+            
+            order.prepayment += amount
+            order.save()
+            
+            messages.success(request, f"✅ Payme orqali {amount:,.0f} so'm to'lov qabul qilindi! Tranzaksiya ID: {transaction_id}")
+            
+            return redirect('order_detail', pk=order.pk)
+    
+    context = {
+        'order': order,
+        'remaining': remaining,
+        'title': f"Payme To'lov - #{order.order_number}",
+    }
+    
+    return render(request, 'orders/order_payment_payme.html', context)
+# orders/views.py ga qo'shing
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_management(request):
+    """Yagona kassa boshqaruv sahifasi"""
+    
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+    from django.core.paginator import Paginator
+    from django.db.models import Q, Sum
+    
+    # Joriy qoldiq
+    balance, created = CashRegisterBalance.objects.get_or_create(id=1)
+    
+    # Bugungi sana
+    today = timezone.now().date()
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    # Bugungi operatsiyalar
+    today_transactions = CashTransaction.objects.filter(
+        transaction_date__range=[today_start, today_end],
+        status='COMPLETED'
+    )
+    
+    # Bugungi statistika
+    today_stats = {
+        'total_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'total_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'cash_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'cash_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'click_income': today_transactions.filter(
+            payment_method='CLICK', transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'payme_income': today_transactions.filter(
+            payment_method='PAYME', transaction_type__in=['INCOME', 'EXTERNAL_INCOME']
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+    }
+    today_stats['net_change'] = today_stats['total_income'] - today_stats['total_expense']
+    
+    # Filtrlar
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    transaction_type = request.GET.get('type', '')
+    category = request.GET.get('category', '')
+    payment_method = request.GET.get('payment_method', '')
+    
+    # Operatsiyalar
+    transactions = CashTransaction.objects.filter(status='COMPLETED')
+    
+    if start_date:
+        start = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
+        transactions = transactions.filter(transaction_date__gte=start)
+    if end_date:
+        end = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        transactions = transactions.filter(transaction_date__lt=end)
+    if transaction_type:
+        transactions = transactions.filter(transaction_type=transaction_type)
+    if category:
+        transactions = transactions.filter(category=category)
+    if payment_method:
+        transactions = transactions.filter(payment_method=payment_method)
+    
+    # Pagination
+    paginator = Paginator(transactions.order_by('-transaction_date'), 30)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    
+    # Bugungi hisobot
+    today_report = DailyCashReport.objects.filter(report_date=today).first()
+    
+    # Faol buyurtmalar
+    active_orders = Order.objects.filter(
+        status__in=['KIRITILDI', 'TASDIQLANDI', 'ISHDA', 'TAYYOR']
+    )[:20]
+    
+    # Kategoriyalar
+    categories = CashTransaction.CATEGORY_CHOICES
+    
+    # URL parametrlarini saqlash
+    current_params = ''
+    if start_date:
+        current_params += f'&start_date={start_date}'
+    if end_date:
+        current_params += f'&end_date={end_date}'
+    if transaction_type:
+        current_params += f'&type={transaction_type}'
+    if category:
+        current_params += f'&category={category}'
+    if payment_method:
+        current_params += f'&payment_method={payment_method}'
+    
+    context = {
+        'balance': balance,
+        'today_stats': today_stats,
+        'today_transactions_count': today_transactions.count(),
+        'today_income_count': today_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).count(),
+        'today_expense_count': today_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).count(),
+        'today': today,
+        'today_report': today_report,
+        'page_obj': page_obj,
+        'active_orders': active_orders,
+        'categories': categories,
+        'start_date': start_date,
+        'end_date': end_date,
+        'current_params': current_params,
+        'opening_balance': today_report.expected_balance if today_report else balance.cash_balance,
+    }
+    
+    return render(request, 'orders/cash_management.html', context)
+
+
+def cash_transaction_json(request, transaction_id):
+    transaction = get_object_or_404(CashTransaction, transaction_id=transaction_id)
+    data = {
+        'transaction_id': transaction.transaction_id,
+        'transaction_date': transaction.transaction_date.strftime('%d.%m.%Y %H:%M:%S'),
+        'amount': float(transaction.amount),
+        'currency': transaction.currency,    # ← qo'shildi
+        'transaction_type': transaction.transaction_type,
+        'customer_name': transaction.customer_name or '-',
+        'description': transaction.description,
+        'performed_by': transaction.performed_by.get_full_name() or transaction.performed_by.username if transaction.performed_by else '-',
+    }
+    return JsonResponse(data)
+from .models import (
+    Order, Notification, Worker, Customer, 
+    Material, MaterialTransaction, Category,
+    CashTransaction, DailyCashReport, CashRegisterBalance  # ✅ Kassa modellari
+)
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def daily_report_json(request, pk):
+    """AJAX uchun hisobot ma'lumotlarini JSON qaytarish"""
+    report = get_object_or_404(DailyCashReport, pk=pk)
+    
+    data = {
+        'report_date': report.report_date.strftime('%d.%m.%Y'),
+        'opening_balance': float(report.opening_balance),
+        'total_income': float(report.total_income),
+        'total_expense': float(report.total_expense),
+        'expected_balance': float(report.expected_balance),
+        'actual_balance': float(report.actual_balance),
+        'difference': float(report.difference),
+        'notes': report.notes,
+        'created_by': report.created_by.get_full_name() or report.created_by.username if report.created_by else '-',
+    }
+    
+    return JsonResponse(data)
+
+def cash_transaction_json(request, transaction_id):
+    transaction = get_object_or_404(CashTransaction, transaction_id=transaction_id)
+    data = {
+        'transaction_id': transaction.transaction_id,
+        'transaction_date': transaction.transaction_date.strftime('%d.%m.%Y %H:%M:%S'),
+        'amount': float(transaction.amount),
+        'currency': transaction.currency,    # ← qo'shildi
+        'transaction_type': transaction.transaction_type,
+        'customer_name': transaction.customer_name or '-',
+        'description': transaction.description,
+        'performed_by': transaction.performed_by.get_full_name() or transaction.performed_by.username if transaction.performed_by else '-',
+    }
+    return JsonResponse(data)
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def daily_report_json(request, pk):
+    """AJAX uchun hisobot ma'lumotlarini JSON qaytarish"""
+    report = get_object_or_404(DailyCashReport, pk=pk)
+    
+    data = {
+        'report_date': report.report_date.strftime('%d.%m.%Y'),
+        'opening_balance': float(report.opening_balance),
+        'total_income': float(report.total_income),
+        'total_expense': float(report.total_expense),
+        'expected_balance': float(report.expected_balance),
+        'actual_balance': float(report.actual_balance),
+        'difference': float(report.difference),
+        'notes': report.notes,
+        'created_by': report.created_by.get_full_name() or report.created_by.username if report.created_by else '-',
+    }
+    
+    return JsonResponse(data)
+# ==================== KASSA AJAX API ENDPOINTLAR ====================
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_stats(request):
+    """AJAX uchun statistik ma'lumotlar"""
+    from django.db.models import Sum
+
+    today = timezone.now().date()
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+
+    today_transactions = CashTransaction.objects.filter(
+        transaction_date__range=[today_start, today_end],
+        status='COMPLETED'
+    )
+
+    balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+    today_report = DailyCashReport.objects.filter(report_date=today).first()
+
+    # Agar modelda currency maydoni bo'lsa — filtrlaymiz
+    # Bo'lmasa — hammasini UZS deb hisoblaymiz
+    has_currency = hasattr(CashTransaction, 'currency')
+
+    if has_currency:
+        today_income_uzs = today_transactions.filter(
+            transaction_type='INCOME', currency='UZS'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        today_income_usd = today_transactions.filter(
+            transaction_type='INCOME', currency='USD'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        today_expense_uzs = today_transactions.filter(
+            transaction_type='EXPENSE', currency='UZS'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        today_expense_usd = today_transactions.filter(
+            transaction_type='EXPENSE', currency='USD'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        cash_balance_usd = balance.cash_balance_usd if hasattr(balance, 'cash_balance_usd') else Decimal('0')
+    else:
+        today_income_uzs = today_transactions.filter(
+            transaction_type='INCOME'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        today_income_usd = Decimal('0')
+        today_expense_uzs = today_transactions.filter(
+            transaction_type='EXPENSE'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+        today_expense_usd = Decimal('0')
+        cash_balance_usd = Decimal('0')
+
+    today_income = today_income_uzs + today_income_usd
+    today_expense = today_expense_uzs + today_expense_usd
+
+    data = {
+        'success': True,
+        # Qoldiqlar
+        'cash_balance_uzs': float(balance.cash_balance),
+        'cash_balance_usd': float(cash_balance_usd),
+        'last_updated': balance.last_updated.strftime('%H:%M %d.%m.%Y'),
+        # Bugungi kirim
+        'today_income_uzs': float(today_income_uzs),
+        'today_income_usd': float(today_income_usd),
+        # Bugungi chiqim
+        'today_expense_uzs': float(today_expense_uzs),
+        'today_expense_usd': float(today_expense_usd),
+        # Jami
+        'today_income': float(today_income),
+        'today_expense': float(today_expense),
+        'net_change': float(today_income - today_expense),
+        # Statistika
+        'today_count': today_transactions.count(),
+        'today_income_count': today_transactions.filter(transaction_type='INCOME').count(),
+        'today_expense_count': today_transactions.filter(transaction_type='EXPENSE').count(),
+        'today': today.strftime('%d.%m.%Y'),
+        # Hisobot
+        'today_report': today_report is not None,
+        'today_report_id': today_report.id if today_report else None,
+    }
+
+    return JsonResponse(data)
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_transactions(request):
+    from django.core.paginator import Paginator
+
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    transaction_type = request.GET.get('type', '')
+    currency_filter = request.GET.get('currency', '')
+    page = request.GET.get('page', 1)
+
+    transactions = CashTransaction.objects.filter(status='COMPLETED')
+
+    if start_date:
+        try:
+            start = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
+            transactions = transactions.filter(transaction_date__gte=start)
+        except:
+            pass
+    if end_date:
+        try:
+            end = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+            transactions = transactions.filter(transaction_date__lt=end)
+        except:
+            pass
+    if transaction_type:
+        transactions = transactions.filter(transaction_type=transaction_type)
+
+    # Currency filter — faqat modelda mavjud bo'lsa
+    has_currency = hasattr(CashTransaction, 'currency') and 'currency' in [f.name for f in CashTransaction._meta.get_fields()]
+    if currency_filter and has_currency:
+        transactions = transactions.filter(currency=currency_filter)
+
+    transactions = transactions.order_by('-transaction_date')
+
+    paginator = Paginator(transactions, 50)
+    page_obj = paginator.get_page(page)
+
+    data = {
+        'success': True,
+        'transactions': [],
+        'total': paginator.count,
+        'total_pages': paginator.num_pages,
+        'current_page': page_obj.number,
+        'has_next': page_obj.has_next(),
+        'has_previous': page_obj.has_previous(),
+        'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+        'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+    }
+
+    for trans in page_obj:
+        # Currency: modelda bo'lsa o'shani, bo'lmasa payment_method ga qarab aniqlash
+        if has_currency:
+            currency = trans.currency
+        else:
+            currency = 'UZS'  # default
+
+        data['transactions'].append({
+                'transaction_id': trans.transaction_id,
+                'date': trans.transaction_date.strftime('%d.%m.%Y %H:%M'),
+                'type': trans.transaction_type,
+                'amount': float(trans.amount),
+                'currency': trans.currency,     # ← getattr emas
+                'customer_name': trans.customer_name or '-',
+                'description': trans.description or '',
+        })
+
+    return JsonResponse(data)
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_transaction_create(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': "Faqat POST so'rovi qabul qilinadi"}, status=405)
+
+    transaction_type = request.POST.get('transaction_type')
+    amount = request.POST.get('amount')
+    customer_name = request.POST.get('customer_name', '').strip()
+    description = request.POST.get('description', '').strip()
+    currency = request.POST.get('currency', 'UZS')
+    category = request.POST.get('category', 'OTHER')
+
+    if not transaction_type:
+        return JsonResponse({'success': False, 'message': "Operatsiya turini tanlang!"})
+    try:
+        amount = Decimal(amount)
+        if amount <= 0:
+            return JsonResponse({'success': False, 'message': "Summa 0 dan katta bo'lishi kerak!"})
+    except:
+        return JsonResponse({'success': False, 'message': "Summa noto'g'ri formatda!"})
+    if not customer_name:
+        return JsonResponse({'success': False, 'message': "Kim oldi/berdi maydonini to'ldiring!"})
+    if not description:
+        return JsonResponse({'success': False, 'message': "Izoh maydonini to'ldiring!"})
+
+    try:
+        transaction = CashTransaction.objects.create(
+            transaction_type=transaction_type,
+            category=category,
+            amount=amount,
+            currency=currency,
+            customer_name=customer_name,
+            description=description,
+            payment_method='CASH',
+            status='COMPLETED',
+            performed_by=request.user,
+            transaction_date=timezone.now()
+        )
+
+        # Kassa qoldig'ini yangilash
+        balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+        if transaction_type == 'INCOME':
+            balance.cash_balance += amount
+        else:
+            balance.cash_balance -= amount
+        balance.updated_by = request.user
+        balance.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f"Operatsiya muvaffaqiyatli bajarildi! ID: {transaction.transaction_id}",
+            'transaction': {
+                'id': transaction.transaction_id,
+                'amount': float(amount),
+                'currency': currency,
+                'type': transaction_type
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'})
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_daily_report_create(request):
+    """AJAX orqali kunlik hisobot yaratish"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Faqat POST so\'rovi qabul qilinadi'}, status=405)
+    
+    today = timezone.now().date()
+    
+    # Bugungi hisobot mavjudligini tekshirish
+    if DailyCashReport.objects.filter(report_date=today).exists():
+        return JsonResponse({'success': False, 'message': f'{today} uchun hisobot allaqachon mavjud!'})
+    
+    opening_balance = Decimal(request.POST.get('opening_balance', '0'))
+    actual_balance = Decimal(request.POST.get('actual_balance', '0'))
+    notes = request.POST.get('notes', '')
+    
+    # Bugungi operatsiyalar
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    
+    today_transactions = CashTransaction.objects.filter(
+        transaction_date__range=[today_start, today_end],
+        status='COMPLETED'
+    )
+    
+    cash_income = today_transactions.filter(transaction_type='INCOME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    cash_expense = today_transactions.filter(transaction_type='EXPENSE').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    total_income = cash_income
+    total_expense = cash_expense
+    expected_balance = opening_balance + total_income - total_expense
+    difference = actual_balance - expected_balance
+    
+    try:
+        report = DailyCashReport.objects.create(
+            report_date=today,
+            opening_balance=opening_balance,
+            cash_income=cash_income,
+            cash_expense=cash_expense,
+            click_income=Decimal('0'),
+            payme_income=Decimal('0'),
+            bank_income=Decimal('0'),
+            click_expense=Decimal('0'),
+            payme_expense=Decimal('0'),
+            bank_expense=Decimal('0'),
+            total_income=total_income,
+            total_expense=total_expense,
+            expected_balance=expected_balance,
+            actual_balance=actual_balance,
+            difference=difference,
+            notes=notes,
+            created_by=request.user
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{today} uchun kunlik hisobot yaratildi!',
+            'report_id': report.id
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'})
