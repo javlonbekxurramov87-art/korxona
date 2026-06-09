@@ -970,7 +970,8 @@ class DailyCashReport(models.Model):
 
 class CashRegisterBalance(models.Model):
     """Joriy kassa qoldig'i"""
-    cash_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Naqd qoldiq")
+    cash_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Naqd qoldiq (UZS)")
+    cash_balance_usd = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Naqd qoldiq (USD)")
     last_updated = models.DateTimeField(auto_now=True, verbose_name="Oxirgi yangilanish")
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Yangilagan")
     
@@ -979,4 +980,4 @@ class CashRegisterBalance(models.Model):
         verbose_name_plural = "Kassa qoldiqlari"
     
     def __str__(self):
-        return f"Joriy qoldiq: {self.cash_balance} so'm"
+        return f"Joriy qoldiq: {self.cash_balance} so'm | {self.cash_balance_usd} USD"
