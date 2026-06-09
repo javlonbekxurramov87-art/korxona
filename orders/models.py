@@ -834,3 +834,149 @@ class Project(models.Model):
             "Muzlatkich eshigi": (960, 2000),
         }
         return door_map.get(self.door_type, (0, 0))
+# orders/models.py - Kassa modellari (formsiz)
+
+class CashTransaction(models.Model):
+    """Kassa operatsiyalari (Ichki kirim/chiqim)"""
+    CURRENCY_CHOICES = [
+        ('UZS', "So'm"),
+        ('USD', 'Dollar'),
+    ]
+    TRANSACTION_TYPES = [
+        ('INCOME', 'Kirim (Naqd tushum)'),
+        ('EXPENSE', 'Chiqim (Sarflash)'),
+        ('EXTERNAL_INCOME', 'Tashqi kirim (Click/Payme)'),
+        ('EXTERNAL_EXPENSE', 'Tashqi chiqim'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('SALARY', 'Ish haqi'),
+        ('MATERIAL', 'Material xaridi'),
+        ('UTILITY', 'Kommunal to\'lovlar'),
+        ('TRANSPORT', 'Transport xarajatlari'),
+        ('REPAIR', 'Ta\'mirlash'),
+        ('OFFICE', 'Kantselyariya'),
+        ('TAX', 'Soliq'),
+        ('OTHER', 'Boshqa'),
+        ('CUSTOMER_PAYMENT', 'Mijoz to\'lovi'),
+        ('ORDER_PAYMENT', 'Buyurtma to\'lovi'),
+    ]
+    
+    transaction_id = models.CharField(max_length=50, unique=True, verbose_name="Operatsiya ID")
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Operatsiya turi")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, verbose_name="Kategoriya")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Summa")
+    payment_method = models.CharField(max_length=10, choices=[
+        ('CASH', 'Naqd'),
+        ('CLICK', 'Click'),
+        ('PAYME', 'Payme'),
+        ('BANK', 'Bank'),
+    ], default='CASH', verbose_name="To'lov usuli")
+    currency = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default='UZS',
+        verbose_name="Valyuta"
+    )
+    # Bog'lanishlar
+    order = models.ForeignKey('Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='cash_transactions', verbose_name="Buyurtma")
+    customer_name = models.CharField(max_length=200, blank=True, verbose_name="Mijoz nomi")
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='cash_transactions', verbose_name="Amalni bajargan")
+    
+    # Operatsiya ma'lumotlari
+    description = models.TextField(verbose_name="Tavsif")
+    receipt_number = models.CharField(max_length=50, blank=True, verbose_name="Chek raqami")
+    transaction_date = models.DateTimeField(default=timezone.now, verbose_name="Operatsiya vaqti")
+    
+    # Qo'shimcha ma'lumotlar
+    external_payment_id = models.CharField(max_length=100, blank=True, verbose_name="Tashqi to'lov ID (Click/Payme)")
+    external_payment_data = models.JSONField(default=dict, blank=True, verbose_name="Tashqi to'lov ma'lumotlari")
+    
+    # Holat
+    status = models.CharField(max_length=20, choices=[
+        ('PENDING', 'Kutilmoqda'),
+        ('COMPLETED', 'Bajarilgan'),
+        ('CANCELLED', 'Bekor qilingan'),
+    ], default='COMPLETED')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-transaction_date']
+        verbose_name = "Kassa operatsiyasi"
+        verbose_name_plural = "Kassa operatsiyalari"
+    
+    def __str__(self):
+        return f"{self.transaction_id} - {self.get_transaction_type_display()}: {self.amount} so'm"
+    
+    def save(self, *args, **kwargs):
+        if not self.transaction_id:
+            import uuid
+            self.transaction_id = f"TR-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        super().save(*args, **kwargs)
+
+
+class DailyCashReport(models.Model):
+    """Kunlik kassa hisoboti"""
+    report_date = models.DateField(unique=True, verbose_name="Hisobot sanasi")
+    
+    # Kun boshidagi qoldiq
+    opening_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Kun boshidagi naqd")
+    
+    # Kirimlar
+    cash_income = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Naqd kirim")
+    click_income = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Click kirim")
+    payme_income = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Payme kirim")
+    bank_income = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Bank kirim")
+    total_income = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Jami kirim")
+    
+    # Chiqimlar
+    cash_expense = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Naqd chiqim")
+    click_expense = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Click chiqim")
+    payme_expense = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Payme chiqim")
+    bank_expense = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Bank chiqim")
+    total_expense = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Jami chiqim")
+    
+    # Kategoriyalar bo'yicha
+    category_breakdown = models.JSONField(default=dict, verbose_name="Kategoriyalar bo'yicha taqsimot")
+    
+    # Kun oxiridagi qoldiq
+    expected_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Kutilgan qoldiq")
+    actual_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Haqiqiy qoldiq")
+    difference = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Farq")
+    
+    # Qo'shimcha
+    notes = models.TextField(blank=True, verbose_name="Izoh")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_reports', verbose_name="Yaratgan")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Kunlik kassa hisoboti"
+        verbose_name_plural = "Kunlik kassa hisobotlari"
+    
+    def __str__(self):
+        return f"Kassa hisoboti - {self.report_date}"
+    
+    def calculate_totals(self):
+        """Jami kirim va chiqimlarni hisoblash"""
+        self.total_income = self.cash_income + self.click_income + self.payme_income + self.bank_income
+        self.total_expense = self.cash_expense + self.click_expense + self.payme_expense + self.bank_expense
+        self.expected_balance = self.opening_balance + self.total_income - self.total_expense
+        self.difference = self.actual_balance - self.expected_balance if self.actual_balance else 0
+        return self
+
+
+class CashRegisterBalance(models.Model):
+    """Joriy kassa qoldig'i"""
+    cash_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Naqd qoldiq")
+    last_updated = models.DateTimeField(auto_now=True, verbose_name="Oxirgi yangilanish")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Yangilagan")
+    
+    class Meta:
+        verbose_name = "Kassa qoldig'i"
+        verbose_name_plural = "Kassa qoldiqlari"
+    
+    def __str__(self):
+        return f"Joriy qoldiq: {self.cash_balance} so'm"
