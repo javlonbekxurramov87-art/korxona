@@ -385,19 +385,20 @@
                     <input type="hidden" name="transaction_type" id="selected_type" value="INCOME">
 
                     <!-- Valyuta tanlash -->
-                    <div class="mb-3">
-                        <label class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Valyuta turi</label>
-                        <div class="d-flex gap-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="currency" id="currencyUZS" value="UZS" checked>
-                                <label class="form-check-label fw-semibold" for="currencyUZS">UZS (so'm)</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="currency" id="currencyUSD" value="USD">
-                                <label class="form-check-label fw-semibold" for="currencyUSD">USD (Dollar)</label>
-                            </div>
-                        </div>
-                    </div>
+                  <!-- Valyuta tanlash - BU MUHIM! -->
+<div class="mb-3">
+    <label class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Valyuta turi</label>
+    <div class="d-flex gap-3">
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="currency" id="currencyUZS" value="UZS" checked>
+            <label class="form-check-label fw-semibold" for="currencyUZS">UZS (so'm)</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="currency" id="currencyUSD" value="USD">
+            <label class="form-check-label fw-semibold" for="currencyUSD">USD (Dollar)</label>
+        </div>
+    </div>
+</div>
 
                     <!-- Miqdor -->
                     <div class="mb-3">
@@ -562,55 +563,89 @@ function loadStats() {
     fetch('/orders/cash/api/stats/')
         .then(r => r.json())
         .then(data => {
-            if (!data.success) return;
+            console.log('📊 API dan kelgan ma\'lumot:', data);  // 🔍 DEBUG: API javobini ko'rish
+            
+            if (!data.success) {
+                console.error('API xatolik:', data);
+                return;
+            }
 
-            // Qoldiqlar
-            document.getElementById('totalBalanceUsd').textContent =
-                (data.cash_balance_usd || 0).toLocaleString('uz-UZ') + ' USD';
-            document.getElementById('totalBalanceUzs').textContent =
-                (data.cash_balance_uzs || 0).toLocaleString('uz-UZ') + " so'm";
+            // 🔍 DEBUG: Qoldiqlarni tekshirish
+            console.log('💰 USD qoldiq:', data.cash_balance_usd);
+            console.log('💰 UZS qoldiq:', data.cash_balance_uzs);
 
-            // Bugungi kirim
-            const incUsd = (data.today_income_usd || 0).toLocaleString('uz-UZ');
-            const incUzs = (data.today_income_uzs || 0).toLocaleString('uz-UZ');
-            document.getElementById('todayIncome').innerHTML =
-                `<span style="font-size:14px;">+${incUzs} <small>UZS</small></span>` +
-                (data.today_income_usd > 0 ? ` <span style="font-size:13px;opacity:.7;">/ +${incUsd} USD</span>` : '');
-            document.getElementById('todayIncomeDetail').textContent =
-                `USD: ${incUsd} | UZS: ${incUzs}`;
+            // ✅ Qoldiqlar - to'g'ri joylashtirish
+            const usdBalance = data.cash_balance_usd || 0;
+            const uzsBalance = data.cash_balance_uzs || 0;
+            
+            document.getElementById('totalBalanceUsd').innerHTML = 
+                usdBalance.toLocaleString('uz-UZ') + ' <span style="font-size:14px;">USD</span>';
+            
+            document.getElementById('totalBalanceUzs').innerHTML = 
+                uzsBalance.toLocaleString('uz-UZ') + ' <span style="font-size:14px;">so\'m</span>';
 
-            // Bugungi chiqim
-            const expUsd = (data.today_expense_usd || 0).toLocaleString('uz-UZ');
-            const expUzs = (data.today_expense_uzs || 0).toLocaleString('uz-UZ');
-            document.getElementById('todayExpense').innerHTML =
-                `<span style="font-size:14px;">-${expUzs} <small>UZS</small></span>` +
-                (data.today_expense_usd > 0 ? ` <span style="font-size:13px;opacity:.7;">/ -${expUsd} USD</span>` : '');
-            document.getElementById('todayExpenseDetail').textContent =
-                `USD: ${expUsd} | UZS: ${expUzs}`;
+            // ✅ Bugungi kirim
+            const incUsd = data.today_income_usd || 0;
+            const incUzs = data.today_income_uzs || 0;
+            
+            const incomeElement = document.getElementById('todayIncome');
+            if (incomeElement) {
+                incomeElement.innerHTML = `
+                    <div style="font-size:20px; font-weight:700;">+${incUzs.toLocaleString('uz-UZ')}</div>
+                    <small class="text-muted">USD: +${incUsd.toLocaleString('uz-UZ')}</small>
+                `;
+            }
+            
+            const incomeDetail = document.getElementById('todayIncomeDetail');
+            if (incomeDetail) {
+                incomeDetail.textContent = `USD: ${incUsd.toLocaleString('uz-UZ')} | UZS: ${incUzs.toLocaleString('uz-UZ')}`;
+            }
 
-            // Kunlik hisobot ogohlantirishi
-            if (!data.today_report) {
-                document.getElementById('reportAlert').innerHTML = `
-                    <div class="alert alert-warning rounded-4 d-flex justify-content-between align-items-center flex-wrap gap-2"
-                         style="background:#fffbeb;border:1px solid #fde68a;">
-                        <div style="font-size:14px;">
-                            <svg class="svg-icon me-2" style="width:18px;height:18px;color:#d97706;" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/>
-                                <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/>
-                            </svg>
-                            <strong>${data.today}</strong> uchun kunlik hisobot hali yaratilmagan
-                        </div>
-                        <button class="btn btn-sm btn-warning rounded-3" data-bs-toggle="modal" data-bs-target="#reportModal">
-                            Hisobot yaratish
-                        </button>
-                    </div>`;
-            } else {
-                document.getElementById('reportAlert').innerHTML = '';
+            // ✅ Bugungi chiqim
+            const expUsd = data.today_expense_usd || 0;
+            const expUzs = data.today_expense_uzs || 0;
+            
+            const expenseElement = document.getElementById('todayExpense');
+            if (expenseElement) {
+                expenseElement.innerHTML = `
+                    <div style="font-size:20px; font-weight:700;">-${expUzs.toLocaleString('uz-UZ')}</div>
+                    <small class="text-muted">USD: -${expUsd.toLocaleString('uz-UZ')}</small>
+                `;
+            }
+            
+            const expenseDetail = document.getElementById('todayExpenseDetail');
+            if (expenseDetail) {
+                expenseDetail.textContent = `USD: ${expUsd.toLocaleString('uz-UZ')} | UZS: ${expUzs.toLocaleString('uz-UZ')}`;
+            }
+
+            // ✅ Kunlik hisobot ogohlantirishi
+            const reportAlert = document.getElementById('reportAlert');
+            if (reportAlert) {
+                if (!data.today_report) {
+                    reportAlert.innerHTML = `
+                        <div class="alert alert-warning rounded-4 d-flex justify-content-between align-items-center flex-wrap gap-2"
+                             style="background:#fffbeb; border:1px solid #fde68a;">
+                            <div style="font-size:14px;">
+                                <svg class="svg-icon me-2" style="width:18px;height:18px;color:#d97706;" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/>
+                                    <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/>
+                                </svg>
+                                <strong>${data.today || 'Bugun'}</strong> uchun kunlik hisobot hali yaratilmagan
+                            </div>
+                            <button class="btn btn-sm btn-warning rounded-3" data-bs-toggle="modal" data-bs-target="#reportModal">
+                                Hisobot yaratish
+                            </button>
+                        </div>`;
+                } else {
+                    reportAlert.innerHTML = '';
+                }
             }
         })
-        .catch(err => console.error('Stats xatolik:', err));
+        .catch(err => {
+            console.error('❌ Stats xatolik:', err);
+            showToast('Statistika yuklanmadi', 'error');
+        });
 }
-
 // ─── Operatsiyalar jadvalini yuklash ──────────────────────
 function loadTransactions(page = 1) {
     currentPage = page;
