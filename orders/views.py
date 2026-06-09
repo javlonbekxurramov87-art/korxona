@@ -6127,7 +6127,6 @@ def cash_dashboard(request):
     
     return render(request, 'orders/cash_dashboard.html', context)
 
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_transaction_create(request):
@@ -6137,6 +6136,7 @@ def cash_transaction_create(request):
         # POST dan ma'lumotlarni olish
         transaction_type = request.POST.get('transaction_type')
         amount = Decimal(request.POST.get('amount', '0'))
+        currency = request.POST.get('currency', 'UZS')  # ✅ QO'SHILDI: Valyuta (USD yoki UZS)
         customer_name = request.POST.get('customer_name', '').strip()
         description = request.POST.get('description', '').strip()
         
@@ -6157,48 +6157,63 @@ def cash_transaction_create(request):
             messages.error(request, "Izoh maydonini to'ldiring!")
             return redirect('cash_management')
         
-        # Tranzaksiyani yaratish
+        # ✅ Tranzaksiyani yaratish (currency bilan)
         transaction = CashTransaction.objects.create(
             transaction_type=transaction_type,
             amount=amount,
+            currency=currency,  # ✅ QO'SHILDI: Valyutani saqlash
             customer_name=customer_name,
             description=description,
-            payment_method='CASH',  # Default naqd pul
+            payment_method='CASH',
             status='COMPLETED',
             performed_by=request.user,
             transaction_date=timezone.now()
         )
         
-        # Kassa qoldig'ini yangilash
+        # ✅ Kassa qoldig'ini yangilash (valyutaga qarab)
         balance, created = CashRegisterBalance.objects.get_or_create(id=1)
+        
         if transaction_type == 'INCOME':
-            balance.cash_balance += amount
+            if currency == 'USD':
+                balance.cash_balance_usd += amount  # ✅ USD qoldiq
+                print(f"💰 USD ga qo'shildi: +{amount} USD")
+            else:
+                balance.cash_balance += amount  # ✅ UZS qoldiq
+                print(f"💰 UZS ga qo'shildi: +{amount} UZS")
         else:  # EXPENSE
-            balance.cash_balance -= amount
+            if currency == 'USD':
+                balance.cash_balance_usd -= amount  # ✅ USD qoldiq
+                print(f"💰 USD dan ayirildi: -{amount} USD")
+            else:
+                balance.cash_balance -= amount  # ✅ UZS qoldiq
+                print(f"💰 UZS dan ayirildi: -{amount} UZS")
+        
         balance.updated_by = request.user
         balance.save()
         
         messages.success(request, f"✅ Operatsiya muvaffaqiyatli bajarildi! ID: {transaction.transaction_id}")
         return redirect('cash_management')
     
-    # GET so'rovi bo'lsa, cash_management sahifasiga qaytarish
     return redirect('cash_management')
-
 def update_cash_balance(transaction):
     """Kassa qoldig'ini yangilash"""
-    balance, created = CashRegisterBalance.objects.get_or_create(id=1)
+    balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
     
     if transaction.transaction_type in ['INCOME', 'EXTERNAL_INCOME']:
-        balance.cash_balance += transaction.amount
-    elif transaction.transaction_type in ['EXPENSE', 'EXTERNAL_EXPENSE']:
-        balance.cash_balance -= transaction.amount
+        if transaction.currency == 'USD':
+            balance.cash_balance_usd += transaction.amount
+        else:
+            balance.cash_balance += transaction.amount
+    else:  # EXPENSE
+        if transaction.currency == 'USD':
+            balance.cash_balance_usd -= transaction.amount
+        else:
+            balance.cash_balance -= transaction.amount
     
     balance.updated_by = transaction.performed_by
     balance.save()
     
     return balance
-
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_transaction_list(request):
@@ -7118,12 +7133,12 @@ def daily_report_json(request, pk):
     
     return JsonResponse(data)
 # ==================== KASSA AJAX API ENDPOINTLAR ====================
-
+# views.py dagi cash_api_stats funksiyasi
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_stats(request):
-    """AJAX uchun statistik ma'lumotlar"""
     from django.db.models import Sum
+    from decimal import Decimal
 
     today = timezone.now().date()
     today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
@@ -7137,65 +7152,111 @@ def cash_api_stats(request):
     balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
     today_report = DailyCashReport.objects.filter(report_date=today).first()
 
-    # Agar modelda currency maydoni bo'lsa — filtrlaymiz
-    # Bo'lmasa — hammasini UZS deb hisoblaymiz
-    has_currency = hasattr(CashTransaction, 'currency')
+    # 🔥 MUHIM: USD qoldiqni ALOHIDA hisoblash
+    all_usd_income = CashTransaction.objects.filter(
+        status='COMPLETED', 
+        transaction_type='INCOME', 
+        currency='USD'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    all_usd_expense = CashTransaction.objects.filter(
+        status='COMPLETED', 
+        transaction_type='EXPENSE', 
+        currency='USD'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    real_usd_balance = all_usd_income - all_usd_expense
+    
+    # 🔥 MUHIM: UZS qoldiqni ALOHIDA hisoblash
+    all_uzs_income = CashTransaction.objects.filter(
+        status='COMPLETED', 
+        transaction_type='INCOME', 
+        currency='UZS'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    all_uzs_expense = CashTransaction.objects.filter(
+        status='COMPLETED', 
+        transaction_type='EXPENSE', 
+        currency='UZS'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    # Currency null bo'lgan eski operatsiyalarni UZS ga qo'shamiz
+    null_income = CashTransaction.objects.filter(
+        status='COMPLETED', 
+        transaction_type='INCOME', 
+        currency__isnull=True
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    null_expense = CashTransaction.objects.filter(
+        status='COMPLETED', 
+        transaction_type='EXPENSE', 
+        currency__isnull=True
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    real_uzs_balance = (all_uzs_income + null_income) - (all_uzs_expense + null_expense)
+    
+    # Modelni to'g'irlash
+    balance.cash_balance_usd = real_usd_balance
+    balance.cash_balance = real_uzs_balance
+    balance.save()
 
-    if has_currency:
-        today_income_uzs = today_transactions.filter(
-            transaction_type='INCOME', currency='UZS'
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        today_income_usd = today_transactions.filter(
-            transaction_type='INCOME', currency='USD'
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        today_expense_uzs = today_transactions.filter(
-            transaction_type='EXPENSE', currency='UZS'
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        today_expense_usd = today_transactions.filter(
-            transaction_type='EXPENSE', currency='USD'
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        cash_balance_usd = balance.cash_balance_usd if hasattr(balance, 'cash_balance_usd') else Decimal('0')
-    else:
-        today_income_uzs = today_transactions.filter(
-            transaction_type='INCOME'
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        today_income_usd = Decimal('0')
-        today_expense_uzs = today_transactions.filter(
-            transaction_type='EXPENSE'
-        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-        today_expense_usd = Decimal('0')
-        cash_balance_usd = Decimal('0')
-
-    today_income = today_income_uzs + today_income_usd
-    today_expense = today_expense_uzs + today_expense_usd
+    # Bugungi operatsiyalar
+    today_usd_income = today_transactions.filter(
+        transaction_type='INCOME', currency='USD'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    today_usd_expense = today_transactions.filter(
+        transaction_type='EXPENSE', currency='USD'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    today_uzs_income = today_transactions.filter(
+        transaction_type='INCOME', currency='UZS'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    today_uzs_expense = today_transactions.filter(
+        transaction_type='EXPENSE', currency='UZS'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    # Null bo'lganlarni UZS ga qo'shamiz
+    today_null_income = today_transactions.filter(
+        transaction_type='INCOME', currency__isnull=True
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    today_null_expense = today_transactions.filter(
+        transaction_type='EXPENSE', currency__isnull=True
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    today_uzs_income += today_null_income
+    today_uzs_expense += today_null_expense
 
     data = {
         'success': True,
-        # Qoldiqlar
-        'cash_balance_uzs': float(balance.cash_balance),
-        'cash_balance_usd': float(cash_balance_usd),
+        # ✅ TO'G'RI QOLDIQLAR
+        'cash_balance_uzs': float(real_uzs_balance),
+        'cash_balance_usd': float(real_usd_balance),
         'last_updated': balance.last_updated.strftime('%H:%M %d.%m.%Y'),
-        # Bugungi kirim
-        'today_income_uzs': float(today_income_uzs),
-        'today_income_usd': float(today_income_usd),
-        # Bugungi chiqim
-        'today_expense_uzs': float(today_expense_uzs),
-        'today_expense_usd': float(today_expense_usd),
-        # Jami
-        'today_income': float(today_income),
-        'today_expense': float(today_expense),
-        'net_change': float(today_income - today_expense),
-        # Statistika
+        
+        # ✅ BUGUNGI MA'LUMOTLAR
+        'today_income_uzs': float(today_uzs_income),
+        'today_income_usd': float(today_usd_income),
+        'today_expense_uzs': float(today_uzs_expense),
+        'today_expense_usd': float(today_usd_expense),
+        
+        'today_income': float(today_uzs_income + today_usd_income),
+        'today_expense': float(today_uzs_expense + today_usd_expense),
+        'net_change': float((today_uzs_income + today_usd_income) - (today_uzs_expense + today_usd_expense)),
+        
         'today_count': today_transactions.count(),
         'today_income_count': today_transactions.filter(transaction_type='INCOME').count(),
         'today_expense_count': today_transactions.filter(transaction_type='EXPENSE').count(),
         'today': today.strftime('%d.%m.%Y'),
-        # Hisobot
         'today_report': today_report is not None,
         'today_report_id': today_report.id if today_report else None,
     }
 
     return JsonResponse(data)
+
+
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_transactions(request):
