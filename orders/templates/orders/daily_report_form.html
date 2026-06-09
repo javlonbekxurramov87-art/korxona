@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kunlik Hisobot Yaratish - EcoProm</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; }
+        .container-custom { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .card-custom { background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .card-header-custom { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; text-align: center; }
+        .card-body-custom { padding: 30px; }
+        .stats-box { background: #f8f9fa; border-radius: 15px; padding: 20px; margin-bottom: 25px; }
+        .stat-item { text-align: center; padding: 10px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+        .stat-label { font-size: 12px; color: #6c757d; margin-top: 5px; }
+        .btn-custom { padding: 12px 25px; border-radius: 30px; font-weight: 600; transition: all 0.3s; }
+        .btn-custom:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+
+<div class="container-custom">
+    <div class="card-custom">
+        <div class="card-header-custom">
+            <i class="fas fa-chart-line fa-2x mb-2"></i>
+            <h3 class="mb-0">Kunlik Hisobot Yaratish</h3>
+            <p class="mb-0 mt-2 opacity-75">{{ today|date:"d.m.Y" }}</p>
+        </div>
+        
+        <div class="card-body-custom">
+            <!-- Bugungi statistika -->
+            <div class="stats-box">
+                <h5 class="text-center mb-3"><i class="fas fa-chart-simple"></i> Bugungi statistikalar</h5>
+                <div class="row">
+                    <div class="col-6 stat-item">
+                        <div class="stat-value text-success">+{{ today_stats.cash_income|floatformat:0 }}</div>
+                        <div class="stat-label">Naqd kirim</div>
+                    </div>
+                    <div class="col-6 stat-item">
+                        <div class="stat-value text-danger">-{{ today_stats.cash_expense|floatformat:0 }}</div>
+                        <div class="stat-label">Naqd chiqim</div>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6 stat-item">
+                        <div class="stat-value text-info">{{ today_income_count }}</div>
+                        <div class="stat-label">Kirimlar soni</div>
+                    </div>
+                    <div class="col-6 stat-item">
+                        <div class="stat-value text-warning">{{ today_expense_count }}</div>
+                        <div class="stat-label">Chiqimlar soni</div>
+                    </div>
+                </div>
+                <div class="text-center mt-3 pt-2 border-top">
+                    <small class="text-muted">Jami kirim: <strong class="text-success">{{ today_stats.total_income|floatformat:0 }}</strong> | Jami chiqim: <strong class="text-danger">{{ today_stats.total_expense|floatformat:0 }}</strong></small>
+                </div>
+            </div>
+            
+            <!-- Hisobot formasi -->
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Kun boshidagi qoldiq</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-money-bill-wave"></i></span>
+                        <input type="number" name="opening_balance" class="form-control form-control-lg" value="{{ opening_balance|default:0 }}" step="0.01" required>
+                    </div>
+                    <small class="text-muted">Kechagi kun oxiridagi qoldiq</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Kun oxiridagi haqiqiy qoldiq</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-calculator"></i></span>
+                        <input type="number" name="actual_balance" class="form-control form-control-lg" step="0.01" required>
+                    </div>
+                    <small class="text-muted">Sanalgan naqd pul miqdori</small>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Izoh</label>
+                    <textarea name="notes" class="form-control" rows="3" placeholder="Qoshimcha malumot..."></textarea>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Hisoblash formulasi:</strong><br>
+                    Kutilgan qoldiq = Kun boshidagi qoldiq + Jami kirim - Jami chiqim<br>
+                    Farq = Haqiqiy qoldiq - Kutilgan qoldiq
+                </div>
+                
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-primary btn-custom flex-grow-1">
+                        <i class="fas fa-save"></i> Hisobotni saqlash
+                    </button>
+                    <a href="{% url 'cash_management' %}" class="btn btn-secondary btn-custom">
+                        <i class="fas fa-times"></i> Bekor qilish
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Avtomatik hisoblash
+    const openingInput = document.querySelector('input[name="opening_balance"]');
+    const actualInput = document.querySelector('input[name="actual_balance"]');
+    
+    function calculateExpected() {
+        const opening = parseFloat(openingInput.value) || 0;
+        const totalIncome = {{ today_stats.total_income|default:0 }};
+        const totalExpense = {{ today_stats.total_expense|default:0 }};
+        const expected = opening + totalIncome - totalExpense;
+        
+        // Expected qiymatni inputga qo'yish mumkin (ixtiyoriy)
+        console.log('Kutilgan qoldiq:', expected);
+    }
+    
+    openingInput.addEventListener('change', calculateExpected);
+    calculateExpected();
+</script>
+
+</body>
+</html>
