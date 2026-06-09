@@ -710,3 +710,83 @@ class QuickCalculatorForm(forms.Form):
         choices=[('0.96', '0.96 m'), ('1.00', '1.00 m'), ('1.16', '1.16 m')],
         initial='1.16'
     )
+# ============================================
+# KASSA FORMLARI
+# ============================================
+
+from .models import CashTransaction, DailyCashReport
+
+
+class CashTransactionForm(forms.ModelForm):
+    """Kassa operatsiyasi formasi (soddalashtirilgan)"""
+    
+    class Meta:
+        model = CashTransaction
+        fields = ['transaction_type', 'amount', 'customer_name', 'description']
+        widgets = {
+            'transaction_type': forms.Select(attrs={
+                'class': 'form-control',
+                'required': True
+            }),
+            'amount': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'required': True,
+                'placeholder': 'Masalan: 500000'
+            }),
+            'customer_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'required': True,
+                'placeholder': 'Ismi familiyasi'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'required': True,
+                'placeholder': 'Operatsiya tavsifi...'
+            }),
+        }
+    
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if amount <= 0:
+            raise forms.ValidationError("Summa 0 dan katta bo'lishi kerak!")
+        return amount
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # transaction_type uchun maxsus choices
+        self.fields['transaction_type'].choices = [
+            ('INCOME', 'Kirim (Pul keldi)'),
+            ('EXPENSE', 'Chiqim (Pul ketdi)'),
+        ]
+        # Barcha required maydonlarni belgilash
+        self.fields['transaction_type'].required = True
+        self.fields['amount'].required = True
+        self.fields['customer_name'].required = True
+        self.fields['description'].required = True
+
+
+class DailyReportForm(forms.ModelForm):
+    """Kunlik hisobot formasi"""
+    
+    class Meta:
+        model = DailyCashReport
+        fields = ['opening_balance', 'actual_balance', 'notes']
+        widgets = {
+            'opening_balance': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'required': True
+            }),
+            'actual_balance': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'required': True
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Qoshimcha malumot...'
+            }),
+        }
