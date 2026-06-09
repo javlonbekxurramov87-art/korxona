@@ -7449,3 +7449,177 @@ def cash_api_daily_report_create(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'})
+    
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_transaction_delete(request, transaction_id):
+    """Kassa operatsiyasini o'chirish"""
+    from decimal import Decimal
+    
+    if request.method == 'POST':
+        try:
+            transaction = CashTransaction.objects.get(transaction_id=transaction_id, status='COMPLETED')
+            
+            # Kassa qoldig'ini qaytarish (operatsiyani bekor qilish)
+            balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+            
+            if transaction.transaction_type == 'INCOME':
+                if transaction.currency == 'USD':
+                    balance.cash_balance_usd -= transaction.amount
+                else:
+                    balance.cash_balance -= transaction.amount
+            else:  # EXPENSE
+                if transaction.currency == 'USD':
+                    balance.cash_balance_usd += transaction.amount
+                else:
+                    balance.cash_balance += transaction.amount
+            
+            balance.updated_by = request.user
+            balance.save()
+            
+            # Operatsiyani o'chirish
+            transaction.status = 'CANCELLED'
+            transaction.save()
+            
+            messages.success(request, f"✅ Operatsiya o'chirildi! ID: {transaction_id}")
+            return JsonResponse({'success': True, 'message': 'Operatsiya o\'chirildi'})
+            
+        except CashTransaction.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Operatsiya topilmadi'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+    return JsonResponse({'success': False, 'message': 'Method not allowed'}, status=405)
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_transaction_edit(request, transaction_id):
+    """Kassa operatsiyasini tahrirlash"""
+    from decimal import Decimal
+    
+    try:
+        transaction = CashTransaction.objects.get(transaction_id=transaction_id, status='COMPLETED')
+    except CashTransaction.DoesNotExist:
+        if request.method == 'GET':
+            return JsonResponse({'success': False, 'message': 'Operatsiya topilmadi'}, status=404)
+        messages.error(request, "Operatsiya topilmadi")
+        return redirect('cash_management')
+    
+    if request.method == 'GET':
+        # Ma'lumotlarni JSON formatda qaytarish
+        data = {
+            'success': True,
+            'transaction_id': transaction.transaction_id,
+            'transaction_type': transaction.transaction_type,
+            'amount': float(transaction.amount),
+            'currency': transaction.currency if hasattr(transaction, 'currency') and transaction.currency else 'UZS',
+            'customer_name': transaction.customer_name,
+            'description': transaction.description,
+            'payment_method': transaction.payment_method,
+            'date': transaction.transaction_date.strftime('%Y-%m-%dT%H:%M'),
+        }
+        return JsonResponse(data)
+    
+    if request.method == 'POST':
+        try:
+            # Eski qoldiqni qaytarish
+            balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+            
+            # Eski operatsiyani bekor qilish
+            if transaction.transaction_type == 'INCOME':
+                if transaction.currency == 'USD':
+                    balance.cash_balance_usd -= transaction.amount
+                else:
+                    balance.cash_balance -= transaction.amount
+            else:  # EXPENSE
+                if transaction.currency == 'USD':
+                    balance.cash_balance_usd += transaction.amount
+                else:
+                    balance.cash_balance += transaction.amount
+            
+            # Yangi ma'lumotlar
+            new_type = request.POST.get('transaction_type')
+            new_amount = Decimal(request.POST.get('amount', '0'))
+            new_currency = request.POST.get('currency', 'UZS')
+            new_customer = request.POST.get('customer_name', '').strip()
+            new_description = request.POST.get('description', '').strip()
+            new_date_str = request.POST.get('transaction_date', '')
+            
+            # Yangi qoldiqni qo'shish
+            if new_type == 'INCOME':
+                if new_currency == 'USD':
+                    balance.cash_balance_usd += new_amount
+                else:
+                    balance.cash_balance += new_amount
+            else:  # EXPENSE
+                if new_currency == 'USD':
+                    balance.cash_balance_usd -= new_amount
+                else:
+                    balance.cash_balance -= new_amount
+            
+            # Tranzaksiyani yangilash
+            transaction.transaction_type = new_type
+            transaction.amount = new_amount
+            transaction.currency = new_currency
+            transaction.customer_name = new_customer
+            transaction.description = new_description
+            
+            if new_date_str:
+                from datetime import datetime
+                new_date = timezone.make_aware(datetime.strptime(new_date_str, '%Y-%m-%dT%H:%M'))
+                transaction.transaction_date = new_date
+            
+            transaction.save()
+            
+            balance.updated_by = request.user
+            balance.save()
+            
+            messages.success(request, f"✅ Operatsiya yangilandi! ID: {transaction_id}")
+            return redirect('cash_management')
+            
+        except Exception as e:
+            messages.error(request, f"Xatolik: {str(e)}")
+            return redirect('cash_management')
+    
+    return redirect('cash_management')
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_transaction_delete(request, transaction_id):
+    """Kassa operatsiyasini o'chirish"""
+    from decimal import Decimal
+    
+    if request.method == 'POST':
+        try:
+            transaction = CashTransaction.objects.get(transaction_id=transaction_id, status='COMPLETED')
+            
+            # Kassa qoldig'ini qaytarish (operatsiyani bekor qilish)
+            balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+            
+            if transaction.transaction_type == 'INCOME':
+                if transaction.currency == 'USD':
+                    balance.cash_balance_usd -= transaction.amount
+                else:
+                    balance.cash_balance -= transaction.amount
+            else:  # EXPENSE
+                if transaction.currency == 'USD':
+                    balance.cash_balance_usd += transaction.amount
+                else:
+                    balance.cash_balance += transaction.amount
+            
+            balance.updated_by = request.user
+            balance.save()
+            
+            # Operatsiyani o'chirish (statusni o'zgartirish)
+            transaction.status = 'CANCELLED'
+            transaction.save()
+            
+            return JsonResponse({'success': True, 'message': 'Operatsiya o\'chirildi'})
+            
+        except CashTransaction.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Operatsiya topilmadi'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+    return JsonResponse({'success': False, 'message': 'Method not allowed'}, status=405)
