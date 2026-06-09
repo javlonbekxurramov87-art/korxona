@@ -1,16 +1,14 @@
 # orders/urls.py
 from django.urls import path
 from . import views
-from django.contrib.auth.views import LogoutView # <--- LogoutView import qilingan
+from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
-    # Kirish va Chiqish (Tuzatildi!)
-    # 1. Login sahifasi (Custom view)
-    path('login/', views.CustomLoginView.as_view(), name='login'), # Bu sizning /login/ manzilingiz
+    # ==================== KIRISH CHIQISH ====================
+    path('login/', views.CustomLoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'),
     
-    # 2. Logout sahifasi (LogoutView orqali qo'shildi)
-    # Tizimdan chiqishni amalga oshiradi va LOGOUT_REDIRECT_URL ga yo'naltiradi.
-    path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'), # <--- O'ZGARISH BU YERDA
+    # ==================== API ENDPOINTLAR ====================
     path('api/statistics/', views.api_statistics, name='api_statistics'),
     path('api/categories/', views.api_categories, name='api_categories'),
     path('api/materials/', views.api_materials, name='api_materials'),
@@ -18,125 +16,114 @@ urlpatterns = [
     path('api/material/<int:material_id>/get/', views.api_material_get, name='api_material_get'),
     path('api/material/<int:material_id>/edit/', views.api_material_edit, name='api_material_edit'),
     path('api/material/<int:material_id>/delete/', views.api_material_delete, name='api_material_delete'),
-    # Asosiy Boshqaruv
+    path('api/calculate/', views.api_calculate, name='api_calculate'),
+    path('api/generate-svg/', views.api_generate_svg, name='api_generate_svg'),
+    path('api/project/<int:pk>/', views.api_project_detail, name='api_project_detail'),
+    path('api/find-material/', views.find_material_by_code_api, name='find_material_api'),
+    path('api/save-scanned-transactions/', views.save_scanned_transactions_api, name='save_scanned_transactions_api'),
+    
+    # ==================== ASOSIY BOSHQARUV ====================
     path('', views.order_list, name='order_list'),
+    path('warehouse/', views.warehouse_dashboard, name='warehouse_dashboard'),
     path('warehouse/add/', views.add_material, name='add_material'),
     path('material/<int:material_id>/edit/', views.edit_material, name='edit_material'),
     path('material/<int:material_id>/delete/', views.delete_material, name='delete_material'),
-    # Eski: path('material/<int:material_id>/output/', views.material_output, name='material_output'),
-# Yangi (ID-siz):
     path('material/output/', views.material_output, name='material_output'),
-    path('outputs/history/', views.output_history, name='output_history'), 
-    # Buyurtma Operatsiyalari
-    path('create/', views.order_create, name='order_create'),
-    path('edit/<int:pk>/', views.order_edit, name='order_edit'),
+    path('outputs/history/', views.output_history, name='output_history'),
     path('outputs/export/excel/', views.export_outputs_excel, name='export_outputs_excel'),
     path('inventory/export/excel/', views.export_inventory_excel, name='export_inventory_excel'),
-    path('delete/<int:pk>/', views.order_delete, name='order_delete'),
+    path('inventory/list/', views.material_list, name='material_list'),
+    path('inventory/transaction/create/', views.material_transaction_create, name='material_transaction_create'),
+    path('fast-scanner/', views.fast_scanner_view, name='fast_scanner'),
     path('import-excel/', views.import_excel_api, name='import_excel_api'),
-
-    # Bosqichlar
+    path('transactions/add/', views.add_transaction_view, name='add_transaction'),
+    path('transactions/remove/', views.remove_transaction_view, name='remove_transaction'),
+    
+    # ==================== BUYURTMA OPERATSIYALARI ====================
+    path('create/', views.order_create, name='order_create'),
+    path('edit/<int:pk>/', views.order_edit, name='order_edit'),
+    path('delete/<int:pk>/', views.order_delete, name='order_delete'),
+    path('detail/<int:pk>/', views.order_detail, name='order_detail'),
+    path('upload-order-image/', views.upload_order_image, name='upload_order_image'),
+    path('archive/', views.order_archive, name='order_archive'),
+    
+    # ==================== BUYURTMA BOSQICHLARI ====================
     path('confirm/<int:pk>/', views.order_confirm, name='order_confirm'),
     path('reject/<int:pk>/', views.order_reject, name='order_reject'),
     path('start/<int:pk>/', views.order_start_production, name='order_start_production'),
     path('finish/<int:pk>/', views.order_finish, name='order_finish'),
     path('complete/<int:pk>/', views.order_complete, name='order_complete'),
-
-    # Hisobotlar
-    path('report/weekly/', views.weekly_report_view, name='weekly_report_view'),
-    path('report/sales/', views.sales_report_view, name='sales_report_view'),
-    path('export/orders/csv/', views.export_orders_csv, name='export_orders_csv'),
-    path('director-dashboard/', views.director_dashboard, name='director_dashboard'),
     
-    # AUDIT LOG
-    path('orders/calculator/all/', views.order_calculator_list, name='order_calculator_list'),
-    path('report/audit/', views.product_audit_log_view, name='product_audit_log_view'),
-    path('audit-log/export-csv/', views.export_audit_log_csv, name='export_audit_log_csv'), 
-
-    # Tafsilotlar va Rasm yuklash
-    path('detail/<int:pk>/', views.order_detail, name='order_detail'),
-    path('upload-order-image/', views.upload_order_image, name='upload_order_image'), 
-
-    # Ustalar harakatlari
+    # ==================== USTALAR ====================
     path('order/<int:pk>/worker-accept/', views.order_worker_accept, name='order_worker_accept'),
     path('order/<int:pk>/worker-start/', views.order_worker_start, name='order_worker_start'),
     path('order/<int:pk>/worker-finish/', views.order_worker_finish, name='order_worker_finish'),
-
     path('worker-panel/', views.worker_panel, name='worker_panel'),
     path('worker-orders/<int:worker_id>/', views.worker_orders, name='worker_orders'),
-    # Ham eski, ham yangi nom bilan ishlashi uchun:
-    # path('worker-panel/', views.worker_panel, name='worker_panel'),
-    path('worker-my-orders/', views.worker_panel, name='worker_my_orders'), # SHUNI QO'SHING
+    path('worker-my-orders/', views.worker_panel, name='worker_my_orders'),
     path('worker-report/', views.worker_activity_report_view, name='worker_activity_report'),
-
-    # Duplicate yo'llar olib tashlandi, lekin quyidagilar qoldirildi
-    # path('worker-report/', views.worker_activity_report_view, name='worker_activity_report'),
-    path('driver/dashboard/', views.driver_dashboard, name='driver_dashboard'),
-    
-    # Koordinatalarni fonda qabul qilish (POST so'rovlar uchun)
-    path('track-location/', views.track_location, name='track_location'),
-    path('archive/', views.order_archive, name='order_archive'),
-    # EKSPORT YO'LI
     path('worker-report/export-csv/', views.export_worker_activity_csv, name='export_worker_activity_csv'),
+    path('rankings/', views.rankings_view, name='ranking'),
+    
+    # ==================== HISOBOTLAR ====================
+    path('report/weekly/', views.weekly_report_view, name='weekly_report_view'),
+    path('report/sales/', views.sales_report_view, name='sales_report_view'),
+    path('report/audit/', views.product_audit_log_view, name='product_audit_log_view'),
+    path('audit-log/export-csv/', views.export_audit_log_csv, name='export_audit_log_csv'),
+    path('export/orders/csv/', views.export_orders_csv, name='export_orders_csv'),
+    path('director-dashboard/', views.director_dashboard, name='director_dashboard'),
+    path('orders/calculator/all/', views.order_calculator_list, name='order_calculator_list'),
     path('material_report/', views.material_sarfi_report, name='material_report'),
+    path('debts/', views.debt_report, name='debt_report'),
+    path('add-payment/<int:order_id>/', views.add_prepayment, name='add_prepayment'),
+    path('rating/', views.customer_rating, name='customer_rating'),
+    path('get-customer-orders/<str:customer_id>/', views.get_customer_orders, name='get_customer_orders'),
+    
+    # ==================== DRIVER VA QOROVUL ====================
+    path('driver/dashboard/', views.driver_dashboard, name='driver_dashboard'),
+    path('track-location/', views.track_location, name='track_location'),
     path('guard/', views.guard_dashboard, name='guard_dashboard'),
     path('patrol/', views.guard_patrol_view, name='guard_patrol'),
-  path('', views.constructor_index, name='index'),
-    path('calculator/', views.constructor_index, name='calculator'),
     
-    # =========================================================
-    # LOYIHA CRUD
-    # =========================================================
+    # ==================== KONSTRUKTOR (CHIZMA) ====================
+    path('', views.constructor_index, name='index'),
+    path('calculator/', views.constructor_index, name='calculator'),
+    path('chizma/', views.constructor_index, name='chizma'),
     path('projects/', views.project_list, name='project_list'),
     path('projects/create/', views.project_create, name='project_create'),
     path('projects/<int:pk>/', views.project_detail, name='project_detail'),
     path('projects/<int:pk>/edit/', views.project_edit, name='project_edit'),
     path('projects/<int:pk>/delete/', views.project_delete, name='project_delete'),
-    
-    # =========================================================
-    # LOYIHA AMALLARI
-    # =========================================================
-    # AI tavsiya olish
     path('projects/<int:pk>/ai/', views.ai_recommendation, name='ai_recommendation'),
-    
-    # Telegramga hisobot yuborish
     path('projects/<int:pk>/send/', views.send_report, name='send_report'),
-    
-    # Buyurtmaga o'tkazish (orders app bilan bog'lash)
     path('projects/<int:pk>/create-order/', views.create_order_from_project, name='create_order'),
-    
-    # SVG yuklab olish
     path('projects/<int:pk>/download-svg/', views.download_svg, name='download_svg'),
-    path('api/project/<int:pk>/', views.api_project_detail, name='api_project_detail'),
-    path('chizma/', views.constructor_index, name='chizma'),
-
-    # =========================================================
-    # API ENDPOINTLAR (AJAX)
-    # =========================================================
-    path('api/calculate/', views.api_calculate, name='api_calculate'),
-    path('api/generate-svg/', views.api_generate_svg, name='api_generate_svg'),
-    path('debts/', views.debt_report, name='debt_report'),
-    path('add-payment/<int:order_id>/', views.add_prepayment, name='add_prepayment'),
-    path('rating/', views.customer_rating, name='customer_rating'), # SHU QATORNI TEKSHIRING
-    path('get-customer-orders/<str:customer_id>/', views.get_customer_orders, name='get_customer_orders'),
-    # 2. Harakatlar
-    path('transactions/add/', views.add_transaction_view, name='add_transaction'),
-    path('transactions/remove/', views.remove_transaction_view, name='remove_transaction'),
-
-    # 3. Inventarizatsiya
-    path('inventory/list/', views.material_list, name='material_list'),
-    path('rankings/', views.rankings_view, name='ranking'), # SHU QATORNI QO'SHING
     
-
-    path('warehouse/', views.warehouse_dashboard, name='warehouse_dashboard'),
-    # 4. Boshqa inventarizatsiya harakatlari
-    path('inventory/transaction/create/', views.material_transaction_create, name='material_transaction_create'),
-    path('fast-scanner/', views.fast_scanner_view, name='fast_scanner'),
-    path('api/find-material/', views.find_material_by_code_api, name='find_material_api'),
-    path('api/save-scanned-transactions/', views.save_scanned_transactions_api, name='save_scanned_transactions_api'),
+    # ==================== KASSA (YAGONA VA TO'LIQ) ====================
+    # Asosiy kassa sahifasi
+    path('cash/management/', views.cash_management, name='cash_management'),
+    
+    # Operatsiyalar
+    path('cash/transaction/create/', views.cash_transaction_create, name='cash_transaction_create'),
+    path('cash/transactions/', views.cash_transaction_list, name='cash_transaction_list'),
+    path('cash/transaction/<str:transaction_id>/json/', views.cash_transaction_json, name='cash_transaction_json'),
+    
+    # Kunlik hisobotlar
+    path('cash/daily-report/create/', views.daily_report_create, name='daily_report_create'),
+    path('cash/daily-report/<int:pk>/', views.daily_report_detail, name='daily_report_detail'),
+    path('cash/daily-reports/', views.daily_report_list, name='daily_report_list'),
+    path('cash/daily-report/<int:pk>/json/', views.daily_report_json, name='daily_report_json'),
+    
+    # Excel export
+    path('cash/export/excel/', views.export_cash_report_excel, name='export_cash_report_excel'),
+    
+    # AJAX API endpointlar
+    path('cash/api/stats/', views.cash_api_stats, name='cash_api_stats'),
+    path('cash/api/transactions/', views.cash_api_transactions, name='cash_api_transactions'),
+    path('cash/api/transaction/create/', views.cash_api_transaction_create, name='cash_api_transaction_create'),
+    path('cash/api/daily-report/create/', views.cash_api_daily_report_create, name='cash_api_daily_report_create'),
+    
+    # Tashqi to'lovlar (Click/Payme)
+    path('order/<int:order_id>/payment/click/', views.order_payment_click, name='order_payment_click'),
+    path('order/<int:order_id>/payment/payme/', views.order_payment_payme, name='order_payment_payme'),
 ]
-
-
-
-
-# Agar mavjud bo'lsa, "Xomashyolar" kategoriyasini olamiz
