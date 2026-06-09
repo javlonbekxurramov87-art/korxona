@@ -1818,7 +1818,17 @@
                                     </div>
                                 </a>
                                 {% endif %}
-
+                                {% if is_glavniy_admin or is_manager %}
+<a href="{% url 'cash_management' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
+    <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+        <i class="fas fa-money-bill-wave"></i>
+    </div>
+    <div>
+        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Kassa</h4>
+        <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8);">Kirim/chiqim</p>
+    </div>
+</a>
+{% endif %}
                             </div>
                         </div>
                     {% endif %}
