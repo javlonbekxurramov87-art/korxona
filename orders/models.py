@@ -862,16 +862,25 @@ class CashTransaction(models.Model):
         ('ORDER_PAYMENT', 'Buyurtma to\'lovi'),
     ]
     
+    # ✅ TO'LOV USULLARI - KARTA QO'SHILDI
+    PAYMENT_METHOD_CHOICES = [
+        ('CASH', 'Naqd pul'),
+        ('CARD', 'Plastik karta'),      # ✅ QO'SHILDI
+        ('CLICK', 'Click'),
+        ('PAYME', 'Payme'),
+        ('BANK', 'Bank'),
+    ]
+    
     transaction_id = models.CharField(max_length=50, unique=True, verbose_name="Operatsiya ID")
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Operatsiya turi")
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, verbose_name="Kategoriya")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Summa")
-    payment_method = models.CharField(max_length=10, choices=[
-        ('CASH', 'Naqd'),
-        ('CLICK', 'Click'),
-        ('PAYME', 'Payme'),
-        ('BANK', 'Bank'),
-    ], default='CASH', verbose_name="To'lov usuli")
+    payment_method = models.CharField(
+        max_length=10, 
+        choices=PAYMENT_METHOD_CHOICES,  # ✅ YANGILANDI
+        default='CASH', 
+        verbose_name="To'lov usuli"
+    )
     currency = models.CharField(
         max_length=3,
         choices=CURRENCY_CHOICES,
@@ -908,14 +917,13 @@ class CashTransaction(models.Model):
         verbose_name_plural = "Kassa operatsiyalari"
     
     def __str__(self):
-        return f"{self.transaction_id} - {self.get_transaction_type_display()}: {self.amount} so'm"
+        return f"{self.transaction_id} - {self.get_transaction_type_display()}: {self.amount} {self.currency}"
     
     def save(self, *args, **kwargs):
         if not self.transaction_id:
             import uuid
             self.transaction_id = f"TR-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
         super().save(*args, **kwargs)
-
 
 class DailyCashReport(models.Model):
     """Kunlik kassa hisoboti"""
