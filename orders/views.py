@@ -7140,7 +7140,7 @@ def daily_report_json(request, pk):
     
     return JsonResponse(data)
 # ==================== KASSA AJAX API ENDPOINTLAR ====================
-# views.py dagi cash_api_stats funksiyasi
+# cash_api_stats funksiyasini O'ZGARTIRING:
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_stats(request):
@@ -7156,58 +7156,10 @@ def cash_api_stats(request):
         status='COMPLETED'
     )
 
+    # 🔥 MUHIM: DB dan to'g'ridan-to'g'ri qoldiqni oling, QAYTA HISOBLAMANG!
     balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
-    today_report = DailyCashReport.objects.filter(report_date=today).first()
-
-    # 🔥 MUHIM: USD qoldiqni ALOHIDA hisoblash
-    all_usd_income = CashTransaction.objects.filter(
-        status='COMPLETED', 
-        transaction_type='INCOME', 
-        currency='USD'
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
-    all_usd_expense = CashTransaction.objects.filter(
-        status='COMPLETED', 
-        transaction_type='EXPENSE', 
-        currency='USD'
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    real_usd_balance = all_usd_income - all_usd_expense
-    
-    # 🔥 MUHIM: UZS qoldiqni ALOHIDA hisoblash
-    all_uzs_income = CashTransaction.objects.filter(
-        status='COMPLETED', 
-        transaction_type='INCOME', 
-        currency='UZS'
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    all_uzs_expense = CashTransaction.objects.filter(
-        status='COMPLETED', 
-        transaction_type='EXPENSE', 
-        currency='UZS'
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    # Currency null bo'lgan eski operatsiyalarni UZS ga qo'shamiz
-    null_income = CashTransaction.objects.filter(
-        status='COMPLETED', 
-        transaction_type='INCOME', 
-        currency__isnull=True
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    null_expense = CashTransaction.objects.filter(
-        status='COMPLETED', 
-        transaction_type='EXPENSE', 
-        currency__isnull=True
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    real_uzs_balance = (all_uzs_income + null_income) - (all_uzs_expense + null_expense)
-    
-    # Modelni to'g'irlash
-    balance.cash_balance_usd = real_usd_balance
-    balance.cash_balance = real_uzs_balance
-    balance.save()
-
-    # Bugungi operatsiyalar
+    # FAQAT BUGUNGI operatsiyalarni hisoblang (KUNLIK HISOBOT UCHUN)
     today_usd_income = today_transactions.filter(
         transaction_type='INCOME', currency='USD'
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
@@ -7236,14 +7188,16 @@ def cash_api_stats(request):
     today_uzs_income += today_null_income
     today_uzs_expense += today_null_expense
 
+    # ✅ JORIY QOLDIQNI HECH QACHON QAYTA HISOBLAMANG!
+    # ✅ SHUNCHAKI MODEldan o'qing!
     data = {
         'success': True,
-        # ✅ TO'G'RI QOLDIQLAR
-        'cash_balance_uzs': float(real_uzs_balance),
-        'cash_balance_usd': float(real_usd_balance),
+        # ✅ Modelda saqlangan qoldiqni ishlating
+        'cash_balance_uzs': float(balance.cash_balance),
+        'cash_balance_usd': float(balance.cash_balance_usd),
         'last_updated': balance.last_updated.strftime('%H:%M %d.%m.%Y'),
         
-        # ✅ BUGUNGI MA'LUMOTLAR
+        # Bugungi ma'lumotlar
         'today_income_uzs': float(today_uzs_income),
         'today_income_usd': float(today_usd_income),
         'today_expense_uzs': float(today_uzs_expense),
@@ -7257,12 +7211,10 @@ def cash_api_stats(request):
         'today_income_count': today_transactions.filter(transaction_type='INCOME').count(),
         'today_expense_count': today_transactions.filter(transaction_type='EXPENSE').count(),
         'today': today.strftime('%d.%m.%Y'),
-        'today_report': today_report is not None,
-        'today_report_id': today_report.id if today_report else None,
+        'today_report': DailyCashReport.objects.filter(report_date=today).exists(),
     }
 
     return JsonResponse(data)
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_transactions(request):
@@ -7353,7 +7305,7 @@ def cash_api_transaction_create(request):
         return JsonResponse({'success': False, 'message': "Izoh maydonini to'ldiring!"})
 
     try:
-        # ✅ Tranzaksiyani yaratish
+        # Tranzaksiyani yaratish
         transaction = CashTransaction.objects.create(
             transaction_type=transaction_type,
             category=category,
@@ -7367,30 +7319,37 @@ def cash_api_transaction_create(request):
             transaction_date=timezone.now()
         )
 
-        # ✅ Kassa qoldig'ini yangilash - FAQAT CASH UCHUN!
-        # 🔥 MUHIM: Faqat 'CASH' to'lov usuli kassa qoldig'iga ta'sir qiladi
-        if payment_method == 'CASH':
-            balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
-            if transaction_type == 'INCOME':
-                if currency == 'USD':
-                    balance.cash_balance_usd += amount
-                else:
-                    balance.cash_balance += amount
-            else:  # EXPENSE
-                if currency == 'USD':
-                    balance.cash_balance_usd -= amount
-                else:
-                    balance.cash_balance -= amount
-            balance.updated_by = request.user
-            balance.save()
-            print(f"💰 Naqd pul: {amount} {currency} - kassa qoldig'i yangilandi")
-        else:
-            # Karta, Click, Payme, Bank orqali to'lov - kassa qoldig'iga ta'sir qilmaydi
-            print(f"💳 {payment_method}: {amount} {currency} - kassa qoldig'iga ta'sir qilmaydi")
-
+        # 🔥 MUHIM: BARCHA TO'LOV USULLARI kassa qoldig'iga ta'sir qiladi!
+        # (Naqd pul, Click, Payme, Karta, Bank - hammasi kompaniya daromadi!)
+        balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+        
+        if transaction_type == 'INCOME':
+            if currency == 'USD':
+                balance.cash_balance_usd += amount
+            else:
+                balance.cash_balance += amount
+        else:  # EXPENSE
+            if currency == 'USD':
+                balance.cash_balance_usd -= amount
+            else:
+                balance.cash_balance -= amount
+        
+        balance.updated_by = request.user
+        balance.save()
+        
+        # Qaysi to'lov usuli ekanligini log'ga yozish
+        payment_names = {
+            'CASH': 'Naqd pul',
+            'CARD': 'Plastik karta',
+            'CLICK': 'Click',
+            'PAYME': 'Payme',
+            'BANK': 'Bank pul o\'tkazmasi'
+        }
+        payment_name = payment_names.get(payment_method, payment_method)
+        
         return JsonResponse({
             'success': True,
-            'message': f"✅ Operatsiya muvaffaqiyatli bajarildi! ID: {transaction.transaction_id}",
+            'message': f"✅ {payment_name} orqali {amount:,.2f} {currency} operatsiya bajarildi!",
             'transaction': {
                 'id': transaction.transaction_id,
                 'amount': float(amount),
@@ -7402,7 +7361,6 @@ def cash_api_transaction_create(request):
     except Exception as e:
         print(f"❌ Xatolik: {str(e)}")
         return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'})
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_daily_report_create(request):
