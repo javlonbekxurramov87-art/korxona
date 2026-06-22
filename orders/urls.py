@@ -22,6 +22,17 @@ urlpatterns = [
     path('api/find-material/', views.find_material_by_code_api, name='find_material_api'),
     path('api/save-scanned-transactions/', views.save_scanned_transactions_api, name='save_scanned_transactions_api'),
     
+    # ==================== QARZDORLAR (DEBTS) API ====================
+    path('cash/api/debts/', views.cash_api_debts, name='cash_api_debts'),
+    path('cash/api/debt/create/', views.cash_api_debt_create, name='cash_api_debt_create'),
+    path('cash/api/debt/<str:debt_id>/json/', views.cash_api_debt_json, name='cash_api_debt_json'),
+    path('cash/api/debt/<str:debt_id>/edit/', views.cash_api_debt_edit, name='cash_api_debt_edit'),
+    path('cash/api/debt/<str:debt_id>/delete/', views.cash_api_debt_delete, name='cash_api_debt_delete'),
+    path('cash/api/debt/payment/', views.cash_api_debt_payment, name='cash_api_debt_payment'),
+    path('cash/api/debt-transactions/', views.cash_api_debt_transactions, name='cash_api_debt_transactions'),
+    path('cash/api/debt-transaction/<str:transaction_id>/json/', views.cash_api_debt_transaction_json, name='cash_api_debt_transaction_json'),
+    path('cash/api/debtors-list/', views.cash_api_debtors_list, name='cash_api_debtors_list'),
+    
     # ==================== ASOSIY BOSHQARUV ====================
     path('', views.order_list, name='order_list'),
     path('warehouse/', views.warehouse_dashboard, name='warehouse_dashboard'),
@@ -107,6 +118,8 @@ urlpatterns = [
     path('cash/transaction/create/', views.cash_transaction_create, name='cash_transaction_create'),
     path('cash/transactions/', views.cash_transaction_list, name='cash_transaction_list'),
     path('cash/transaction/<str:transaction_id>/json/', views.cash_transaction_json, name='cash_transaction_json'),
+    path('cash/transaction/<str:transaction_id>/edit/', views.cash_transaction_edit, name='cash_transaction_edit'),
+    path('cash/transaction/<str:transaction_id>/delete/', views.cash_transaction_delete, name='cash_transaction_delete'),
     
     # Kunlik hisobotlar
     path('cash/daily-report/create/', views.daily_report_create, name='daily_report_create'),
@@ -122,9 +135,7 @@ urlpatterns = [
     path('cash/api/transactions/', views.cash_api_transactions, name='cash_api_transactions'),
     path('cash/api/transaction/create/', views.cash_api_transaction_create, name='cash_api_transaction_create'),
     path('cash/api/daily-report/create/', views.cash_api_daily_report_create, name='cash_api_daily_report_create'),
-    # urls.py ga qo'shing
-    path('cash/transaction/<str:transaction_id>/edit/', views.cash_transaction_edit, name='cash_transaction_edit'),
-    path('cash/transaction/<str:transaction_id>/delete/', views.cash_transaction_delete, name='cash_transaction_delete'),
+    
     # Tashqi to'lovlar (Click/Payme)
     path('order/<int:order_id>/payment/click/', views.order_payment_click, name='order_payment_click'),
     path('order/<int:order_id>/payment/payme/', views.order_payment_payme, name='order_payment_payme'),
