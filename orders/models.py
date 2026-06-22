@@ -974,7 +974,61 @@ class DailyCashReport(models.Model):
         self.expected_balance = self.opening_balance + self.total_income - self.total_expense
         self.difference = self.actual_balance - self.expected_balance if self.actual_balance else 0
         return self
+# ==================== QARZDORLAR MODELLARI ====================
 
+class Debt(models.Model):
+    """Qarzdor modeli"""
+    CURRENCY_CHOICES = [
+        ('UZS', "So'm"),
+        ('USD', 'Dollar'),
+    ]
+    
+    debt_id = models.CharField(max_length=20, unique=True, editable=False)
+    full_name = models.CharField(max_length=255, verbose_name="To'liq ism")
+    phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Telefon")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Jami qarz")
+    remaining = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Qolgan qarz")
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='UZS', verbose_name="Valyuta")
+    due_date = models.DateField(verbose_name="Qaytarish muddati")
+    description = models.TextField(blank=True, verbose_name="Izoh")
+    is_active = models.BooleanField(default=True, verbose_name="Faol")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='debts_created')
+    
+    def __str__(self):
+        return f"{self.full_name} - {self.remaining:,.2f} {self.currency}"
+    
+    def save(self, *args, **kwargs):
+        if not self.debt_id:
+            self.debt_id = uuid.uuid4().hex[:12].upper()
+        super().save(*args, **kwargs)
+
+
+class DebtTransaction(models.Model):
+    """Qarz operatsiyalari (qarz berish va qarz to'lash)"""
+    TRANSACTION_TYPES = [
+        ('DEBT_GIVEN', 'Qarz berildi'),
+        ('DEBT_PAID', 'Qarz to\'landi'),
+    ]
+    
+    transaction_id = models.CharField(max_length=20, unique=True, editable=False)
+    debt = models.ForeignKey(Debt, on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    currency = models.CharField(max_length=3, choices=Debt.CURRENCY_CHOICES, default='UZS')
+    remaining_after = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Qolgan qarz")
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    
+    def __str__(self):
+        return f"{self.debt.full_name} - {self.transaction_type} - {self.amount:,.2f}"
+    
+    def save(self, *args, **kwargs):
+        if not self.transaction_id:
+            self.transaction_id = f"DEBT-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
 
 class CashRegisterBalance(models.Model):
     """Joriy kassa qoldig'i"""
