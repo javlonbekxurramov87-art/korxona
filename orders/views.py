@@ -6421,7 +6421,13 @@ def daily_report_list(request):
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def export_cash_report_excel(request):
-    """Kassa hisobotini Excel formatida eksport qilish - USD, UZS, JAMI alohida varaqlar"""
+    """Kassa hisobotini Excel formatida eksport qilish - Barcha to'lov usullari bo'yicha alohida"""
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+    from django.db.models import Sum, Q
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
     
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -6439,17 +6445,29 @@ def export_cash_report_excel(request):
         status='COMPLETED'
     ).order_by('-transaction_date')
     
-    # ============ ALOHIDA AJRATISH ============
+    # ============ VALYUTALAR BO'YICHA ALOHIDA ============
     usd_transactions = all_transactions.filter(currency='USD')
     uzs_transactions = all_transactions.filter(currency='UZS')
     null_transactions = all_transactions.filter(currency__isnull=True)
     
-    # USD hisoblar
+    # ============ USD HISOBLAR ============
     usd_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_net = usd_income - usd_expense
     
-    # UZS hisoblar (null bilan birga)
+    # USD to'lov usullari bo'yicha
+    usd_cash_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_cash_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_card_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_card_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_click_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CLICK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_click_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CLICK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_payme_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_payme_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_bank_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    usd_bank_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    # ============ UZS HISOBLAR (null bilan birga) ============
     uzs_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     uzs_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
@@ -6460,15 +6478,58 @@ def export_cash_report_excel(request):
     total_uzs_expense = uzs_expense + null_expense
     uzs_net = total_uzs_income - total_uzs_expense
     
-    # Jami hisoblar
+    # UZS to'lov usullari bo'yicha
+    uzs_cash_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_cash_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_card_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_card_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_click_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CLICK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_click_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CLICK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_payme_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_payme_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_bank_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    uzs_bank_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    # null bo'lganlarni qo'shamiz
+    null_cash_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_cash_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_card_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_card_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_click_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CLICK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_click_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CLICK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_payme_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_payme_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_bank_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    null_bank_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    # UZS ga null larni qo'shamiz
+    total_uzs_cash_income = uzs_cash_income + null_cash_income
+    total_uzs_cash_expense = uzs_cash_expense + null_cash_expense
+    total_uzs_card_income = uzs_card_income + null_card_income
+    total_uzs_card_expense = uzs_card_expense + null_card_expense
+    total_uzs_click_income = uzs_click_income + null_click_income
+    total_uzs_click_expense = uzs_click_expense + null_click_expense
+    total_uzs_payme_income = uzs_payme_income + null_payme_income
+    total_uzs_payme_expense = uzs_payme_expense + null_payme_expense
+    total_uzs_bank_income = uzs_bank_income + null_bank_income
+    total_uzs_bank_expense = uzs_bank_expense + null_bank_expense
+    
+    # ============ JAMI HISOBLAR ============
     total_income = usd_income + total_uzs_income
     total_expense = usd_expense + total_uzs_expense
     total_net = total_income - total_expense
     
-    # Barcha operatsiyalar soni
-    usd_total_count = usd_transactions.count()
-    uzs_total_count = uzs_transactions.count() + null_transactions.count()
-    all_total_count = all_transactions.count()
+    # Jami to'lov usullari bo'yicha
+    total_cash_income = usd_cash_income + total_uzs_cash_income
+    total_cash_expense = usd_cash_expense + total_uzs_cash_expense
+    total_card_income = usd_card_income + total_uzs_card_income
+    total_card_expense = usd_card_expense + total_uzs_card_expense
+    total_click_income = usd_click_income + total_uzs_click_income
+    total_click_expense = usd_click_expense + total_uzs_click_expense
+    total_payme_income = usd_payme_income + total_uzs_payme_income
+    total_payme_expense = usd_payme_expense + total_uzs_payme_expense
+    total_bank_income = usd_bank_income + total_uzs_bank_income
+    total_bank_expense = usd_bank_expense + total_uzs_bank_expense
     
     # ============ EXCEL FAYL YARATISH ============
     wb = openpyxl.Workbook()
@@ -6477,10 +6538,12 @@ def export_cash_report_excel(request):
     title_font = Font(name='Segoe UI', size=14, bold=True, color='FFFFFF')
     header_font = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
     stats_font = Font(name='Segoe UI', size=12, bold=True)
+    sub_header_font = Font(name='Segoe UI', size=10, bold=True)
     
     usd_header_fill = PatternFill(start_color="B45309", end_color="B45309", fill_type="solid")
     uzs_header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
     total_header_fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
+    payment_header_fill = PatternFill(start_color="6B7280", end_color="6B7280", fill_type="solid")
     
     income_fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
     expense_fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
@@ -6508,17 +6571,17 @@ def export_cash_report_excel(request):
     ws_usd.title = "USD"
     
     # Sarlavha
-    ws_usd.merge_cells('A1:H1')
+    ws_usd.merge_cells('A1:J1')
     ws_usd['A1'] = f"USD (AQSH DOLLARI) OPERATSIYALARI"
     ws_usd['A1'].font = Font(bold=True, size=16, color='B45309')
     ws_usd['A1'].alignment = center_alignment
     
-    ws_usd.merge_cells('A2:H2')
+    ws_usd.merge_cells('A2:J2')
     ws_usd['A2'] = f"Davr: {start_date} - {end_date}"
     ws_usd['A2'].font = Font(size=11, color='666666')
     ws_usd['A2'].alignment = center_alignment
     
-    # Statistika kartalari
+    # Statistika - Kirim/Chiqim
     ws_usd['A4'] = "JAMI KIRIM"
     ws_usd['A4'].font = Font(bold=True, size=10, color='FFFFFF')
     ws_usd['A4'].fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
@@ -6541,26 +6604,87 @@ def export_cash_report_excel(request):
     ws_usd['G4'].alignment = right_alignment
     ws_usd.merge_cells('G4:H4')
     
-    ws_usd['A5'] = "SOF NATIJA"
-    ws_usd['A5'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_usd['A5'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_usd['A5'].alignment = center_alignment
-    ws_usd.merge_cells('A5:B5')
+    ws_usd['I4'] = "SOF NATIJA"
+    ws_usd['I4'].font = Font(bold=True, size=10, color='FFFFFF')
+    ws_usd['I4'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    ws_usd['I4'].alignment = center_alignment
+    ws_usd.merge_cells('I4:J4')
     
     net_color = "10B981" if usd_net >= 0 else "EF4444"
-    ws_usd['C5'] = f"{float(usd_net):,.2f} USD"
-    ws_usd['C5'].font = Font(bold=True, size=12, color=net_color)
-    ws_usd['C5'].alignment = right_alignment
-    ws_usd.merge_cells('C5:H5')
+    ws_usd['K4'] = f"{float(usd_net):,.2f} USD"
+    ws_usd['K4'].font = Font(bold=True, size=12, color=net_color)
+    ws_usd['K4'].alignment = right_alignment
+    ws_usd.merge_cells('K4:L4')
     
-    # Operatsiyalar jadvali
-    row = 7
-    ws_usd.cell(row=row, column=1, value="USD OPERATSIYALARI RO'YXATI")
+    # To'lov usullari bo'yicha statistika
+    row = 6
+    ws_usd.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_usd.cell(row=row, column=1).font = stats_font
-    ws_usd.merge_cells(f'A{row}:H{row}')
+    ws_usd.merge_cells(f'A{row}:L{row}')
     row += 1
     
-    # Header (STICKY uchun freeze panes)
+    payment_headers = ['To\'lov usuli', 'Kirim (USD)', 'Chiqim (USD)', 'Sof (USD)']
+    payment_data = [
+        ('Naqd pul 💵', float(usd_cash_income), float(usd_cash_expense), float(usd_cash_income - usd_cash_expense)),
+        ('Plastik karta 💳', float(usd_card_income), float(usd_card_expense), float(usd_card_income - usd_card_expense)),
+        ('Click 🖱️', float(usd_click_income), float(usd_click_expense), float(usd_click_income - usd_click_expense)),
+        ('Payme 📱', float(usd_payme_income), float(usd_payme_expense), float(usd_payme_income - usd_payme_expense)),
+        ('Bank 🏦', float(usd_bank_income), float(usd_bank_expense), float(usd_bank_income - usd_bank_expense)),
+    ]
+    
+    for col, header in enumerate(payment_headers, 1):
+        cell = ws_usd.cell(row=row, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = payment_header_fill
+        cell.alignment = center_alignment
+        cell.border = thin_border
+    
+    row += 1
+    for idx, (name, inc, exp, net) in enumerate(payment_data):
+        ws_usd.cell(row=row, column=1, value=name)
+        ws_usd.cell(row=row, column=2, value=inc)
+        ws_usd.cell(row=row, column=3, value=exp)
+        ws_usd.cell(row=row, column=4, value=net)
+        
+        if inc > 0:
+            ws_usd.cell(row=row, column=2).fill = income_fill
+        if exp > 0:
+            ws_usd.cell(row=row, column=3).fill = expense_fill
+        ws_usd.cell(row=row, column=4).font = Font(bold=True, color='10B981' if net >= 0 else 'EF4444')
+        
+        for col in range(1, 5):
+            ws_usd.cell(row=row, column=col).border = thin_border
+            if col > 1:
+                ws_usd.cell(row=row, column=col).number_format = money_format
+                ws_usd.cell(row=row, column=col).alignment = right_alignment
+            else:
+                ws_usd.cell(row=row, column=col).alignment = left_alignment
+        row += 1
+    
+    # Jami qator
+    ws_usd.cell(row=row, column=1, value="JAMI")
+    ws_usd.cell(row=row, column=1).font = Font(bold=True)
+    ws_usd.cell(row=row, column=2, value=float(usd_income))
+    ws_usd.cell(row=row, column=3, value=float(usd_expense))
+    ws_usd.cell(row=row, column=4, value=float(usd_net))
+    ws_usd.cell(row=row, column=4).font = Font(bold=True, color='10B981' if usd_net >= 0 else 'EF4444')
+    for col in range(1, 5):
+        ws_usd.cell(row=row, column=col).border = thin_border
+        if col > 1:
+            ws_usd.cell(row=row, column=col).number_format = money_format
+            ws_usd.cell(row=row, column=col).alignment = right_alignment
+        else:
+            ws_usd.cell(row=row, column=col).alignment = center_alignment
+            ws_usd.cell(row=row, column=col).fill = total_bg_fill
+    
+    # Operatsiyalar jadvali
+    row += 2
+    ws_usd.cell(row=row, column=1, value="USD OPERATSIYALARI RO'YXATI")
+    ws_usd.cell(row=row, column=1).font = stats_font
+    ws_usd.merge_cells(f'A{row}:L{row}')
+    row += 1
+    
     headers = ['No', 'Sana', 'Operatsiya ID', 'Tur', "To'lov usuli", 'Summa (USD)', 'Kim oldi/berdi', 'Izoh']
     for col, header in enumerate(headers, 1):
         cell = ws_usd.cell(row=row, column=col)
@@ -6570,11 +6694,9 @@ def export_cash_report_excel(request):
         cell.alignment = center_alignment
         cell.border = thin_border
     
-    # STICKY HEADER - birinchi qatorlarni qotirish
-    ws_usd.freeze_panes = ws_usd['A8']
+    ws_usd.freeze_panes = ws_usd['A' + str(row + 1)]
     
     usd_only = usd_transactions.order_by('-transaction_date')
-    start_row = row + 1
     for idx, trans in enumerate(usd_only, 1):
         row += 1
         ws_usd.cell(row=row, column=1, value=idx)
@@ -6601,21 +6723,12 @@ def export_cash_report_excel(request):
             elif col == 4 or col == 5:
                 ws_usd.cell(row=row, column=col).alignment = center_alignment
     
-    # Jami qator
-    if usd_only.exists():
-        row += 1
-        ws_usd.cell(row=row, column=5, value="JAMI:")
-        ws_usd.cell(row=row, column=5).font = Font(bold=True)
-        ws_usd.cell(row=row, column=6, value=float(usd_income + usd_expense))
-        ws_usd.cell(row=row, column=6).font = Font(bold=True, color='B45309')
-        ws_usd.cell(row=row, column=6).number_format = money_format
-    
     # Ustun kengliklari
     ws_usd.column_dimensions['A'].width = 6
     ws_usd.column_dimensions['B'].width = 18
     ws_usd.column_dimensions['C'].width = 22
     ws_usd.column_dimensions['D'].width = 10
-    ws_usd.column_dimensions['E'].width = 14
+    ws_usd.column_dimensions['E'].width = 16
     ws_usd.column_dimensions['F'].width = 18
     ws_usd.column_dimensions['G'].width = 22
     ws_usd.column_dimensions['H'].width = 50
@@ -6625,17 +6738,17 @@ def export_cash_report_excel(request):
     # ==============================================================
     ws_uzs = wb.create_sheet("UZS")
     
-    ws_uzs.merge_cells('A1:H1')
+    ws_uzs.merge_cells('A1:J1')
     ws_uzs['A1'] = f"UZS (SO'M) OPERATSIYALARI"
     ws_uzs['A1'].font = Font(bold=True, size=16, color='1E40AF')
     ws_uzs['A1'].alignment = center_alignment
     
-    ws_uzs.merge_cells('A2:H2')
+    ws_uzs.merge_cells('A2:J2')
     ws_uzs['A2'] = f"Davr: {start_date} - {end_date}"
     ws_uzs['A2'].font = Font(size=11, color='666666')
     ws_uzs['A2'].alignment = center_alignment
     
-    # Statistika kartalari
+    # Statistika
     ws_uzs['A4'] = "JAMI KIRIM"
     ws_uzs['A4'].font = Font(bold=True, size=10, color='FFFFFF')
     ws_uzs['A4'].fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
@@ -6658,23 +6771,83 @@ def export_cash_report_excel(request):
     ws_uzs['G4'].alignment = right_alignment
     ws_uzs.merge_cells('G4:H4')
     
-    ws_uzs['A5'] = "SOF NATIJA"
-    ws_uzs['A5'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_uzs['A5'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_uzs['A5'].alignment = center_alignment
-    ws_uzs.merge_cells('A5:B5')
+    ws_uzs['I4'] = "SOF NATIJA"
+    ws_uzs['I4'].font = Font(bold=True, size=10, color='FFFFFF')
+    ws_uzs['I4'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    ws_uzs['I4'].alignment = center_alignment
+    ws_uzs.merge_cells('I4:J4')
     
     net_color_uzs = "10B981" if uzs_net >= 0 else "EF4444"
-    ws_uzs['C5'] = f"{float(uzs_net):,.2f} UZS"
-    ws_uzs['C5'].font = Font(bold=True, size=12, color=net_color_uzs)
-    ws_uzs['C5'].alignment = right_alignment
-    ws_uzs.merge_cells('C5:H5')
+    ws_uzs['K4'] = f"{float(uzs_net):,.2f} UZS"
+    ws_uzs['K4'].font = Font(bold=True, size=12, color=net_color_uzs)
+    ws_uzs['K4'].alignment = right_alignment
+    ws_uzs.merge_cells('K4:L4')
+    
+    # To'lov usullari bo'yicha statistika
+    row = 6
+    ws_uzs.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
+    ws_uzs.cell(row=row, column=1).font = stats_font
+    ws_uzs.merge_cells(f'A{row}:L{row}')
+    row += 1
+    
+    for col, header in enumerate(payment_headers, 1):
+        cell = ws_uzs.cell(row=row, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = payment_header_fill
+        cell.alignment = center_alignment
+        cell.border = thin_border
+    
+    uzs_payment_data = [
+        ('Naqd pul 💵', float(total_uzs_cash_income), float(total_uzs_cash_expense), float(total_uzs_cash_income - total_uzs_cash_expense)),
+        ('Plastik karta 💳', float(total_uzs_card_income), float(total_uzs_card_expense), float(total_uzs_card_income - total_uzs_card_expense)),
+        ('Click 🖱️', float(total_uzs_click_income), float(total_uzs_click_expense), float(total_uzs_click_income - total_uzs_click_expense)),
+        ('Payme 📱', float(total_uzs_payme_income), float(total_uzs_payme_expense), float(total_uzs_payme_income - total_uzs_payme_expense)),
+        ('Bank 🏦', float(total_uzs_bank_income), float(total_uzs_bank_expense), float(total_uzs_bank_income - total_uzs_bank_expense)),
+    ]
+    
+    row += 1
+    for idx, (name, inc, exp, net) in enumerate(uzs_payment_data):
+        ws_uzs.cell(row=row, column=1, value=name)
+        ws_uzs.cell(row=row, column=2, value=inc)
+        ws_uzs.cell(row=row, column=3, value=exp)
+        ws_uzs.cell(row=row, column=4, value=net)
+        
+        if inc > 0:
+            ws_uzs.cell(row=row, column=2).fill = income_fill
+        if exp > 0:
+            ws_uzs.cell(row=row, column=3).fill = expense_fill
+        ws_uzs.cell(row=row, column=4).font = Font(bold=True, color='10B981' if net >= 0 else 'EF4444')
+        
+        for col in range(1, 5):
+            ws_uzs.cell(row=row, column=col).border = thin_border
+            if col > 1:
+                ws_uzs.cell(row=row, column=col).number_format = money_format
+                ws_uzs.cell(row=row, column=col).alignment = right_alignment
+            else:
+                ws_uzs.cell(row=row, column=col).alignment = left_alignment
+        row += 1
+    
+    ws_uzs.cell(row=row, column=1, value="JAMI")
+    ws_uzs.cell(row=row, column=1).font = Font(bold=True)
+    ws_uzs.cell(row=row, column=2, value=float(total_uzs_income))
+    ws_uzs.cell(row=row, column=3, value=float(total_uzs_expense))
+    ws_uzs.cell(row=row, column=4, value=float(uzs_net))
+    ws_uzs.cell(row=row, column=4).font = Font(bold=True, color='10B981' if uzs_net >= 0 else 'EF4444')
+    for col in range(1, 5):
+        ws_uzs.cell(row=row, column=col).border = thin_border
+        if col > 1:
+            ws_uzs.cell(row=row, column=col).number_format = money_format
+            ws_uzs.cell(row=row, column=col).alignment = right_alignment
+        else:
+            ws_uzs.cell(row=row, column=col).alignment = center_alignment
+            ws_uzs.cell(row=row, column=col).fill = total_bg_fill
     
     # Operatsiyalar jadvali
-    row = 7
+    row += 2
     ws_uzs.cell(row=row, column=1, value="UZS OPERATSIYALARI RO'YXATI")
     ws_uzs.cell(row=row, column=1).font = stats_font
-    ws_uzs.merge_cells(f'A{row}:H{row}')
+    ws_uzs.merge_cells(f'A{row}:L{row}')
     row += 1
     
     for col, header in enumerate(headers, 1):
@@ -6685,9 +6858,8 @@ def export_cash_report_excel(request):
         cell.alignment = center_alignment
         cell.border = thin_border
     
-    ws_uzs.freeze_panes = ws_uzs['A8']
+    ws_uzs.freeze_panes = ws_uzs['A' + str(row + 1)]
     
-    # UZS va null birlashtirilgan
     uzs_all = list(uzs_transactions) + list(null_transactions)
     uzs_all.sort(key=lambda x: x.transaction_date, reverse=True)
     
@@ -6717,19 +6889,11 @@ def export_cash_report_excel(request):
             elif col == 4 or col == 5:
                 ws_uzs.cell(row=row, column=col).alignment = center_alignment
     
-    if uzs_all:
-        row += 1
-        ws_uzs.cell(row=row, column=5, value="JAMI:")
-        ws_uzs.cell(row=row, column=5).font = Font(bold=True)
-        ws_uzs.cell(row=row, column=6, value=float(total_uzs_income + total_uzs_expense))
-        ws_uzs.cell(row=row, column=6).font = Font(bold=True, color='1E40AF')
-        ws_uzs.cell(row=row, column=6).number_format = money_format
-    
     ws_uzs.column_dimensions['A'].width = 6
     ws_uzs.column_dimensions['B'].width = 18
     ws_uzs.column_dimensions['C'].width = 22
     ws_uzs.column_dimensions['D'].width = 10
-    ws_uzs.column_dimensions['E'].width = 14
+    ws_uzs.column_dimensions['E'].width = 16
     ws_uzs.column_dimensions['F'].width = 18
     ws_uzs.column_dimensions['G'].width = 22
     ws_uzs.column_dimensions['H'].width = 50
@@ -6739,18 +6903,18 @@ def export_cash_report_excel(request):
     # ==============================================================
     ws_total = wb.create_sheet("JAMI")
     
-    ws_total.merge_cells('A1:H1')
+    ws_total.merge_cells('A1:J1')
     ws_total['A1'] = f"UMUMIY HISOBOT"
     ws_total['A1'].font = Font(bold=True, size=16, color='FFFFFF')
     ws_total['A1'].fill = total_header_fill
     ws_total['A1'].alignment = center_alignment
     
-    ws_total.merge_cells('A2:H2')
+    ws_total.merge_cells('A2:J2')
     ws_total['A2'] = f"Davr: {start_date} - {end_date}"
     ws_total['A2'].font = Font(size=11, color='666666')
     ws_total['A2'].alignment = center_alignment
     
-    # Statistika kartalari
+    # Statistika
     ws_total['A4'] = "JAMI KIRIM"
     ws_total['A4'].font = Font(bold=True, size=10, color='FFFFFF')
     ws_total['A4'].fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
@@ -6773,23 +6937,83 @@ def export_cash_report_excel(request):
     ws_total['G4'].alignment = right_alignment
     ws_total.merge_cells('G4:H4')
     
-    ws_total['A5'] = "SOF NATIJA"
-    ws_total['A5'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_total['A5'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_total['A5'].alignment = center_alignment
-    ws_total.merge_cells('A5:B5')
+    ws_total['I4'] = "SOF NATIJA"
+    ws_total['I4'].font = Font(bold=True, size=10, color='FFFFFF')
+    ws_total['I4'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    ws_total['I4'].alignment = center_alignment
+    ws_total.merge_cells('I4:J4')
     
     net_color_total = "10B981" if total_net >= 0 else "EF4444"
-    ws_total['C5'] = f"{float(total_net):,.2f}"
-    ws_total['C5'].font = Font(bold=True, size=12, color=net_color_total)
-    ws_total['C5'].alignment = right_alignment
-    ws_total.merge_cells('C5:H5')
+    ws_total['K4'] = f"{float(total_net):,.2f}"
+    ws_total['K4'].font = Font(bold=True, size=12, color=net_color_total)
+    ws_total['K4'].alignment = right_alignment
+    ws_total.merge_cells('K4:L4')
+    
+    # To'lov usullari bo'yicha statistika
+    row = 6
+    ws_total.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
+    ws_total.cell(row=row, column=1).font = stats_font
+    ws_total.merge_cells(f'A{row}:L{row}')
+    row += 1
+    
+    for col, header in enumerate(payment_headers, 1):
+        cell = ws_total.cell(row=row, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = payment_header_fill
+        cell.alignment = center_alignment
+        cell.border = thin_border
+    
+    total_payment_data = [
+        ('Naqd pul 💵', float(total_cash_income), float(total_cash_expense), float(total_cash_income - total_cash_expense)),
+        ('Plastik karta 💳', float(total_card_income), float(total_card_expense), float(total_card_income - total_card_expense)),
+        ('Click 🖱️', float(total_click_income), float(total_click_expense), float(total_click_income - total_click_expense)),
+        ('Payme 📱', float(total_payme_income), float(total_payme_expense), float(total_payme_income - total_payme_expense)),
+        ('Bank 🏦', float(total_bank_income), float(total_bank_expense), float(total_bank_income - total_bank_expense)),
+    ]
+    
+    row += 1
+    for idx, (name, inc, exp, net) in enumerate(total_payment_data):
+        ws_total.cell(row=row, column=1, value=name)
+        ws_total.cell(row=row, column=2, value=inc)
+        ws_total.cell(row=row, column=3, value=exp)
+        ws_total.cell(row=row, column=4, value=net)
+        
+        if inc > 0:
+            ws_total.cell(row=row, column=2).fill = income_fill
+        if exp > 0:
+            ws_total.cell(row=row, column=3).fill = expense_fill
+        ws_total.cell(row=row, column=4).font = Font(bold=True, color='10B981' if net >= 0 else 'EF4444')
+        
+        for col in range(1, 5):
+            ws_total.cell(row=row, column=col).border = thin_border
+            if col > 1:
+                ws_total.cell(row=row, column=col).number_format = money_format
+                ws_total.cell(row=row, column=col).alignment = right_alignment
+            else:
+                ws_total.cell(row=row, column=col).alignment = left_alignment
+        row += 1
+    
+    ws_total.cell(row=row, column=1, value="JAMI")
+    ws_total.cell(row=row, column=1).font = Font(bold=True)
+    ws_total.cell(row=row, column=2, value=float(total_income))
+    ws_total.cell(row=row, column=3, value=float(total_expense))
+    ws_total.cell(row=row, column=4, value=float(total_net))
+    ws_total.cell(row=row, column=4).font = Font(bold=True, color='10B981' if total_net >= 0 else 'EF4444')
+    for col in range(1, 5):
+        ws_total.cell(row=row, column=col).border = thin_border
+        if col > 1:
+            ws_total.cell(row=row, column=col).number_format = money_format
+            ws_total.cell(row=row, column=col).alignment = right_alignment
+        else:
+            ws_total.cell(row=row, column=col).alignment = center_alignment
+            ws_total.cell(row=row, column=col).fill = total_bg_fill
     
     # Valyutalar bo'yicha taqqoslash
-    row = 7
+    row += 2
     ws_total.cell(row=row, column=1, value="VALYUTALAR BO'YICHA TAQQOSLASH")
     ws_total.cell(row=row, column=1).font = stats_font
-    ws_total.merge_cells(f'A{row}:H{row}')
+    ws_total.merge_cells(f'A{row}:L{row}')
     row += 1
     
     compare_headers = ['Valyuta', 'Jami kirim', 'Jami chiqim', 'Sof natija', 'Operatsiyalar soni']
@@ -6806,7 +7030,7 @@ def export_cash_report_excel(request):
     ws_total.cell(row=row, column=2, value=float(usd_income))
     ws_total.cell(row=row, column=3, value=float(usd_expense))
     ws_total.cell(row=row, column=4, value=float(usd_net))
-    ws_total.cell(row=row, column=5, value=usd_total_count)
+    ws_total.cell(row=row, column=5, value=usd_transactions.count())
     ws_total.cell(row=row, column=1).fill = usd_bg_fill
     
     row += 1
@@ -6814,17 +7038,18 @@ def export_cash_report_excel(request):
     ws_total.cell(row=row, column=2, value=float(total_uzs_income))
     ws_total.cell(row=row, column=3, value=float(total_uzs_expense))
     ws_total.cell(row=row, column=4, value=float(uzs_net))
-    ws_total.cell(row=row, column=5, value=uzs_total_count)
+    ws_total.cell(row=row, column=5, value=uzs_transactions.count() + null_transactions.count())
     ws_total.cell(row=row, column=1).fill = uzs_bg_fill
     
     row += 1
     ws_total.cell(row=row, column=1, value="JAMI")
+    ws_total.cell(row=row, column=1).font = Font(bold=True)
     ws_total.cell(row=row, column=2, value=float(total_income))
     ws_total.cell(row=row, column=3, value=float(total_expense))
     ws_total.cell(row=row, column=4, value=float(total_net))
-    ws_total.cell(row=row, column=5, value=all_total_count)
+    ws_total.cell(row=row, column=5, value=all_transactions.count())
     ws_total.cell(row=row, column=1).fill = total_bg_fill
-    ws_total.cell(row=row, column=1).font = Font(bold=True)
+    ws_total.cell(row=row, column=4).font = Font(bold=True, color='10B981' if total_net >= 0 else 'EF4444')
     
     for r in range(row-2, row+1):
         for col in range(2, 6):
@@ -6833,7 +7058,7 @@ def export_cash_report_excel(request):
         ws_total.cell(row=r, column=1).alignment = center_alignment
     
     # Ustun kengliklari
-    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']:
         ws_total.column_dimensions[col].width = 18
     
     # Faylni yuborish
@@ -6843,7 +7068,6 @@ def export_cash_report_excel(request):
     wb.save(response)
     
     return response
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def order_payment_click(request, order_id):
@@ -7140,7 +7364,6 @@ def daily_report_json(request, pk):
     
     return JsonResponse(data)
 # ==================== KASSA AJAX API ENDPOINTLAR ====================
-# cash_api_stats funksiyasini O'ZGARTIRING:
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_stats(request):
@@ -7156,43 +7379,108 @@ def cash_api_stats(request):
         status='COMPLETED'
     )
 
-    # 🔥 MUHIM: DB dan to'g'ridan-to'g'ri qoldiqni oling, QAYTA HISOBLAMANG!
     balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
     
-    # FAQAT BUGUNGI operatsiyalarni hisoblang (KUNLIK HISOBOT UCHUN)
+    # Bugungi statistika - BARCHA KIRIM/CHIQIM TURLARI UCHUN
     today_usd_income = today_transactions.filter(
-        transaction_type='INCOME', currency='USD'
+        transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], currency='USD'
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
     today_usd_expense = today_transactions.filter(
-        transaction_type='EXPENSE', currency='USD'
+        transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], currency='USD'
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
     today_uzs_income = today_transactions.filter(
-        transaction_type='INCOME', currency='UZS'
+        transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], currency='UZS'
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
     today_uzs_expense = today_transactions.filter(
-        transaction_type='EXPENSE', currency='UZS'
+        transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], currency='UZS'
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
     # Null bo'lganlarni UZS ga qo'shamiz
     today_null_income = today_transactions.filter(
-        transaction_type='INCOME', currency__isnull=True
+        transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], currency__isnull=True
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
     today_null_expense = today_transactions.filter(
-        transaction_type='EXPENSE', currency__isnull=True
+        transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], currency__isnull=True
     ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     
     today_uzs_income += today_null_income
     today_uzs_expense += today_null_expense
 
-    # ✅ JORIY QOLDIQNI HECH QACHON QAYTA HISOBLAMANG!
-    # ✅ SHUNCHAKI MODEldan o'qing!
+    # ✅ TO'LOV USULLARI BO'YICHA STATISTIKA - BARCHA TURLAR UCHUN
+    payment_stats = {
+        # Naqd pul
+        'cash_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'cash_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        
+        # Plastik karta
+        'card_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'card_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CARD'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        
+        # Click
+        'click_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CLICK'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'click_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CLICK'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        
+        # Payme
+        'payme_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='PAYME'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'payme_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        
+        # Bank
+        'bank_income': today_transactions.filter(
+            transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+        'bank_expense': today_transactions.filter(
+            transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK'
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0'),
+    }
+
+    # Qarz statistikasi
+    debt_stats = {
+        'total_usd': Debt.objects.filter(is_active=True, currency='USD').aggregate(Sum('remaining'))['remaining__sum'] or Decimal('0'),
+        'total_uzs': Debt.objects.filter(is_active=True, currency='UZS').aggregate(Sum('remaining'))['remaining__sum'] or Decimal('0'),
+        'count_usd': Debt.objects.filter(is_active=True, currency='USD', remaining__gt=0).count(),
+        'count_uzs': Debt.objects.filter(is_active=True, currency='UZS', remaining__gt=0).count(),
+    }
+
+    # Muddati o'tgan qarzlar
+    overdue_debts = Debt.objects.filter(is_active=True, remaining__gt=0, due_date__lt=today)
+    overdue_list = [
+        {
+            'full_name': d.full_name,
+            'remaining': float(d.remaining),
+            'currency': d.currency,
+            'due_date': d.due_date.strftime('%d.%m.%Y'),
+            'debt_id': str(d.debt_id),
+        }
+        for d in overdue_debts[:10]
+    ]
+
+    # Bugungi hisobot
+    today_report = DailyCashReport.objects.filter(report_date=today).first()
+    expected_balance = float(today_report.expected_balance) if today_report else 0
+    actual_balance = float(today_report.actual_balance) if today_report else 0
+
     data = {
         'success': True,
-        # ✅ Modelda saqlangan qoldiqni ishlating
         'cash_balance_uzs': float(balance.cash_balance),
         'cash_balance_usd': float(balance.cash_balance_usd),
         'last_updated': balance.last_updated.strftime('%H:%M %d.%m.%Y'),
@@ -7208,10 +7496,19 @@ def cash_api_stats(request):
         'net_change': float((today_uzs_income + today_usd_income) - (today_uzs_expense + today_usd_expense)),
         
         'today_count': today_transactions.count(),
-        'today_income_count': today_transactions.filter(transaction_type='INCOME').count(),
-        'today_expense_count': today_transactions.filter(transaction_type='EXPENSE').count(),
+        'today_income_count': today_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).count(),
+        'today_expense_count': today_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).count(),
         'today': today.strftime('%d.%m.%Y'),
-        'today_report': DailyCashReport.objects.filter(report_date=today).exists(),
+        'today_report': today_report is not None,
+        'expected_balance': expected_balance,
+        'actual_balance': actual_balance,
+        
+        # ✅ TO'LOV USULLARI BO'YICHA STATISTIKA
+        'payment_stats': payment_stats,
+        
+        # Qarz statistikasi
+        'debt_stats': debt_stats,
+        'overdue_debts': overdue_list,
     }
 
     return JsonResponse(data)
@@ -7274,13 +7571,13 @@ def cash_api_transactions(request):
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_transaction_create(request):
     """AJAX orqali yangi kassa operatsiyasi yaratish"""
-    from decimal import Decimal
+    from decimal import Decimal, InvalidOperation
     
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': "Faqat POST so'rovi qabul qilinadi"}, status=405)
 
     transaction_type = request.POST.get('transaction_type')
-    amount = request.POST.get('amount')
+    amount_str = request.POST.get('amount', '0')
     customer_name = request.POST.get('customer_name', '').strip()
     description = request.POST.get('description', '').strip()
     currency = request.POST.get('currency', 'UZS')
@@ -7291,12 +7588,14 @@ def cash_api_transaction_create(request):
     if not transaction_type:
         return JsonResponse({'success': False, 'message': "Operatsiya turini tanlang!"})
     
+    # ✅ Decimal ga o'tkazishda xatolikni ushlash
     try:
-        amount = Decimal(amount)
-        if amount <= 0:
-            return JsonResponse({'success': False, 'message': "Summa 0 dan katta bo'lishi kerak!"})
-    except:
-        return JsonResponse({'success': False, 'message': "Summa noto'g'ri formatda!"})
+        amount = Decimal(amount_str)
+    except InvalidOperation:
+        return JsonResponse({'success': False, 'message': "Summa noto'g'ri formatda! Iltimos, son kiriting."})
+    
+    if amount <= 0:
+        return JsonResponse({'success': False, 'message': "Summa 0 dan katta bo'lishi kerak!"})
     
     if not customer_name:
         return JsonResponse({'success': False, 'message': "Kim oldi/berdi maydonini to'ldiring!"})
@@ -7319,23 +7618,22 @@ def cash_api_transaction_create(request):
             transaction_date=timezone.now()
         )
 
-        # 🔥 MUHIM: BARCHA TO'LOV USULLARI kassa qoldig'iga ta'sir qiladi!
-        # (Naqd pul, Click, Payme, Karta, Bank - hammasi kompaniya daromadi!)
+        # FAQAT NAQD PUL kassa balansiga ta'sir qiladi
         balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
         
-        if transaction_type == 'INCOME':
-            if currency == 'USD':
-                balance.cash_balance_usd += amount
-            else:
-                balance.cash_balance += amount
-        else:  # EXPENSE
-            if currency == 'USD':
-                balance.cash_balance_usd -= amount
-            else:
-                balance.cash_balance -= amount
-        
-        balance.updated_by = request.user
-        balance.save()
+        if payment_method == 'CASH':
+            if transaction_type == 'INCOME':
+                if currency == 'USD':
+                    balance.cash_balance_usd += amount
+                else:
+                    balance.cash_balance += amount
+            else:  # EXPENSE
+                if currency == 'USD':
+                    balance.cash_balance_usd -= amount
+                else:
+                    balance.cash_balance -= amount
+            balance.updated_by = request.user
+            balance.save()
         
         # Qaysi to'lov usuli ekanligini log'ga yozish
         payment_names = {
@@ -7361,6 +7659,7 @@ def cash_api_transaction_create(request):
     except Exception as e:
         print(f"❌ Xatolik: {str(e)}")
         return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'})
+
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_daily_report_create(request):
@@ -7604,3 +7903,471 @@ def cash_transaction_delete(request, transaction_id):
         return JsonResponse({'success': False, 'message': 'Operatsiya topilmadi'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+
+# ==================== QARZDORLAR (DEBT) FUNKSIYALARI ====================
+from .models import (
+    Order, Notification, Worker, Customer, 
+    Material, MaterialTransaction, Category,
+    CashTransaction, DailyCashReport, CashRegisterBalance,
+    Debt, DebtTransaction,  # ✅ QARZDORLAR MODELLARI - SHUNI QO'SHING
+)
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debts(request):
+    """AJAX uchun qarzdorlar ro'yxati"""
+    from django.core.paginator import Paginator
+    from django.db.models import Q, Sum
+    
+    page = request.GET.get('page', 1)
+    search = request.GET.get('search', '')
+    status = request.GET.get('status', '')
+    currency = request.GET.get('currency', '')
+    
+    # Qarzdorlarni olish
+    debts = Debt.objects.filter(is_active=True)
+    
+    # Qidiruv
+    if search:
+        debts = debts.filter(
+            Q(full_name__icontains=search) |
+            Q(phone__icontains=search)
+        )
+    
+    # Valyuta filtri
+    if currency:
+        debts = debts.filter(currency=currency)
+    
+    # Holat filtri
+    today = timezone.now().date()
+    if status == 'active':
+        debts = debts.filter(remaining__gt=0, due_date__gte=today)
+    elif status == 'overdue':
+        debts = debts.filter(remaining__gt=0, due_date__lt=today)
+    elif status == 'paid':
+        debts = debts.filter(remaining=0)
+    
+    # Pagination
+    paginator = Paginator(debts.order_by('-created_at'), 50)
+    page_obj = paginator.get_page(page)
+    
+    data = {
+        'success': True,
+        'debts': [
+            {
+                'debt_id': str(d.debt_id),
+                'full_name': d.full_name,
+                'phone': d.phone or '',
+                'amount': float(d.amount),
+                'remaining': float(d.remaining),
+                'currency': d.currency,
+                'due_date': d.due_date.strftime('%Y-%m-%d') if d.due_date else None,
+                'description': d.description or '',
+                'created_at': d.created_at.strftime('%d.%m.%Y'),
+                'is_overdue': d.due_date and d.due_date < today and d.remaining > 0,
+            }
+            for d in page_obj
+        ],
+        'total': paginator.count,
+        'total_pages': paginator.num_pages,
+        'current_page': page_obj.number,
+        'has_previous': page_obj.has_previous(),
+        'has_next': page_obj.has_next(),
+        'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+        'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+    }
+    
+    return JsonResponse(data)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_create(request):
+    """AJAX orqali yangi qarzdor qo'shish"""
+    from decimal import Decimal
+    import uuid
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Faqat POST so\'rovi qabul qilinadi'}, status=405)
+    
+    full_name = request.POST.get('full_name', '').strip()
+    phone = request.POST.get('phone', '').strip()
+    amount = request.POST.get('amount', '0')
+    currency = request.POST.get('currency', 'UZS')
+    due_date = request.POST.get('due_date')
+    description = request.POST.get('description', '').strip()
+    
+    # Validatsiya
+    if not full_name:
+        return JsonResponse({'success': False, 'message': "To'liq ism majburiy!"})
+    
+    try:
+        amount = Decimal(amount)
+        if amount <= 0:
+            return JsonResponse({'success': False, 'message': "Qarz summasi 0 dan katta bo'lishi kerak!"})
+    except:
+        return JsonResponse({'success': False, 'message': "Summa noto'g'ri formatda!"})
+    
+    if not due_date:
+        return JsonResponse({'success': False, 'message': "Qaytarish muddati majburiy!"})
+    
+    try:
+        due_date = timezone.datetime.strptime(due_date, '%Y-%m-%d').date()
+    except:
+        return JsonResponse({'success': False, 'message': "Sana noto'g'ri formatda!"})
+    
+    # Qarzdorni yaratish
+    debt = Debt.objects.create(
+        debt_id=uuid.uuid4().hex[:12].upper(),
+        full_name=full_name,
+        phone=phone or None,
+        amount=amount,
+        remaining=amount,  # Dastlab qolgan qarz = jami qarz
+        currency=currency,
+        due_date=due_date,
+        description=description,
+        created_by=request.user
+    )
+    
+    # 🔥 Kassa qoldig'idan chiqim (qarz berilgan)
+    balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+    
+    if currency == 'USD':
+        balance.cash_balance_usd -= amount
+    else:
+        balance.cash_balance -= amount
+    
+    balance.updated_by = request.user
+    balance.save()
+    
+    # 🔥 Qarz operatsiyasini yozish
+    DebtTransaction.objects.create(
+        debt=debt,
+        transaction_type='DEBT_GIVEN',
+        amount=amount,
+        currency=currency,
+        remaining_after=amount,
+        description=f"{full_name} ga qarz berildi - {description}" if description else f"{full_name} ga qarz berildi",
+        created_by=request.user
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'message': f"✅ {full_name} ga {amount:,.2f} {currency} qarz berildi!",
+        'debt': {
+            'id': str(debt.debt_id),
+            'full_name': debt.full_name,
+            'amount': float(debt.amount),
+            'remaining': float(debt.remaining),
+            'currency': debt.currency,
+            'due_date': debt.due_date.strftime('%Y-%m-%d'),
+        }
+    })
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_json(request, debt_id):
+    """Qarzdor ma'lumotlarini JSON qaytarish"""
+    try:
+        debt = Debt.objects.get(debt_id=debt_id, is_active=True)
+        
+        today = timezone.now().date()
+        is_overdue = debt.due_date and debt.due_date < today and debt.remaining > 0
+        
+        data = {
+            'success': True,
+            'debt_id': str(debt.debt_id),
+            'full_name': debt.full_name,
+            'phone': debt.phone or '',
+            'amount': float(debt.amount),
+            'remaining': float(debt.remaining),
+            'currency': debt.currency,
+            'due_date': debt.due_date.strftime('%Y-%m-%d') if debt.due_date else None,
+            'description': debt.description or '',
+            'created_at': debt.created_at.strftime('%d.%m.%Y %H:%M'),
+            'is_overdue': is_overdue,
+            'paid_amount': float(debt.amount - debt.remaining),
+        }
+        return JsonResponse(data)
+        
+    except Debt.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Qarzdor topilmadi'}, status=404)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_edit(request, debt_id):
+    """Qarzdor ma'lumotlarini tahrirlash"""
+    from decimal import Decimal
+    
+    try:
+        debt = Debt.objects.get(debt_id=debt_id, is_active=True)
+    except Debt.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Qarzdor topilmadi'}, status=404)
+    
+    if request.method == 'POST':
+        full_name = request.POST.get('full_name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        amount = request.POST.get('amount', '0')
+        currency = request.POST.get('currency', 'UZS')
+        due_date = request.POST.get('due_date')
+        description = request.POST.get('description', '').strip()
+        
+        if not full_name:
+            return JsonResponse({'success': False, 'message': "To'liq ism majburiy!"})
+        
+        try:
+            new_amount = Decimal(amount)
+            if new_amount <= 0:
+                return JsonResponse({'success': False, 'message': "Qarz summasi 0 dan katta bo'lishi kerak!"})
+        except:
+            return JsonResponse({'success': False, 'message': "Summa noto'g'ri formatda!"})
+        
+        if not due_date:
+            return JsonResponse({'success': False, 'message': "Qaytarish muddati majburiy!"})
+        
+        try:
+            new_due_date = timezone.datetime.strptime(due_date, '%Y-%m-%d').date()
+        except:
+            return JsonResponse({'success': False, 'message': "Sana noto'g'ri formatda!"})
+        
+        # 🔥 Qarz summasini o'zgartirganda kassa balansini yangilash
+        old_amount = debt.amount
+        balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+        
+        if old_amount != new_amount:
+            difference = new_amount - old_amount
+            if debt.currency == 'USD':
+                balance.cash_balance_usd -= difference
+            else:
+                balance.cash_balance -= difference
+            balance.updated_by = request.user
+            balance.save()
+        
+        # Qarzdorni yangilash
+        debt.full_name = full_name
+        debt.phone = phone or None
+        debt.amount = new_amount
+        debt.currency = currency
+        debt.due_date = new_due_date
+        debt.description = description
+        debt.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"✅ {full_name} ma'lumotlari yangilandi!"
+        })
+    
+    # GET so'rovi uchun ma'lumotlarni qaytarish
+    data = {
+        'success': True,
+        'full_name': debt.full_name,
+        'phone': debt.phone or '',
+        'amount': float(debt.amount),
+        'currency': debt.currency,
+        'due_date': debt.due_date.strftime('%Y-%m-%d') if debt.due_date else None,
+        'description': debt.description or '',
+    }
+    return JsonResponse(data)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_delete(request, debt_id):
+    """Qarzdorni o'chirish (faqat qolgan qarz 0 bo'lsa)"""
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Method not allowed'}, status=405)
+    
+    try:
+        debt = Debt.objects.get(debt_id=debt_id, is_active=True)
+        
+        if debt.remaining > 0:
+            return JsonResponse({
+                'success': False,
+                'message': f"Bu qarzdorning hali {debt.remaining:,.2f} {debt.currency} qarzi bor! Avval to'lashing kerak."
+            })
+        
+        debt.is_active = False
+        debt.save()
+        
+        return JsonResponse({'success': True, 'message': 'Qarzdor o\'chirildi'})
+        
+    except Debt.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Qarzdor topilmadi'}, status=404)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_payment(request):
+    """Qarz to'lovini qabul qilish - AJAX"""
+    from decimal import Decimal
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Faqat POST so\'rovi qabul qilinadi'}, status=405)
+    
+    debt_id = request.POST.get('debt_id')
+    amount = request.POST.get('amount', '0')
+    payment_method = request.POST.get('payment_method', 'CASH')
+    description = request.POST.get('description', '').strip()
+    
+    if not debt_id:
+        return JsonResponse({'success': False, 'message': 'Qarzdor ID si majburiy!'})
+    
+    try:
+        debt = Debt.objects.get(debt_id=debt_id, is_active=True)
+    except Debt.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Qarzdor topilmadi'}, status=404)
+    
+    try:
+        amount = Decimal(amount)
+        if amount <= 0:
+            return JsonResponse({'success': False, 'message': "To'lov summasi 0 dan katta bo'lishi kerak!"})
+    except:
+        return JsonResponse({'success': False, 'message': "Summa noto'g'ri formatda!"})
+    
+    if amount > debt.remaining:
+        return JsonResponse({
+            'success': False,
+            'message': f"To'lov summasi qolgan qarzdan ({debt.remaining:,.2f}) ko'p bo'lishi mumkin emas!"
+        })
+    
+    # 🔥 Kassa qoldig'iga kirim (qarz to'landi)
+    balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+    
+    if debt.currency == 'USD':
+        balance.cash_balance_usd += amount
+    else:
+        balance.cash_balance += amount
+    
+    balance.updated_by = request.user
+    balance.save()
+    
+    # Qolgan qarzni hisoblash
+    old_remaining = debt.remaining
+    debt.remaining -= amount
+    debt.save()
+    
+    # 🔥 Qarz operatsiyasini yozish
+    payment_names = {
+        'CASH': 'Naqd pul',
+        'CARD': 'Plastik karta',
+        'CLICK': 'Click',
+        'PAYME': 'Payme',
+        'BANK': 'Bank'
+    }
+    payment_name = payment_names.get(payment_method, 'Naqd pul')
+    
+    transaction = DebtTransaction.objects.create(
+        debt=debt,
+        transaction_type='DEBT_PAID',
+        amount=amount,
+        currency=debt.currency,
+        remaining_after=debt.remaining,
+        description=f"{debt.full_name} dan qarz to'lovi - {payment_name} orqali. {description}" if description else f"{debt.full_name} dan qarz to'lovi - {payment_name} orqali",
+        created_by=request.user
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'message': f"✅ {debt.full_name} dan {amount:,.2f} {debt.currency} qarz to'lovi qabul qilindi! Qolgan qarz: {debt.remaining:,.2f}",
+        'remaining': float(debt.remaining),
+        'is_paid': debt.remaining == 0
+    })
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_transactions(request):
+    """Qarz operatsiyalari ro'yxati - AJAX"""
+    from django.core.paginator import Paginator
+    
+    page = request.GET.get('page', 1)
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    debtor_id = request.GET.get('debtor')
+    
+    transactions = DebtTransaction.objects.all().order_by('-created_at')
+    
+    if start_date:
+        transactions = transactions.filter(created_at__date__gte=start_date)
+    if end_date:
+        transactions = transactions.filter(created_at__date__lte=end_date)
+    if debtor_id:
+        transactions = transactions.filter(debt__debt_id=debtor_id)
+    
+    paginator = Paginator(transactions, 50)
+    page_obj = paginator.get_page(page)
+    
+    data = {
+        'success': True,
+        'transactions': [
+            {
+                'transaction_id': str(t.transaction_id),
+                'date': t.created_at.strftime('%d.%m.%Y %H:%M'),
+                'debtor_name': t.debt.full_name,
+                'type': t.transaction_type,
+                'currency': t.currency,
+                'amount': float(t.amount),
+                'remaining_after': float(t.remaining_after),
+                'description': t.description or '',
+            }
+            for t in page_obj
+        ],
+        'total': paginator.count,
+        'total_pages': paginator.num_pages,
+        'current_page': page_obj.number,
+        'has_previous': page_obj.has_previous(),
+        'has_next': page_obj.has_next(),
+        'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+        'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+    }
+    
+    return JsonResponse(data)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debt_transaction_json(request, transaction_id):
+    """Qarz operatsiyasi tafsilotlarini JSON qaytarish"""
+    from django.shortcuts import get_object_or_404
+    
+    transaction = get_object_or_404(DebtTransaction, transaction_id=transaction_id)
+    
+    data = {
+        'success': True,
+        'transaction_id': str(transaction.transaction_id),
+        'date': transaction.created_at.strftime('%d.%m.%Y %H:%M'),
+        'debtor_name': transaction.debt.full_name,
+        'type': transaction.transaction_type,
+        'currency': transaction.currency,
+        'amount': float(transaction.amount),
+        'remaining_after': float(transaction.remaining_after),
+        'description': transaction.description or '',
+        'debt_id': str(transaction.debt.debt_id),
+    }
+    
+    return JsonResponse(data)
+
+
+@login_required
+@user_passes_test(is_cashier, login_url='/login/')
+def cash_api_debtors_list(request):
+    """Select uchun qarzdorlar ro'yxati (faol qarzi borlar)"""
+    debts = Debt.objects.filter(is_active=True, remaining__gt=0).order_by('full_name')
+    
+    data = {
+        'success': True,
+        'debtors': [
+            {
+                'debt_id': str(d.debt_id),
+                'full_name': d.full_name,
+                'remaining': float(d.remaining),
+                'currency': d.currency,
+            }
+            for d in debts
+        ]
+    }
+    
+    return JsonResponse(data)
