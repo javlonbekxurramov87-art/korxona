@@ -15,12 +15,14 @@
         .container-premium { max-width: 1600px; margin: 0 auto; padding: 24px; }
 
         .stat-card {
-            background: white; border-radius: 24px; padding: 24px;
+            background: white; border-radius: 24px; padding: 20px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: 1px solid #eef2f6; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            height: 100%;
         }
         .stat-card:hover { transform: translateY(-4px); box-shadow: 0 20px 35px -12px rgba(0,0,0,0.1); border-color: transparent; }
-        .stat-icon { width: 56px; height: 56px; border-radius: 18px; display: flex; align-items: center; justify-content: center; }
+        .stat-icon { width: 48px; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .stat-icon-sm { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         .btn-primary-premium { background: #1a73e8; color: white; border: none; padding: 12px 28px; border-radius: 14px; font-weight: 600; font-size: 14px; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
         .btn-primary-premium:hover { background: #1557b0; transform: translateY(-1px); color: white; }
@@ -31,19 +33,31 @@
         .btn-success-premium { background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; width: 100%; justify-content: center; }
         .btn-success-premium:hover { background: #059669; transform: translateY(-1px); }
 
+        .btn-danger-premium { background: #ef4444; color: white; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+        .btn-danger-premium:hover { background: #dc2626; transform: translateY(-1px); }
+
         .table-premium { background: white; border-radius: 20px; overflow: hidden; border: 1px solid #eef2f6; }
         .table-premium thead { background: #f8fafc; }
-        .table-premium thead th { padding: 16px 20px; font-weight: 600; font-size: 13px; color: #64748b; border-bottom: 1px solid #eef2f6; }
-        .table-premium tbody td { padding: 16px 20px; font-size: 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .table-premium thead th { padding: 14px 16px; font-weight: 600; font-size: 12px; color: #64748b; border-bottom: 1px solid #eef2f6; }
+        .table-premium tbody td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .table-premium tbody tr:hover { background: #fafcff; }
         .table-premium tbody tr:last-child td { border-bottom: none; }
 
-        .badge-income { background: #d1fae5; color: #065f46; padding: 6px 12px; border-radius: 40px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-        .badge-expense { background: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 40px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-        .currency-usd { background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 30px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
-        .currency-uzs { background: #dbeafe; color: #1e40af; padding: 4px 10px; border-radius: 30px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-income { background: #d1fae5; color: #065f46; padding: 5px 12px; border-radius: 40px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .badge-expense { background: #fee2e2; color: #991b1b; padding: 5px 12px; border-radius: 40px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .badge-debt { background: #fef3c7; color: #92400e; padding: 5px 12px; border-radius: 40px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .badge-paid { background: #d1fae5; color: #065f46; padding: 5px 12px; border-radius: 40px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .badge-overdue { background: #fee2e2; color: #991b1b; padding: 5px 12px; border-radius: 40px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; animation: pulse 2s infinite; }
 
-        .payment-badge { padding: 4px 10px; border-radius: 30px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .currency-usd { background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 30px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+        .currency-uzs { background: #dbeafe; color: #1e40af; padding: 3px 10px; border-radius: 30px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+
+        .payment-badge { padding: 3px 10px; border-radius: 30px; font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
         .payment-cash { background: #e0f2fe; color: #0369a1; }
         .payment-card { background: #f3e8ff; color: #6b21a5; }
         .payment-click { background: #fef3c7; color: #b45309; }
@@ -72,19 +86,33 @@
         .spinner { width: 45px; height: 45px; border: 3px solid #e2e8f0; border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .svg-icon { width: 22px; height: 22px; stroke-width: 1.5; stroke: currentColor; fill: none; }
-        .svg-icon-fill { width: 22px; height: 22px; fill: currentColor; }
+        .svg-icon { width: 20px; height: 20px; stroke-width: 1.5; stroke: currentColor; fill: none; }
+        .svg-icon-fill { width: 20px; height: 20px; fill: currentColor; }
+        .svg-icon-sm { width: 16px; height: 16px; stroke-width: 2; stroke: currentColor; fill: none; }
+
+        .nav-tabs-custom { border-bottom: 2px solid #eef2f6; margin-bottom: 24px; }
+        .nav-tabs-custom .nav-link { border: none; padding: 12px 24px; font-weight: 600; color: #64748b; border-radius: 0; border-bottom: 3px solid transparent; }
+        .nav-tabs-custom .nav-link.active { color: #1a73e8; border-bottom-color: #1a73e8; background: transparent; }
+        .nav-tabs-custom .nav-link:hover { border-bottom-color: #1a73e8; color: #1a73e8; }
+
+        .stat-group { background: #f8fafc; border-radius: 16px; padding: 16px; }
+        .stat-group .stat-item { padding: 8px 0; border-bottom: 1px solid #eef2f6; }
+        .stat-group .stat-item:last-child { border-bottom: none; }
 
         @media (max-width: 768px) {
             .container-premium { padding: 16px; }
             .stat-card { padding: 16px; }
-            .table-premium thead th { padding: 12px; font-size: 11px; }
-            .table-premium tbody td { padding: 12px; font-size: 12px; }
+            .table-premium thead th { padding: 10px; font-size: 10px; }
+            .table-premium tbody td { padding: 10px; font-size: 11px; }
             .type-selector { flex-direction: column; }
         }
 
         .text-success { color: #10b981 !important; }
         .text-danger { color: #ef4444 !important; }
+        .text-warning { color: #f59e0b !important; }
+        .text-muted-dark { color: #64748b !important; }
+        .fs-small { font-size: 12px; }
+        .fw-500 { font-weight: 500; }
     </style>
 </head>
 <body>
@@ -102,12 +130,16 @@
                 </svg>
                 Kassa Boshqaruvi
             </h1>
-            <p class="text-muted mb-0" style="font-size: 14px;">Kirim va chiqim operatsiyalari | USD / UZS</p>
+            <p class="text-muted mb-0" style="font-size: 14px;">Kirim va chiqim operatsiyalari | Qarzdorlar boshqaruvi</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <button class="btn-primary-premium" data-bs-toggle="modal" data-bs-target="#transactionModal">
                 <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-linecap="round"/></svg>
                 Yangi operatsiya
+            </button>
+            <button class="btn-danger-premium" data-bs-toggle="modal" data-bs-target="#debtModal">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                Qarzdor qo'shish
             </button>
             <button class="btn-outline-premium" data-bs-toggle="modal" data-bs-target="#reportModal">
                 <svg class="svg-icon" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16M7 16l4-4 4 4 5-6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -120,51 +152,346 @@
                 </svg>
                 Excel export
             </button>
+            <button class="btn-outline-premium" onclick="loadStats()">
+                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 4v16h16" stroke="currentColor" stroke-linecap="round"/><path d="M8 16l3-4 4 4 5-7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Yangilash
+            </button>
         </div>
     </div>
 
     <!-- Statistics Cards -->
-    <div class="row g-4 mb-4">
-        <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="d-flex justify-content-between align-items-start"><div><p class="text-muted mb-1" style="font-size:13px;font-weight:500;">Jami qoldiq (USD)</p><h2 class="fw-bold mb-0" id="totalBalanceUsd" style="font-size:26px;color:#0f172a;">0 USD</h2><span class="currency-usd mt-2 d-inline-flex"><svg class="svg-icon" style="width:12px;height:12px;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg> AQSH dollari</span></div><div class="stat-icon" style="background:#fef3c7;"><svg class="svg-icon" style="width:28px;height:28px;color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg></div></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="d-flex justify-content-between align-items-start"><div><p class="text-muted mb-1" style="font-size:13px;font-weight:500;">Jami qoldiq (UZS)</p><h2 class="fw-bold mb-0" id="totalBalanceUzs" style="font-size:26px;color:#0f172a;">0 so'm</h2><span class="currency-uzs mt-2 d-inline-flex"><svg class="svg-icon" style="width:12px;height:12px;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg> so'm</span></div><div class="stat-icon" style="background:#dbeafe;"><svg class="svg-icon" style="width:28px;height:28px;color:#2563eb;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 6v6l4 2" stroke="currentColor" fill="none"/></svg></div></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="d-flex justify-content-between align-items-start"><div><p class="text-muted mb-1" style="font-size:13px;">Bugungi kirim</p><h3 class="fw-bold text-success mb-1" id="todayIncome" style="font-size:18px;">0</h3><small class="text-muted" id="todayIncomeDetail">USD: 0 | UZS: 0</small></div><div class="stat-icon" style="background:#d1fae5;"><svg class="svg-icon" style="width:28px;height:28px;color:#059669;" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-linecap="round"/><path d="M12 19l-4-4M12 19l4-4" stroke="currentColor" stroke-linecap="round"/></svg></div></div></div></div>
-        <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="d-flex justify-content-between align-items-start"><div><p class="text-muted mb-1" style="font-size:13px;">Bugungi chiqim</p><h3 class="fw-bold text-danger mb-1" id="todayExpense" style="font-size:18px;">0</h3><small class="text-muted" id="todayExpenseDetail">USD: 0 | UZS: 0</small></div><div class="stat-icon" style="background:#fee2e2;"><svg class="svg-icon" style="width:28px;height:28px;color:#dc2626;" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-linecap="round"/><path d="M12 5l-4 4M12 5l4 4" stroke="currentColor" stroke-linecap="round"/></svg></div></div></div></div>
-    </div>
-
-    <!-- Report Alert -->
-    <div id="reportAlert" class="mb-4"></div>
-
-    <!-- Filter Bar -->
-    <div class="filter-bar">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Boshlanish sanasi</label><input type="date" id="filter_start" class="form-control-premium"></div>
-            <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Tugash sanasi</label><input type="date" id="filter_end" class="form-control-premium"></div>
-            <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Operatsiya turi</label><select id="filter_type" class="form-control-premium"><option value="">Barchasi</option><option value="INCOME">Kirim</option><option value="EXPENSE">Chiqim</option></select></div>
-            <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Valyuta</label><select id="filter_currency" class="form-control-premium"><option value="">Barchasi</option><option value="USD">USD</option><option value="UZS">UZS</option></select></div>
-            <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">To'lov usuli</label><select id="filter_payment" class="form-control-premium"><option value="">Barchasi</option><option value="CASH">Naqd pul</option><option value="CARD">Plastik karta</option><option value="CLICK">Click</option><option value="PAYME">Payme</option><option value="BANK">Bank</option></select></div>
-            <div class="col-md-2"><button class="btn-primary-premium w-100 justify-content-center" onclick="loadTransactions()"><svg class="svg-icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" fill="none"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-linecap="round"/></svg> Qidirish</button></div>
-        </div>
-    </div>
-
-    <!-- Transactions Table -->
-    <div class="table-premium">
-        <div class="p-4 border-bottom bg-white">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="fw-bold mb-0" style="font-size:16px;"><svg class="svg-icon me-2" style="color:#1a73e8;" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" fill="none"/><path d="M16 2v4M8 2v4" stroke="currentColor" stroke-linecap="round"/><path d="M3 10h18" stroke="currentColor" stroke-linecap="round"/></svg> Kassa operatsiyalari</h5>
-                <span class="badge bg-secondary bg-opacity-10 text-dark px-3 py-2 rounded-pill" id="totalCount">0 ta operatsiya</span>
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:12px;font-weight:500;">Jami qoldiq (USD)</p>
+                        <h3 class="fw-bold mb-0" id="totalBalanceUsd" style="font-size:24px;color:#0f172a;">0 USD</h3>
+                        <span class="currency-usd mt-1 d-inline-flex" style="font-size:10px;">AQSH dollari</span>
+                    </div>
+                    <div class="stat-icon" style="background:#fef3c7;">
+                        <svg class="svg-icon" style="width:24px;height:24px;color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-premium mb-0">
-                <thead>
-                    <tr><th>#</th><th>Sana</th><th>Tur</th><th>Valyuta</th><th>To'lov usuli</th><th class="text-end">Summa</th><th>Kim oldi/berdi</th><th>Izoh</th><th></th></tr>
-                </thead>
-                <tbody id="transactionsTableBody">
-                    <tr><td colspan="9" class="text-center py-5"><div class="spinner" style="width:35px;height:35px;margin:0 auto;"></div><p class="mt-3 text-muted">Yuklanmoqda...</p></td></tr>
-                </tbody>
-            </table>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:12px;font-weight:500;">Jami qoldiq (UZS)</p>
+                        <h3 class="fw-bold mb-0" id="totalBalanceUzs" style="font-size:24px;color:#0f172a;">0 so'm</h3>
+                        <span class="currency-uzs mt-1 d-inline-flex" style="font-size:10px;">so'm</span>
+                    </div>
+                    <div class="stat-icon" style="background:#dbeafe;">
+                        <svg class="svg-icon" style="width:24px;height:24px;color:#2563eb;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 6v6l4 2" stroke="currentColor" fill="none"/></svg>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="paginationContainer" class="p-4 bg-white border-top"></div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:12px;font-weight:500;">Bugungi USD</p>
+                        <div class="d-flex gap-3 mt-1">
+                            <div>
+                                <span class="text-success fw-bold" id="todayIncomeUsd">+0</span>
+                                <span class="text-muted-dark fs-small d-block">Kirim</span>
+                            </div>
+                            <div>
+                                <span class="text-danger fw-bold" id="todayExpenseUsd">-0</span>
+                                <span class="text-muted-dark fs-small d-block">Chiqim</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-icon" style="background:#fef3c7;">
+                        <svg class="svg-icon" style="width:24px;height:24px;color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:12px;font-weight:500;">Bugungi UZS</p>
+                        <div class="d-flex gap-3 mt-1">
+                            <div>
+                                <span class="text-success fw-bold" id="todayIncomeUzs">+0</span>
+                                <span class="text-muted-dark fs-small d-block">Kirim</span>
+                            </div>
+                            <div>
+                                <span class="text-danger fw-bold" id="todayExpenseUzs">-0</span>
+                                <span class="text-muted-dark fs-small d-block">Chiqim</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-icon" style="background:#dbeafe;">
+                        <svg class="svg-icon" style="width:24px;height:24px;color:#2563eb;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 6v6l4 2" stroke="currentColor" fill="none"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- To'lov usullari bo'yicha statistika -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0" style="font-size:14px;">
+                        <svg class="svg-icon me-2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" fill="none"/><path d="M16 2v4M8 2v4" stroke="currentColor" stroke-linecap="round"/><path d="M3 10h18" stroke="currentColor" stroke-linecap="round"/></svg>
+                        To'lov usullari bo'yicha bugungi statistika
+                    </h6>
+                    <span class="text-muted-dark fs-small">Faqat Naqd pul kassa balansiga ta'sir qiladi</span>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-2 col-6">
+                        <div class="stat-group" style="background:#e0f2fe;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="stat-icon-sm" style="background:#0284c1;color:white;">
+                                    <svg class="svg-icon-sm" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                                </div>
+                                <div>
+                                    <div class="fw-bold" style="font-size:13px;">Naqd pul</div>
+                                    <div class="d-flex gap-2 fs-small">
+                                        <span class="text-success" id="cashIncome">+0</span>
+                                        <span class="text-danger" id="cashExpense">-0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-group" style="background:#f3e8ff;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="stat-icon-sm" style="background:#6b21a5;color:white;">
+                                    <svg class="svg-icon-sm" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" fill="none"/><path d="M3 10h18" stroke="currentColor" stroke-linecap="round"/></svg>
+                                </div>
+                                <div>
+                                    <div class="fw-bold" style="font-size:13px;">Karta</div>
+                                    <div class="d-flex gap-2 fs-small">
+                                        <span class="text-success" id="cardIncome">+0</span>
+                                        <span class="text-danger" id="cardExpense">-0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-group" style="background:#fef3c7;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="stat-icon-sm" style="background:#b45309;color:white;">
+                                    <svg class="svg-icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4l3 3" stroke="currentColor" stroke-linecap="round"/></svg>
+                                </div>
+                                <div>
+                                    <div class="fw-bold" style="font-size:13px;">Click</div>
+                                    <div class="d-flex gap-2 fs-small">
+                                        <span class="text-success" id="clickIncome">+0</span>
+                                        <span class="text-danger" id="clickExpense">-0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-group" style="background:#dbeafe;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="stat-icon-sm" style="background:#1e40af;color:white;">
+                                    <svg class="svg-icon-sm" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" fill="none"/><path d="M8 12h8" stroke="currentColor" stroke-linecap="round"/><path d="M12 8v8" stroke="currentColor" stroke-linecap="round"/></svg>
+                                </div>
+                                <div>
+                                    <div class="fw-bold" style="font-size:13px;">Payme</div>
+                                    <div class="d-flex gap-2 fs-small">
+                                        <span class="text-success" id="paymeIncome">+0</span>
+                                        <span class="text-danger" id="paymeExpense">-0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-group" style="background:#dcfce7;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="stat-icon-sm" style="background:#166534;color:white;">
+                                    <svg class="svg-icon-sm" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="1" stroke="currentColor" fill="none"/><path d="M12 2v6M8 6l4-4 4 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div>
+                                    <div class="fw-bold" style="font-size:13px;">Bank</div>
+                                    <div class="d-flex gap-2 fs-small">
+                                        <span class="text-success" id="bankIncome">+0</span>
+                                        <span class="text-danger" id="bankExpense">-0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-group" style="background:#fef3c7;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="stat-icon-sm" style="background:#d97706;color:white;">
+                                    <svg class="svg-icon-sm" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                                </div>
+                                <div>
+                                    <div class="fw-bold" style="font-size:13px;">Qarzlar</div>
+                                    <div class="d-flex gap-2 fs-small">
+                                        <span class="text-warning" id="debtTotal">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Qarzlar statistikasi -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:12px;font-weight:500;">Jami qarz (USD)</p>
+                        <h4 class="fw-bold text-warning mb-1" id="totalDebtUsd" style="font-size:18px;">0 USD</h4>
+                        <small class="text-muted" id="debtCountUsd">0 ta qarzdor</small>
+                    </div>
+                    <div class="stat-icon" style="background:#fef3c7;">
+                        <svg class="svg-icon" style="width:24px;height:24px;color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted mb-1" style="font-size:12px;font-weight:500;">Jami qarz (UZS)</p>
+                        <h4 class="fw-bold text-warning mb-1" id="totalDebtUzs" style="font-size:18px;">0 so'm</h4>
+                        <small class="text-muted" id="debtCountUzs">0 ta qarzdor</small>
+                    </div>
+                    <div class="stat-icon" style="background:#fef3c7;">
+                        <svg class="svg-icon" style="width:24px;height:24px;color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6 col-md-12">
+            <div class="stat-card" id="reportAlert">
+                <div class="text-center text-muted py-2">
+                    <svg class="svg-icon me-2" style="width:20px;height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg>
+                    <span>Kunlik hisobot ma'lumotlari yuklanmoqda...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs-custom" id="mainTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active" id="transactions-tab" data-bs-toggle="tab" href="#transactions" role="tab">Kassa operatsiyalari</a></li>
+        <li class="nav-item"><a class="nav-link" id="debts-tab" data-bs-toggle="tab" href="#debts" role="tab">Qarzdorlar</a></li>
+        <li class="nav-item"><a class="nav-link" id="debt-transactions-tab" data-bs-toggle="tab" href="#debt-transactions" role="tab">Qarz operatsiyalari</a></li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- Transactions Tab -->
+        <div class="tab-pane fade show active" id="transactions" role="tabpanel">
+            <div class="filter-bar">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Boshlanish sanasi</label><input type="date" id="filter_start" class="form-control-premium"></div>
+                    <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Tugash sanasi</label><input type="date" id="filter_end" class="form-control-premium"></div>
+                    <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Operatsiya turi</label><select id="filter_type" class="form-control-premium"><option value="">Barchasi</option><option value="INCOME">Kirim</option><option value="EXPENSE">Chiqim</option></select></div>
+                    <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Valyuta</label><select id="filter_currency" class="form-control-premium"><option value="">Barchasi</option><option value="USD">USD</option><option value="UZS">UZS</option></select></div>
+                    <div class="col-md-2"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">To'lov usuli</label><select id="filter_payment" class="form-control-premium"><option value="">Barchasi</option><option value="CASH">Naqd pul</option><option value="CARD">Plastik karta</option><option value="CLICK">Click</option><option value="PAYME">Payme</option><option value="BANK">Bank</option></select></div>
+                    <div class="col-md-2"><button class="btn-primary-premium w-100 justify-content-center" onclick="loadTransactions()"><svg class="svg-icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" fill="none"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-linecap="round"/></svg> Qidirish</button></div>
+                </div>
+            </div>
+
+            <div class="table-premium">
+                <div class="p-4 border-bottom bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0" style="font-size:16px;"><svg class="svg-icon me-2" style="color:#1a73e8;" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" fill="none"/><path d="M16 2v4M8 2v4" stroke="currentColor" stroke-linecap="round"/><path d="M3 10h18" stroke="currentColor" stroke-linecap="round"/></svg> Kassa operatsiyalari</h5>
+                        <span class="badge bg-secondary bg-opacity-10 text-dark px-3 py-2 rounded-pill" id="totalCount">0 ta operatsiya</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-premium mb-0">
+                        <thead>
+                            <tr><th>#</th><th>Sana</th><th>Tur</th><th>Valyuta</th><th>To'lov usuli</th><th class="text-end">Summa</th><th>Kim oldi/berdi</th><th>Izoh</th><th></th></tr>
+                        </thead>
+                        <tbody id="transactionsTableBody">
+                            <tr><td colspan="9" class="text-center py-5"><div class="spinner" style="width:35px;height:35px;margin:0 auto;"></div><p class="mt-3 text-muted">Yuklanmoqda...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="paginationContainer" class="p-4 bg-white border-top"></div>
+            </div>
+        </div>
+
+        <!-- Debts Tab -->
+        <div class="tab-pane fade" id="debts" role="tabpanel">
+            <div class="filter-bar">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Qidirish</label><input type="text" id="debt_search" class="form-control-premium" placeholder="Ism yoki telefon bo'yicha..."></div>
+                    <div class="col-md-3"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Holati</label><select id="debt_status_filter" class="form-control-premium"><option value="">Barchasi</option><option value="active">Faol</option><option value="overdue">Muddati o'tgan</option><option value="paid">To'langan</option></select></div>
+                    <div class="col-md-3"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Valyuta</label><select id="debt_currency_filter" class="form-control-premium"><option value="">Barchasi</option><option value="USD">USD</option><option value="UZS">UZS</option></select></div>
+                    <div class="col-md-2"><button class="btn-primary-premium w-100 justify-content-center" onclick="loadDebts()"><svg class="svg-icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" fill="none"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-linecap="round"/></svg> Qidirish</button></div>
+                </div>
+            </div>
+
+            <div class="table-premium">
+                <div class="p-4 border-bottom bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0" style="font-size:16px;"><svg class="svg-icon me-2" style="color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg> Qarzdorlar ro'yxati</h5>
+                        <span class="badge bg-secondary bg-opacity-10 text-dark px-3 py-2 rounded-pill" id="debtTotalCount">0 ta qarzdor</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-premium mb-0">
+                        <thead>
+                            <tr><th>#</th><th>Ism</th><th>Telefon</th><th>Valyuta</th><th>Jami qarz</th><th>To'langan</th><th>Qolgan qarz</th><th>Qaytarish muddati</th><th>Holati</th><th></th></tr>
+                        </thead>
+                        <tbody id="debtsTableBody">
+                            <tr><td colspan="10" class="text-center py-5"><div class="spinner" style="width:35px;height:35px;margin:0 auto;"></div><p class="mt-3 text-muted">Yuklanmoqda...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="debtPaginationContainer" class="p-4 bg-white border-top"></div>
+            </div>
+        </div>
+
+        <!-- Debt Transactions Tab -->
+        <div class="tab-pane fade" id="debt-transactions" role="tabpanel">
+            <div class="filter-bar">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Boshlanish sanasi</label><input type="date" id="debt_tx_start" class="form-control-premium"></div>
+                    <div class="col-md-3"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Tugash sanasi</label><input type="date" id="debt_tx_end" class="form-control-premium"></div>
+                    <div class="col-md-3"><label class="text-muted mb-2" style="font-size:12px;font-weight:600;">Qarzdor</label><select id="debt_tx_debtor" class="form-control-premium"><option value="">Barchasi</option></select></div>
+                    <div class="col-md-3"><button class="btn-primary-premium w-100 justify-content-center" onclick="loadDebtTransactions()"><svg class="svg-icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" fill="none"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-linecap="round"/></svg> Qidirish</button></div>
+                </div>
+            </div>
+
+            <div class="table-premium">
+                <div class="p-4 border-bottom bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0" style="font-size:16px;"><svg class="svg-icon me-2" style="color:#d97706;" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg> Qarz operatsiyalari</h5>
+                        <span class="badge bg-secondary bg-opacity-10 text-dark px-3 py-2 rounded-pill" id="debtTxTotalCount">0 ta operatsiya</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-premium mb-0">
+                        <thead>
+                            <tr><th>#</th><th>Sana</th><th>Qarzdor</th><th>Tur</th><th>Valyuta</th><th class="text-end">Summa</th><th>Qolgan qarz</th><th>Izoh</th><th></th></tr>
+                        </thead>
+                        <tbody id="debtTransactionsBody">
+                            <tr><td colspan="9" class="text-center py-5"><div class="spinner" style="width:35px;height:35px;margin:0 auto;"></div><p class="mt-3 text-muted">Yuklanmoqda...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="debtTxPaginationContainer" class="p-4 bg-white border-top"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -174,7 +501,7 @@
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title fw-bold"><svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-linecap="round"/></svg> Yangi operatsiya</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body p-4">
-                <form id="transactionForm" action="{% url 'cash_transaction_create' %}" method="POST">
+                <form id="transactionForm">
                     {% csrf_token %}
                     <div class="type-selector">
                         <div class="type-option selected" data-type="INCOME" onclick="selectType('INCOME')"><svg class="svg-icon" style="width:28px;height:28px;margin-bottom:8px;color:#10b981;" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-linecap="round"/><path d="M12 19l-4-4M12 19l4-4" stroke="currentColor" stroke-linecap="round"/></svg><div style="font-weight:600;">Kirim</div><small class="text-muted">Pul keldi</small></div>
@@ -184,15 +511,25 @@
 
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Valyuta turi</label><div class="d-flex gap-3"><div class="form-check"><input class="form-check-input" type="radio" name="currency" id="currencyUZS" value="UZS" checked><label class="form-check-label fw-semibold" for="currencyUZS">UZS (so'm)</label></div><div class="form-check"><input class="form-check-input" type="radio" name="currency" id="currencyUSD" value="USD"><label class="form-check-label fw-semibold" for="currencyUSD">USD (Dollar)</label></div></div></div>
 
-                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'lov usuli</label><select name="payment_method" class="form-control-premium" required><option value="CASH">Naqd pul</option><option value="CARD">Plastik karta</option><option value="CLICK">Click</option><option value="PAYME">Payme</option><option value="BANK">Bank</option></select></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'lov usuli</label><select name="payment_method" id="transaction_payment_method" class="form-control-premium" required>
+                        <option value="CASH">Naqd pul</option>
+                        <option value="CARD">Plastik karta</option>
+                        <option value="CLICK">Click</option>
+                        <option value="PAYME">Payme</option>
+                        <option value="BANK">Bank</option>
+                    </select></div>
 
-                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Miqdor</label><input type="number" name="amount" class="form-control-premium" step="0.01" required placeholder="Masalan: 1000000"></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Miqdor</label><input type="number" name="amount" id="transaction_amount" class="form-control-premium" step="0.01" required placeholder="Masalan: 1000000"></div>
 
-                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Kim oldi / berdi?</label><input type="text" name="customer_name" class="form-control-premium" required placeholder="To'liq ismi"></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Kim oldi / berdi?</label><input type="text" name="customer_name" id="transaction_customer" class="form-control-premium" required placeholder="To'liq ismi"></div>
 
-                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Izoh</label><textarea name="description" class="form-control-premium" rows="3" required placeholder="Operatsiya haqida ma'lumot..."></textarea></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Izoh</label><textarea name="description" id="transaction_description" class="form-control-premium" rows="3" required placeholder="Operatsiya haqida ma'lumot..."></textarea></div>
 
-                    <div class="alert rounded-4 py-3 mb-3" id="typeNote" style="background:#f0f9ff;border:none;"><svg class="svg-icon me-2" style="width:16px;height:16px;color:#0284c7;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Kirim qilganingizda kassa qoldig'i <strong>ortadi</strong>.</div>
+                    <div class="alert rounded-4 py-3 mb-3" id="typeNote" style="background:#f0f9ff;border:none;">
+                        <svg class="svg-icon me-2" style="width:16px;height:16px;color:#0284c7;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> 
+                        Kirim qilganingizda kassa qoldig'i <strong>ortadi</strong>.
+                        <span class="d-block text-muted fs-small mt-1">⚠️ Faqat <strong>Naqd pul</strong> kassa balansiga ta'sir qiladi</span>
+                    </div>
 
                     <button type="submit" class="btn-success-premium"><svg class="svg-icon" style="width:18px;height:18px;" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" fill="none"/><path d="M17 21v-4H7v4M12 3v5" stroke="currentColor" fill="none"/></svg> Saqlash</button>
                 </form>
@@ -201,7 +538,53 @@
     </div>
 </div>
 
-<!-- Edit Modal -->
+<!-- Debt Modal -->
+<div class="modal fade modal-premium" id="debtModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold" id="debtModalTitle"><svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg> Yangi qarzdor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-4">
+                <form id="debtForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="debt_id" id="debt_id">
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'liq ism *</label><input type="text" name="full_name" id="debt_full_name" class="form-control-premium" required placeholder="Misol: Alisher Karimov"></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Telefon raqam</label><input type="text" name="phone" id="debt_phone" class="form-control-premium" placeholder="+998 90 123 45 67"></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Valyuta</label><div class="d-flex gap-3"><div class="form-check"><input class="form-check-input" type="radio" name="currency" id="debt_currency_uzs" value="UZS" checked><label class="form-check-label fw-semibold" for="debt_currency_uzs">UZS (so'm)</label></div><div class="form-check"><input class="form-check-input" type="radio" name="currency" id="debt_currency_usd" value="USD"><label class="form-check-label fw-semibold" for="debt_currency_usd">USD (Dollar)</label></div></div></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Qarz summasi *</label><input type="number" name="amount" id="debt_amount" class="form-control-premium" step="0.01" required placeholder="Qancha qarz berilgan"></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Qaytarish muddati *</label><input type="date" name="due_date" id="debt_due_date" class="form-control-premium" required></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Izoh</label><textarea name="description" id="debt_description" class="form-control-premium" rows="3" placeholder="Qo'shimcha ma'lumot..."></textarea></div>
+                    <div class="alert alert-info rounded-4 py-3 mb-3"><svg class="svg-icon me-2" style="width:16px;height:16px;color:#0284c7;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Qarz berilganda kassa balansidan <strong>chiqim</strong> qilinadi.</div>
+                    <div class="d-flex gap-3"><button type="button" class="btn-outline-premium flex-grow-1" data-bs-dismiss="modal">Bekor qilish</button><button type="submit" class="btn-primary-premium flex-grow-1" id="debtSubmitBtn">Saqlash</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Debt Payment Modal -->
+<div class="modal fade modal-premium" id="debtPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold"><svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-linecap="round"/><path d="M12 19l-4-4M12 19l4-4" stroke="currentColor" stroke-linecap="round"/></svg> Qarz to'lash</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-4">
+                <form id="debtPaymentForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="debt_id" id="payment_debt_id">
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Qarzdor</label><p class="fw-semibold" id="payment_debtor_name">-</p></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Jami qarz</label><p class="fw-bold" id="payment_total_debt">0</p></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Qolgan qarz</label><p class="fw-bold" id="payment_remaining_debt">0</p></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'lov miqdori *</label><input type="number" name="amount" id="payment_amount" class="form-control-premium" step="0.01" required placeholder="Qancha to'layapti"></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'lov usuli</label><select name="payment_method" id="payment_method" class="form-control-premium"><option value="CASH">Naqd pul</option><option value="CARD">Plastik karta</option><option value="CLICK">Click</option><option value="PAYME">Payme</option><option value="BANK">Bank</option></select></div>
+                    <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Izoh</label><textarea name="description" id="payment_description" class="form-control-premium" rows="3" placeholder="Qo'shimcha ma'lumot..."></textarea></div>
+                    <div class="alert alert-success rounded-4 py-3 mb-3"><svg class="svg-icon me-2" style="width:16px;height:16px;color:#059669;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Qarz to'langanda kassa balansiga <strong>kirim</strong> qilinadi.</div>
+                    <div class="d-flex gap-3"><button type="button" class="btn-outline-premium flex-grow-1" data-bs-dismiss="modal">Bekor qilish</button><button type="submit" class="btn-success-premium flex-grow-1">To'lovni qabul qilish</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Transaction Modal -->
 <div class="modal fade modal-premium" id="editModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -231,7 +614,7 @@
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title fw-bold"><svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16M7 16l4-4 4 4 5-6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg> Kunlik hisobot</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body p-4">
-                <form id="reportForm" method="POST" action="{% url 'daily_report_create' %}">
+                <form id="reportForm">
                     {% csrf_token %}
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Kun boshidagi qoldiq (USD)</label><input type="number" name="opening_balance_usd" class="form-control-premium" step="0.01" placeholder="0 USD"></div>
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Kun boshidagi qoldiq (UZS)</label><input type="number" name="opening_balance_uzs" class="form-control-premium" step="0.01" placeholder="0 so'm"></div>
@@ -260,9 +643,18 @@
 
 <script>
 let currentPage = 1;
+let currentDebtPage = 1;
+let currentDebtTxPage = 1;
 
 var paymentLabels = {'CASH':'Naqd pul','CARD':'Plastik karta','CLICK':'Click','PAYME':'Payme','BANK':'Bank'};
 var paymentClasses = {'CASH':'payment-cash','CARD':'payment-card','CLICK':'payment-click','PAYME':'payment-payme','BANK':'payment-bank'};
+var paymentIcons = {
+    'CASH': '💵',
+    'CARD': '💳',
+    'CLICK': '🖱️',
+    'PAYME': '📱',
+    'BANK': '🏦'
+};
 
 function selectType(type) {
     document.getElementById('selected_type').value = type;
@@ -275,14 +667,24 @@ function selectType(type) {
         }
     }
     var note = document.getElementById('typeNote');
+    var paymentMethod = document.getElementById('transaction_payment_method').value;
+    var isCash = paymentMethod === 'CASH';
+    
     if(type === 'INCOME') {
         note.style.background = '#f0f9ff';
-        note.innerHTML = '<svg class="svg-icon me-2" style="width:16px;height:16px;color:#0284c7;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Kirim qilganingizda kassa qoldig\'i <strong>ortadi</strong>.';
+        note.innerHTML = '<svg class="svg-icon me-2" style="width:16px;height:16px;color:#0284c7;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Kirim qilganingizda kassa qoldig\'i <strong>ortadi</strong>.' +
+            '<span class="d-block text-muted fs-small mt-1">' + (isCash ? '✅ Naqd pul kassa balansiga qo\'shiladi' : '⚠️ ' + paymentLabels[paymentMethod] + ' kassa balansiga ta\'sir qilmaydi (faqat naqd pul)') + '</span>';
     } else {
         note.style.background = '#fff5f5';
-        note.innerHTML = '<svg class="svg-icon me-2" style="width:16px;height:16px;color:#dc2626;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Chiqim qilganingizda kassa qoldig\'i <strong>kamayadi</strong>.';
+        note.innerHTML = '<svg class="svg-icon me-2" style="width:16px;height:16px;color:#dc2626;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Chiqim qilganingizda kassa qoldig\'i <strong>kamayadi</strong>.' +
+            '<span class="d-block text-muted fs-small mt-1">' + (isCash ? '✅ Naqd pul kassa balansidan chiqariladi' : '⚠️ ' + paymentLabels[paymentMethod] + ' kassa balansiga ta\'sir qilmaydi (faqat naqd pul)') + '</span>';
     }
 }
+
+document.getElementById('transaction_payment_method')?.addEventListener('change', function() {
+    var type = document.getElementById('selected_type').value;
+    selectType(type);
+});
 
 function selectEditType(type) {
     document.getElementById('edit_selected_type').value = type;
@@ -321,30 +723,64 @@ function showToast(message, type) {
 function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
 function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
+// ===== STATISTICS =====
 function loadStats() {
     fetch('/orders/cash/api/stats/')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if(!data.success) return;
+            
             var usdBalance = data.cash_balance_usd || 0;
             var uzsBalance = data.cash_balance_uzs || 0;
             document.getElementById('totalBalanceUsd').innerHTML = usdBalance.toLocaleString('uz-UZ') + ' USD';
             document.getElementById('totalBalanceUzs').innerHTML = uzsBalance.toLocaleString('uz-UZ') + " so'm";
+            
             var incUsd = data.today_income_usd || 0;
-            var incUzs = data.today_income_uzs || 0;
             var expUsd = data.today_expense_usd || 0;
+            document.getElementById('todayIncomeUsd').innerHTML = '+' + incUsd.toLocaleString('uz-UZ');
+            document.getElementById('todayExpenseUsd').innerHTML = '-' + expUsd.toLocaleString('uz-UZ');
+            
+            var incUzs = data.today_income_uzs || 0;
             var expUzs = data.today_expense_uzs || 0;
-            document.getElementById('todayIncome').innerHTML = '<div style="font-size:20px;font-weight:700;">+' + incUzs.toLocaleString('uz-UZ') + '</div><small class="text-muted">USD: +' + incUsd.toLocaleString('uz-UZ') + '</small>';
-            document.getElementById('todayExpense').innerHTML = '<div style="font-size:20px;font-weight:700;">-' + expUzs.toLocaleString('uz-UZ') + '</div><small class="text-muted">USD: -' + expUsd.toLocaleString('uz-UZ') + '</small>';
+            document.getElementById('todayIncomeUzs').innerHTML = '+' + incUzs.toLocaleString('uz-UZ');
+            document.getElementById('todayExpenseUzs').innerHTML = '-' + expUzs.toLocaleString('uz-UZ');
+            
+            if(data.payment_stats) {
+                var ps = data.payment_stats;
+                document.getElementById('cashIncome').innerHTML = '+' + (ps.cash_income || 0).toLocaleString('uz-UZ');
+                document.getElementById('cashExpense').innerHTML = '-' + (ps.cash_expense || 0).toLocaleString('uz-UZ');
+                document.getElementById('cardIncome').innerHTML = '+' + (ps.card_income || 0).toLocaleString('uz-UZ');
+                document.getElementById('cardExpense').innerHTML = '-' + (ps.card_expense || 0).toLocaleString('uz-UZ');
+                document.getElementById('clickIncome').innerHTML = '+' + (ps.click_income || 0).toLocaleString('uz-UZ');
+                document.getElementById('clickExpense').innerHTML = '-' + (ps.click_expense || 0).toLocaleString('uz-UZ');
+                document.getElementById('paymeIncome').innerHTML = '+' + (ps.payme_income || 0).toLocaleString('uz-UZ');
+                document.getElementById('paymeExpense').innerHTML = '-' + (ps.payme_expense || 0).toLocaleString('uz-UZ');
+                document.getElementById('bankIncome').innerHTML = '+' + (ps.bank_income || 0).toLocaleString('uz-UZ');
+                document.getElementById('bankExpense').innerHTML = '-' + (ps.bank_expense || 0).toLocaleString('uz-UZ');
+            }
+            
+            if(data.debt_stats) {
+                document.getElementById('totalDebtUsd').innerHTML = (data.debt_stats.total_usd || 0).toLocaleString('uz-UZ') + ' USD';
+                document.getElementById('totalDebtUzs').innerHTML = (data.debt_stats.total_uzs || 0).toLocaleString('uz-UZ') + " so'm";
+                document.getElementById('debtCountUsd').innerHTML = (data.debt_stats.count_usd || 0) + ' ta qarzdor';
+                document.getElementById('debtCountUzs').innerHTML = (data.debt_stats.count_uzs || 0) + ' ta qarzdor';
+                document.getElementById('debtTotal').innerHTML = (data.debt_stats.total_usd || 0).toLocaleString('uz-UZ') + ' USD / ' + (data.debt_stats.total_uzs || 0).toLocaleString('uz-UZ') + " so'm";
+            }
+            
             if(!data.today_report) {
-                document.getElementById('reportAlert').innerHTML = '<div class="alert alert-warning rounded-4 d-flex justify-content-between"><div><strong>' + (data.today || 'Bugun') + '</strong> uchun kunlik hisobot hali yaratilmagan</div><button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#reportModal">Hisobot yaratish</button></div>';
+                document.getElementById('reportAlert').innerHTML = '<div class="d-flex justify-content-between align-items-center"><div><svg class="svg-icon me-2" style="width:20px;height:20px;color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg><strong>' + (data.today || 'Bugun') + '</strong> uchun kunlik hisobot hali yaratilmagan</div><button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#reportModal">Hisobot yaratish</button></div>';
             } else {
-                document.getElementById('reportAlert').innerHTML = '';
+                document.getElementById('reportAlert').innerHTML = '<div class="d-flex justify-content-between align-items-center"><div><svg class="svg-icon me-2" style="width:20px;height:20px;color:#10b981;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg><strong>' + (data.today || 'Bugun') + '</strong> uchun hisobot yaratilgan ✅</div><span class="text-muted-dark fs-small">Kutilgan: ' + (data.expected_balance || 0).toLocaleString('uz-UZ') + ' | Haqiqiy: ' + (data.actual_balance || 0).toLocaleString('uz-UZ') + '</span></div>';
+            }
+            
+            if(data.overdue_debts && data.overdue_debts.length > 0) {
+                showToast('⚠️ ' + data.overdue_debts.length + ' ta qarz muddati o\'tgan! Iltimos tekshiring.', 'warning');
             }
         })
         .catch(function(err) { console.error(err); });
 }
 
+// ===== TRANSACTIONS =====
 function loadTransactions(page) {
     if(page === undefined) page = 1;
     currentPage = page;
@@ -380,12 +816,13 @@ function loadTransactions(page) {
                 var amount = parseFloat(t.amount || 0).toLocaleString('uz-UZ');
                 var desc = (t.description || '').substring(0, 35);
                 if((t.description || '').length > 35) desc = desc + '...';
+                var isCash = paymentMethod === 'CASH';
                 html += '<tr>';
                 html += '<td class="fw-semibold">' + rowNum + '</td>';
                 html += '<td>' + t.date + '</td>';
                 html += '<td><span class="' + (t.type === 'INCOME' ? 'badge-income' : 'badge-expense') + '">' + (t.type === 'INCOME' ? 'Kirim' : 'Chiqim') + '</span></td>';
                 html += '<td><span class="' + (currencyVal === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currencyVal === 'USD' ? 'USD' : 'UZS') + '</span></td>';
-                html += '<td><span class="payment-badge ' + paymentClasses[paymentMethod] + '">' + paymentLabels[paymentMethod] + '</span></td>';
+                html += '<td><span class="payment-badge ' + paymentClasses[paymentMethod] + '">' + paymentIcons[paymentMethod] + ' ' + paymentLabels[paymentMethod] + (isCash ? ' 💰' : '') + '</span></td>';
                 html += '<td class="text-end fw-semibold ' + (t.type === 'INCOME' ? 'text-success' : 'text-danger') + '">' + sign + ' ' + amount + '</td>';
                 html += '<td>' + (t.customer_name || '-') + '</td>';
                 html += '<td>' + desc + '</td>';
@@ -414,15 +851,6 @@ function loadTransactions(page) {
             }
         })
         .catch(function(err) { console.error(err); document.getElementById('transactionsTableBody').innerHTML = '<tr><td colspan="9" class="text-center text-danger">Server xatolik</td></tr>'; });
-}
-
-function resetFilters() {
-    document.getElementById('filter_start').value = '';
-    document.getElementById('filter_end').value = '';
-    document.getElementById('filter_type').value = '';
-    document.getElementById('filter_currency').value = '';
-    document.getElementById('filter_payment').value = '';
-    loadTransactions();
 }
 
 function editTransaction(transactionId) {
@@ -468,6 +896,392 @@ function deleteTransaction(transactionId) {
     }
 }
 
+function viewTransaction(transactionId) {
+    fetch('/orders/cash/transaction/' + transactionId + '/json/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var sign = data.transaction_type === 'INCOME' ? '+' : '-';
+            var amountClass = data.transaction_type === 'INCOME' ? 'text-success' : 'text-danger';
+            var currency = data.currency || 'UZS';
+            var amount = Number(data.amount || 0).toLocaleString('uz-UZ');
+            var paymentName = paymentLabels[data.payment_method] || 'Naqd pul';
+            var paymentClass = paymentClasses[data.payment_method] || 'payment-cash';
+            var html = '<div class="row g-3"><div class="col-6"><div class="text-muted mb-1">ID</div><div class="fw-semibold">' + transactionId + '</div></div><div class="col-6"><div class="text-muted mb-1">Sana</div><div class="fw-semibold">' + (data.transaction_date || '-') + '</div></div><div class="col-12"><hr></div><div class="col-4"><div class="text-muted mb-1">Valyuta</div><span class="' + (currency === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currency === 'USD' ? 'AQSH dollari (USD)' : "so'm (UZS)") + '</span></div><div class="col-4"><div class="text-muted mb-1">To\'lov usuli</div><span class="payment-badge ' + paymentClass + '">' + paymentName + '</span></div><div class="col-4"><div class="text-muted mb-1">Summa</div><div class="fw-bold ' + amountClass + '" style="font-size:20px;">' + sign + ' ' + amount + ' ' + currency + '</div></div><div class="col-12"><hr></div><div class="col-12"><div class="text-muted mb-1">Kim oldi/berdi</div><div>' + (data.customer_name || '-') + '</div></div><div class="col-12"><div class="text-muted mb-1">Izoh</div><div>' + (data.description || '-') + '</div></div><div class="col-12"><div class="text-muted mb-1">Amalni bajargan</div><div>' + (data.performed_by || '-') + '</div></div></div>';
+            document.getElementById('detailContent').innerHTML = html;
+            var detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+            detailModal.show();
+        })
+        .catch(function() { showToast("Ma'lumot yuklanmadi", 'error'); });
+}
+
+function exportExcel() {
+    var start = document.getElementById('filter_start').value;
+    var end = document.getElementById('filter_end').value;
+    if(!start || !end) {
+        showToast("Iltimos, sana oralig'ini tanlang!", 'warning');
+        return;
+    }
+    window.location.href = "/orders/cash/export/excel/?start_date=" + start + "&end_date=" + end;
+}
+
+// ===== DEBTS =====
+function loadDebts(page) {
+    if(page === undefined) page = 1;
+    currentDebtPage = page;
+    var search = document.getElementById('debt_search').value;
+    var status = document.getElementById('debt_status_filter').value;
+    var currency = document.getElementById('debt_currency_filter').value;
+    var url = '/orders/cash/api/debts/?page=' + page;
+    if(search) url += '&search=' + encodeURIComponent(search);
+    if(status) url += '&status=' + status;
+    if(currency) url += '&currency=' + currency;
+    
+    document.getElementById('debtsTableBody').innerHTML = '<tr><td colspan="10" class="text-center py-5"><div class="spinner"></div><p>Yuklanmoqda...</p></td></tr>';
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if(!data.success) return;
+            document.getElementById('debtTotalCount').innerHTML = data.total + ' ta qarzdor';
+            if(data.debts.length === 0) {
+                document.getElementById('debtsTableBody').innerHTML = '<tr><td colspan="10" class="text-center py-5">Hech qanday qarzdor topilmadi</td></tr>';
+                document.getElementById('debtPaginationContainer').innerHTML = '';
+                return;
+            }
+            var html = '';
+            for(var i = 0; i < data.debts.length; i++) {
+                var d = data.debts[i];
+                var rowNum = (page - 1) * 50 + i + 1;
+                var remaining = d.remaining || 0;
+                var total = d.amount || 0;
+                var paid = total - remaining;
+                var currencyVal = d.currency || 'UZS';
+                var statusText = 'Faol';
+                var statusClass = 'badge-debt';
+                if(d.due_date) {
+                    var dueDate = new Date(d.due_date);
+                    var today = new Date();
+                    if(dueDate < today && remaining > 0) {
+                        statusText = 'Muddat o\'tgan';
+                        statusClass = 'badge-overdue';
+                    }
+                }
+                if(remaining <= 0) {
+                    statusText = 'To\'langan';
+                    statusClass = 'badge-paid';
+                }
+                
+                html += '<tr>';
+                html += '<td class="fw-semibold">' + rowNum + '</td>';
+                html += '<td><strong>' + d.full_name + '</strong></td>';
+                html += '<td>' + (d.phone || '-') + '</td>';
+                html += '<td><span class="' + (currencyVal === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currencyVal === 'USD' ? 'USD' : 'UZS') + '</span></td>';
+                html += '<td>' + total.toLocaleString('uz-UZ') + '</td>';
+                html += '<td>' + paid.toLocaleString('uz-UZ') + '</td>';
+                html += '<td class="fw-bold ' + (remaining > 0 ? 'text-warning' : 'text-success') + '">' + remaining.toLocaleString('uz-UZ') + '</td>';
+                html += '<td>' + (d.due_date || '-') + '</td>';
+                html += '<td><span class="' + statusClass + '">' + statusText + '</span></td>';
+                html += '<td><div class="d-flex gap-2 flex-wrap">';
+                if(remaining > 0) {
+                    html += '<button class="btn btn-sm btn-success" onclick="openPaymentModal(\'' + d.debt_id + '\')">To\'lov qabul qilish</button>';
+                }
+                html += '<button class="btn btn-sm btn-outline-primary" onclick="editDebt(\'' + d.debt_id + '\')">Tahrirlash</button>';
+                html += '<button class="btn btn-sm btn-outline-danger" onclick="deleteDebt(\'' + d.debt_id + '\')">O\'chirish</button>';
+                html += '</div></td></tr>';
+            }
+            document.getElementById('debtsTableBody').innerHTML = html;
+            if(data.total_pages > 1) {
+                var pg = '<ul class="pagination pagination-custom justify-content-center mb-0">';
+                if(data.has_previous) pg += '<li class="page-item"><a class="page-link" href="#" onclick="loadDebts(' + data.previous_page + ');return false;">«</a></li>';
+                for(var j = 1; j <= data.total_pages; j++) {
+                    if(j === data.current_page) {
+                        pg += '<li class="page-item active"><span class="page-link">' + j + '</span></li>';
+                    } else if(Math.abs(j - data.current_page) <= 2) {
+                        pg += '<li class="page-item"><a class="page-link" href="#" onclick="loadDebts(' + j + ');return false;">' + j + '</a></li>';
+                    }
+                }
+                if(data.has_next) pg += '<li class="page-item"><a class="page-link" href="#" onclick="loadDebts(' + data.next_page + ');return false;">»</a></li>';
+                pg += '</ul>';
+                document.getElementById('debtPaginationContainer').innerHTML = pg;
+            } else {
+                document.getElementById('debtPaginationContainer').innerHTML = '';
+            }
+        })
+        .catch(function(err) { console.error(err); document.getElementById('debtsTableBody').innerHTML = '<tr><td colspan="10" class="text-center text-danger">Server xatolik</td></tr>'; });
+}
+
+// ===== DEBT TRANSACTIONS =====
+function loadDebtTransactions(page) {
+    if(page === undefined) page = 1;
+    currentDebtTxPage = page;
+    var start = document.getElementById('debt_tx_start').value;
+    var end = document.getElementById('debt_tx_end').value;
+    var debtor = document.getElementById('debt_tx_debtor').value;
+    var url = '/orders/cash/api/debt-transactions/?page=' + page;
+    if(start) url += '&start_date=' + start;
+    if(end) url += '&end_date=' + end;
+    if(debtor) url += '&debtor=' + debtor;
+    
+    document.getElementById('debtTransactionsBody').innerHTML = '<tr><td colspan="9" class="text-center py-5"><div class="spinner"></div><p>Yuklanmoqda...</p></td></tr>';
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if(!data.success) return;
+            document.getElementById('debtTxTotalCount').innerHTML = data.total + ' ta operatsiya';
+            if(data.transactions.length === 0) {
+                document.getElementById('debtTransactionsBody').innerHTML = '<tr><td colspan="9" class="text-center py-5">Hech qanday operatsiya topilmadi</td></tr>';
+                document.getElementById('debtTxPaginationContainer').innerHTML = '';
+                return;
+            }
+            var html = '';
+            for(var i = 0; i < data.transactions.length; i++) {
+                var t = data.transactions[i];
+                var rowNum = (page - 1) * 50 + i + 1;
+                var typeText = t.type === 'DEBT_GIVEN' ? 'Qarz berildi' : 'Qarz to\'landi';
+                var typeClass = t.type === 'DEBT_GIVEN' ? 'badge-expense' : 'badge-income';
+                var currencyVal = t.currency || 'UZS';
+                var amount = parseFloat(t.amount || 0).toLocaleString('uz-UZ');
+                var remaining = parseFloat(t.remaining_after || 0).toLocaleString('uz-UZ');
+                
+                html += '<tr>';
+                html += '<td class="fw-semibold">' + rowNum + '</td>';
+                html += '<td>' + t.date + '</td>';
+                html += '<td><strong>' + t.debtor_name + '</strong></td>';
+                html += '<td><span class="' + typeClass + '">' + typeText + '</span></td>';
+                html += '<td><span class="' + (currencyVal === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currencyVal === 'USD' ? 'USD' : 'UZS') + '</span></td>';
+                html += '<td class="text-end fw-semibold">' + amount + '</td>';
+                html += '<td>' + remaining + '</td>';
+                html += '<td>' + (t.description || '-') + '</td>';
+                html += '<td><button class="btn btn-sm btn-outline-secondary" onclick="viewDebtTransaction(\'' + t.transaction_id + '\')">Batafsil</button></td></tr>';
+            }
+            document.getElementById('debtTransactionsBody').innerHTML = html;
+            if(data.total_pages > 1) {
+                var pg = '<ul class="pagination pagination-custom justify-content-center mb-0">';
+                if(data.has_previous) pg += '<li class="page-item"><a class="page-link" href="#" onclick="loadDebtTransactions(' + data.previous_page + ');return false;">«</a></li>';
+                for(var j = 1; j <= data.total_pages; j++) {
+                    if(j === data.current_page) {
+                        pg += '<li class="page-item active"><span class="page-link">' + j + '</span></li>';
+                    } else if(Math.abs(j - data.current_page) <= 2) {
+                        pg += '<li class="page-item"><a class="page-link" href="#" onclick="loadDebtTransactions(' + j + ');return false;">' + j + '</a></li>';
+                    }
+                }
+                if(data.has_next) pg += '<li class="page-item"><a class="page-link" href="#" onclick="loadDebtTransactions(' + data.next_page + ');return false;">»</a></li>';
+                pg += '</ul>';
+                document.getElementById('debtTxPaginationContainer').innerHTML = pg;
+            } else {
+                document.getElementById('debtTxPaginationContainer').innerHTML = '';
+            }
+        })
+        .catch(function(err) { console.error(err); document.getElementById('debtTransactionsBody').innerHTML = '<tr><td colspan="9" class="text-center text-danger">Server xatolik</td></tr>'; });
+}
+
+function loadDebtorsForSelect() {
+    fetch('/orders/cash/api/debtors-list/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if(!data.success) return;
+            var select = document.getElementById('debt_tx_debtor');
+            select.innerHTML = '<option value="">Barchasi</option>';
+            for(var i = 0; i < data.debtors.length; i++) {
+                var d = data.debtors[i];
+                select.innerHTML += '<option value="' + d.debt_id + '">' + d.full_name + ' (' + d.remaining + ' ' + d.currency + ')</option>';
+            }
+        })
+        .catch(function(err) { console.error(err); });
+}
+
+// ===== DEBT CRUD =====
+document.getElementById('debtForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    showLoading();
+    var debtId = document.getElementById('debt_id').value;
+    var formData = new FormData(this);
+    var url = debtId ? '/orders/cash/api/debt/' + debtId + '/edit/' : '/orders/cash/api/debt/create/';
+    
+    fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+        body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        hideLoading();
+        if(data.success) {
+            showToast(debtId ? 'Qarzdor ma\'lumotlari yangilandi' : 'Yangi qarzdor qo\'shildi', 'success');
+            document.getElementById('debtForm').reset();
+            document.getElementById('debt_id').value = '';
+            document.getElementById('debtModalTitle').innerHTML = '<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-linecap="round"/></svg> Yangi qarzdor';
+            document.getElementById('debtSubmitBtn').textContent = 'Saqlash';
+            var debtModal = bootstrap.Modal.getInstance(document.getElementById('debtModal'));
+            debtModal.hide();
+            loadStats();
+            loadDebts(currentDebtPage);
+            loadDebtorsForSelect();
+        } else {
+            showToast(data.message || 'Xatolik yuz berdi', 'error');
+        }
+    })
+    .catch(function(error) {
+        hideLoading();
+        console.error(error);
+        showToast('Server xatoligi', 'error');
+    });
+});
+
+function editDebt(debtId) {
+    fetch('/orders/cash/api/debt/' + debtId + '/json/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if(!data.success) { showToast(data.message, 'error'); return; }
+            document.getElementById('debt_id').value = debtId;
+            document.getElementById('debt_full_name').value = data.full_name;
+            document.getElementById('debt_phone').value = data.phone || '';
+            document.getElementById('debt_amount').value = data.amount;
+            document.getElementById('debt_due_date').value = data.due_date || '';
+            document.getElementById('debt_description').value = data.description || '';
+            if(data.currency === 'USD') {
+                document.getElementById('debt_currency_usd').checked = true;
+            } else {
+                document.getElementById('debt_currency_uzs').checked = true;
+            }
+            document.getElementById('debtModalTitle').innerHTML = '<svg class="svg-icon me-2" viewBox="0 0 24 24"><path d="M17 3l4 4-7 7H10v-4l7-7z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M4 20h16" stroke="currentColor" stroke-linecap="round"/></svg> Qarzdorni tahrirlash';
+            document.getElementById('debtSubmitBtn').textContent = 'Yangilash';
+            var debtModal = new bootstrap.Modal(document.getElementById('debtModal'));
+            debtModal.show();
+        })
+        .catch(function() { showToast('Ma\'lumot yuklanmadi', 'error'); });
+}
+
+function deleteDebt(debtId) {
+    if(confirm('Ushbu qarzdorni o\'chirishga ishonchingiz komilmi? Barcha ma\'lumotlar o\'chiriladi.')) {
+        showLoading();
+        fetch('/orders/cash/api/debt/' + debtId + '/delete/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            hideLoading();
+            if(data.success) {
+                showToast(data.message, 'success');
+                loadStats();
+                loadDebts(currentDebtPage);
+                loadDebtorsForSelect();
+            } else {
+                showToast(data.message, 'error');
+            }
+        })
+        .catch(function() { hideLoading(); showToast('Server xatoligi', 'error'); });
+    }
+}
+
+function openPaymentModal(debtId) {
+    fetch('/orders/cash/api/debt/' + debtId + '/json/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if(!data.success) { showToast(data.message, 'error'); return; }
+            document.getElementById('payment_debt_id').value = debtId;
+            document.getElementById('payment_debtor_name').textContent = data.full_name;
+            var currency = data.currency || 'UZS';
+            document.getElementById('payment_total_debt').textContent = data.amount.toLocaleString('uz-UZ') + ' ' + currency;
+            document.getElementById('payment_remaining_debt').textContent = data.remaining.toLocaleString('uz-UZ') + ' ' + currency;
+            document.getElementById('payment_amount').max = data.remaining;
+            document.getElementById('payment_amount').placeholder = 'Maks: ' + data.remaining;
+            var paymentModal = new bootstrap.Modal(document.getElementById('debtPaymentModal'));
+            paymentModal.show();
+        })
+        .catch(function() { showToast('Ma\'lumot yuklanmadi', 'error'); });
+}
+
+document.getElementById('debtPaymentForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var amount = parseFloat(document.getElementById('payment_amount').value);
+    var remaining = parseFloat(document.getElementById('payment_remaining_debt').textContent.replace(/[^0-9.]/g, ''));
+    if(amount <= 0) {
+        showToast('Iltimos, to\'g\'ri miqdor kiriting', 'warning');
+        return;
+    }
+    if(amount > remaining) {
+        showToast('To\'lov miqdori qolgan qarzdan ko\'p bo\'lishi mumkin emas. Maks: ' + remaining, 'warning');
+        return;
+    }
+    showLoading();
+    var formData = new FormData(this);
+    fetch('/orders/cash/api/debt/payment/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+        body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        hideLoading();
+        if(data.success) {
+            showToast(data.message, 'success');
+            document.getElementById('debtPaymentForm').reset();
+            var paymentModal = bootstrap.Modal.getInstance(document.getElementById('debtPaymentModal'));
+            paymentModal.hide();
+            loadStats();
+            loadDebts(currentDebtPage);
+            loadDebtTransactions(currentDebtTxPage);
+            loadDebtorsForSelect();
+        } else {
+            showToast(data.message || 'Xatolik yuz berdi', 'error');
+        }
+    })
+    .catch(function(error) {
+        hideLoading();
+        console.error(error);
+        showToast('Server xatoligi', 'error');
+    });
+});
+
+function viewDebtTransaction(transactionId) {
+    fetch('/orders/cash/api/debt-transaction/' + transactionId + '/json/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if(!data.success) { showToast(data.message, 'error'); return; }
+            var typeText = data.type === 'DEBT_GIVEN' ? 'Qarz berildi' : 'Qarz to\'landi';
+            var typeColor = data.type === 'DEBT_GIVEN' ? 'text-danger' : 'text-success';
+            var currency = data.currency || 'UZS';
+            var html = '<div class="row g-3"><div class="col-6"><div class="text-muted mb-1">ID</div><div class="fw-semibold">' + transactionId + '</div></div><div class="col-6"><div class="text-muted mb-1">Sana</div><div class="fw-semibold">' + (data.date || '-') + '</div></div><div class="col-12"><hr></div><div class="col-12"><div class="text-muted mb-1">Qarzdor</div><div class="fw-semibold">' + data.debtor_name + '</div></div><div class="col-12"><div class="text-muted mb-1">Operatsiya turi</div><span class="' + (data.type === 'DEBT_GIVEN' ? 'badge-expense' : 'badge-income') + '">' + typeText + '</span></div><div class="col-6"><div class="text-muted mb-1">Valyuta</div><span class="' + (currency === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currency === 'USD' ? 'AQSH dollari (USD)' : "so'm (UZS)") + '</span></div><div class="col-6"><div class="text-muted mb-1">Summa</div><div class="fw-bold ' + typeColor + '" style="font-size:20px;">' + Number(data.amount || 0).toLocaleString('uz-UZ') + ' ' + currency + '</div></div><div class="col-12"><div class="text-muted mb-1">Qolgan qarz</div><div class="fw-semibold">' + Number(data.remaining_after || 0).toLocaleString('uz-UZ') + ' ' + currency + '</div></div><div class="col-12"><div class="text-muted mb-1">Izoh</div><div>' + (data.description || '-') + '</div></div></div>';
+            document.getElementById('detailContent').innerHTML = html;
+            var detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+            detailModal.show();
+        })
+        .catch(function() { showToast('Ma\'lumot yuklanmadi', 'error'); });
+}
+
+// ===== FORMS =====
+document.getElementById('transactionForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    showLoading();
+    var formData = new FormData(this);
+    fetch('/orders/cash/api/transaction/create/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+        body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        hideLoading();
+        if(data.success) {
+            showToast(data.message, 'success');
+            document.getElementById('transactionForm').reset();
+            selectType('INCOME');
+            var transModal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
+            transModal.hide();
+            loadStats();
+            loadTransactions(currentPage);
+        } else {
+            showToast(data.message || 'Xatolik yuz berdi', 'error');
+        }
+    })
+    .catch(function(error) {
+        hideLoading();
+        console.error(error);
+        showToast('Server xatoligi: ' + error.message, 'error');
+    });
+});
+
 document.getElementById('editForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     showLoading();
@@ -494,49 +1308,6 @@ document.getElementById('editForm')?.addEventListener('submit', function(e) {
     .catch(function() { hideLoading(); showToast('Server xatoligi', 'error'); });
 });
 
-document.getElementById('transactionForm')?.addEventListener('submit', function(e) {
-    e.preventDefault();
-    showLoading();
-    
-    var formData = new FormData(this);
-    
-    // 🔍 DEBUG: Konsolga chiqarish
-    console.log('=== YANGI OPERATSIYA ===');
-    console.log('transaction_type:', formData.get('transaction_type'));
-    console.log('amount:', formData.get('amount'));
-    console.log('currency:', formData.get('currency'));
-    console.log('payment_method:', formData.get('payment_method'));  // 👈 MUHIM
-    console.log('customer_name:', formData.get('customer_name'));
-    console.log('description:', formData.get('description'));
-    
-    fetch('/orders/cash/api/transaction/create/', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-        body: formData
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        hideLoading();
-        console.log('Response:', data);
-        
-        if(data.success) {
-            showToast(data.message, 'success');
-            document.getElementById('transactionForm').reset();
-            selectType('INCOME');
-            var transModal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
-            transModal.hide();
-            loadStats();
-            loadTransactions(currentPage);
-        } else {
-            showToast(data.message || 'Xatolik yuz berdi', 'error');
-        }
-    })
-    .catch(function(error) {
-        hideLoading();
-        console.error('Error:', error);
-        showToast('Server xatoligi: ' + error.message, 'error');
-    });
-});
 document.getElementById('reportForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     showLoading();
@@ -562,44 +1333,32 @@ document.getElementById('reportForm')?.addEventListener('submit', function(e) {
     .catch(function() { hideLoading(); showToast('Server xatoligi', 'error'); });
 });
 
-function viewTransaction(transactionId) {
-    fetch('/orders/cash/transaction/' + transactionId + '/json/')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            var sign = data.transaction_type === 'INCOME' ? '+' : '-';
-            var amountClass = data.transaction_type === 'INCOME' ? 'text-success' : 'text-danger';
-            var currency = data.currency || 'UZS';
-            var amount = Number(data.amount || 0).toLocaleString('uz-UZ');
-            var paymentName = paymentLabels[data.payment_method] || 'Naqd pul';
-            var paymentClass = paymentClasses[data.payment_method] || 'payment-cash';
-            var html = '<div class="row g-3"><div class="col-6"><div class="text-muted mb-1">ID</div><div class="fw-semibold">' + transactionId + '</div></div><div class="col-6"><div class="text-muted mb-1">Sana</div><div class="fw-semibold">' + (data.transaction_date || '-') + '</div></div><div class="col-12"><hr></div><div class="col-4"><div class="text-muted mb-1">Valyuta</div><span class="' + (currency === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currency === 'USD' ? 'AQSH dollari (USD)' : "so'm (UZS)") + '</span></div><div class="col-4"><div class="text-muted mb-1">To\'lov usuli</div><span class="payment-badge ' + paymentClass + '">' + paymentName + '</span></div><div class="col-4"><div class="text-muted mb-1">Summa</div><div class="fw-bold ' + amountClass + '" style="font-size:20px;">' + sign + ' ' + amount + ' ' + currency + '</div></div><div class="col-12"><hr></div><div class="col-12"><div class="text-muted mb-1">Kim oldi/berdi</div><div>' + (data.customer_name || '-') + '</div></div><div class="col-12"><div class="text-muted mb-1">Izoh</div><div>' + (data.description || '-') + '</div></div><div class="col-12"><div class="text-muted mb-1">Amalni bajargan</div><div>' + (data.performed_by || '-') + '</div></div></div>';
-            document.getElementById('detailContent').innerHTML = html;
-            var detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
-            detailModal.show();
-        })
-        .catch(function() { showToast("Ma'lumot yuklanmadi", 'error'); });
-}
+// ===== EVENT LISTENERS =====
+document.getElementById('debt_search')?.addEventListener('keyup', function(e) {
+    if(e.key === 'Enter') loadDebts();
+});
 
-function exportExcel() {
-    var start = document.getElementById('filter_start').value;
-    var end = document.getElementById('filter_end').value;
-    if(!start || !end) {
-        showToast("Iltimos, sana oralig'ini tanlang!", 'warning');
-        return;
-    }
-    window.location.href = "{% url 'export_cash_report_excel' %}?start_date=" + start + "&end_date=" + end;
-}
-
+// ===== INIT =====
 document.addEventListener('DOMContentLoaded', function() {
     var today = new Date().toISOString().split('T')[0];
     var thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     document.getElementById('filter_start').value = thirtyDaysAgo.toISOString().split('T')[0];
     document.getElementById('filter_end').value = today;
+    document.getElementById('debt_tx_start').value = thirtyDaysAgo.toISOString().split('T')[0];
+    document.getElementById('debt_tx_end').value = today;
+    
+    var futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 30);
+    document.getElementById('debt_due_date').value = futureDate.toISOString().split('T')[0];
+    
     selectType('INCOME');
     selectEditType('INCOME');
     loadStats();
     loadTransactions();
+    loadDebts();
+    loadDebtTransactions();
+    loadDebtorsForSelect();
 });
 </script>
 </body>
