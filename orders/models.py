@@ -97,6 +97,12 @@ class Material(models.Model):
         default=Decimal('0.000'), 
         verbose_name="Ombordagi joriy qoldiq"
     )
+    note = models.TextField(
+        blank=True, 
+        null=True, 
+        verbose_name="Izoh / Eslatma",
+        help_text="Material haqida qo'shimcha ma'lumot"
+    )
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
     def save(self, *args, **kwargs):
         is_new = self.pk is None
