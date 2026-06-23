@@ -553,7 +553,11 @@
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Qarz summasi *</label><input type="number" name="amount" id="debt_amount" class="form-control-premium" step="0.01" required placeholder="Qancha qarz berilgan"></div>
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Qaytarish muddati *</label><input type="date" name="due_date" id="debt_due_date" class="form-control-premium" required></div>
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Izoh</label><textarea name="description" id="debt_description" class="form-control-premium" rows="3" placeholder="Qo'shimcha ma'lumot..."></textarea></div>
-                    <div class="alert alert-info rounded-4 py-3 mb-3"><svg class="svg-icon me-2" style="width:16px;height:16px;color:#0284c7;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Qarz berilganda kassa balansidan <strong>chiqim</strong> qilinadi.</div>
+                    <!-- ✅ O'ZGARTIRILDI: Kassa balansiga ta'sir qilmaydi -->
+                    <div class="alert alert-warning rounded-4 py-3 mb-3">
+                        <svg class="svg-icon me-2" style="width:16px;height:16px;color:#d97706;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> 
+                        Qarz berish <strong>kassa balansiga ta'sir qilmaydi</strong>. Faqat qarzdorlar ro'yxatida hisoblanadi.
+                    </div>
                     <div class="d-flex gap-3"><button type="button" class="btn-outline-premium flex-grow-1" data-bs-dismiss="modal">Bekor qilish</button><button type="submit" class="btn-primary-premium flex-grow-1" id="debtSubmitBtn">Saqlash</button></div>
                 </form>
             </div>
@@ -576,7 +580,11 @@
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'lov miqdori *</label><input type="number" name="amount" id="payment_amount" class="form-control-premium" step="0.01" required placeholder="Qancha to'layapti"></div>
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">To'lov usuli</label><select name="payment_method" id="payment_method" class="form-control-premium"><option value="CASH">Naqd pul</option><option value="CARD">Plastik karta</option><option value="CLICK">Click</option><option value="PAYME">Payme</option><option value="BANK">Bank</option></select></div>
                     <div class="mb-3"><label class="text-muted mb-2" style="font-size:13px;font-weight:600;">Izoh</label><textarea name="description" id="payment_description" class="form-control-premium" rows="3" placeholder="Qo'shimcha ma'lumot..."></textarea></div>
-                    <div class="alert alert-success rounded-4 py-3 mb-3"><svg class="svg-icon me-2" style="width:16px;height:16px;color:#059669;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> Qarz to'langanda kassa balansiga <strong>kirim</strong> qilinadi.</div>
+                    <!-- ✅ O'ZGARTIRILDI: Kassa balansiga ta'sir qilmaydi -->
+                    <div class="alert alert-warning rounded-4 py-3 mb-3">
+                        <svg class="svg-icon me-2" style="width:16px;height:16px;color:#d97706;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-linecap="round"/></svg> 
+                        Qarz to'lash <strong>kassa balansiga ta'sir qilmaydi</strong>. Faqat qarzdor qarzi kamayadi.
+                    </div>
                     <div class="d-flex gap-3"><button type="button" class="btn-outline-premium flex-grow-1" data-bs-dismiss="modal">Bekor qilish</button><button type="submit" class="btn-success-premium flex-grow-1">To'lovni qabul qilish</button></div>
                 </form>
             </div>
@@ -648,13 +656,6 @@ let currentDebtTxPage = 1;
 
 var paymentLabels = {'CASH':'Naqd pul','CARD':'Plastik karta','CLICK':'Click','PAYME':'Payme','BANK':'Bank'};
 var paymentClasses = {'CASH':'payment-cash','CARD':'payment-card','CLICK':'payment-click','PAYME':'payment-payme','BANK':'payment-bank'};
-var paymentIcons = {
-    'CASH': '💵',
-    'CARD': '💳',
-    'CLICK': '🖱️',
-    'PAYME': '📱',
-    'BANK': '🏦'
-};
 
 function selectType(type) {
     document.getElementById('selected_type').value = type;
@@ -822,7 +823,7 @@ function loadTransactions(page) {
                 html += '<td>' + t.date + '</td>';
                 html += '<td><span class="' + (t.type === 'INCOME' ? 'badge-income' : 'badge-expense') + '">' + (t.type === 'INCOME' ? 'Kirim' : 'Chiqim') + '</span></td>';
                 html += '<td><span class="' + (currencyVal === 'USD' ? 'currency-usd' : 'currency-uzs') + '">' + (currencyVal === 'USD' ? 'USD' : 'UZS') + '</span></td>';
-                html += '<td><span class="payment-badge ' + paymentClasses[paymentMethod] + '">' + paymentIcons[paymentMethod] + ' ' + paymentLabels[paymentMethod] + (isCash ? ' 💰' : '') + '</span></td>';
+                html += '<td><span class="payment-badge ' + paymentClasses[paymentMethod] + '">' + paymentLabels[paymentMethod] + '</span></td>';
                 html += '<td class="text-end fw-semibold ' + (t.type === 'INCOME' ? 'text-success' : 'text-danger') + '">' + sign + ' ' + amount + '</td>';
                 html += '<td>' + (t.customer_name || '-') + '</td>';
                 html += '<td>' + desc + '</td>';
