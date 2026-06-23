@@ -58,7 +58,8 @@
             color: #4f46e5;
         }
         .form-group input, 
-        .form-group select {
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 10px 12px;
             border: 1px solid #e5e7eb;
@@ -66,9 +67,16 @@
             font-size: 14px;
             font-family: 'Inter', sans-serif;
             transition: all 0.3s;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+            max-height: 200px;
         }
         .form-group input:focus, 
-        .form-group select:focus {
+        .form-group select:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: #4f46e5;
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
@@ -238,6 +246,24 @@
                     <div class="helper-text">Bu qiymatdan pastga tushganda ogohlantirish chiqadi</div>
                 </div>
             </div>
+
+            <!-- IZOH QISMI -->
+            <div class="form-group">
+                <label for="note">
+                    <i class="fas fa-pen"></i> Izoh / Eslatma
+                </label>
+                <textarea 
+                    id="note" 
+                    name="note" 
+                    placeholder="Material haqida qo'shimcha ma'lumot kiriting (masalan: yetkazib beruvchi, saqlash sharoiti, narx va h.k.)"
+                    rows="3"
+                ></textarea>
+                <div class="helper-text">
+                    <i class="fas fa-info-circle"></i> 
+                    Ixtiyoriy maydon, material haqida qo'shimcha eslatmalar yozishingiz mumkin
+                </div>
+            </div>
+            <!-- IZOH QISMI TUGADI -->
 
             <hr>
 
