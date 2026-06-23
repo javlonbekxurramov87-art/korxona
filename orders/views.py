@@ -976,6 +976,8 @@ def api_categories(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+# orders/views.py - api_materials funksiyasini yangilang
+
 @login_required
 @staff_member_required
 def api_materials(request):
@@ -991,11 +993,12 @@ def api_materials(request):
         if category_name:
             materials = materials.filter(category__name=category_name)
         
-        # Qidiruv bo'yicha filtr
+        # Qidiruv bo'yicha filtr (izohni ham qo'shish)
         if search_query:
             materials = materials.filter(
                 Q(name__icontains=search_query) |
-                Q(category__name__icontains=search_query)
+                Q(category__name__icontains=search_query) |
+                Q(note__icontains=search_query)  # ✅ IZOH BO'YICHA QIDIRUV
             )
         
         # Holat bo'yicha filtr
@@ -1003,6 +1006,8 @@ def api_materials(request):
             materials = materials.filter(quantity__lte=F('min_stock_level'))
         elif status_filter == 'success':
             materials = materials.filter(quantity__gt=F('min_stock_level'))
+        elif status_filter == 'has_note':
+            materials = materials.filter(note__isnull=False).exclude(note='')  # ✅ IZOHLI MATERIALLAR
         
         materials = materials.order_by('name')
         
@@ -1023,12 +1028,12 @@ def api_materials(request):
                 'min_stock_level': float(m.min_stock_level),
                 'is_low': is_low,
                 'qr_code_url': m.qr_code.url if m.qr_code else None,
+                'note': m.note or '',  # ✅ IZOHNI QAYTARISH
             })
         
         return JsonResponse(data)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
-
 
 @login_required
 @staff_member_required
@@ -1078,6 +1083,8 @@ def api_material_add(request):
         return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'}, status=500)
 
 
+# orders/views.py - api_material_get funksiyasini yangilang
+
 @login_required
 @staff_member_required
 def api_material_get(request, material_id):
@@ -1092,11 +1099,10 @@ def api_material_get(request, material_id):
             'quantity': float(material.quantity),
             'unit': material.unit,
             'min_stock_level': float(material.min_stock_level),
+            'note': material.note or '',  # ✅ IZOHN QAYTARISH
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
-
-
 @login_required
 @staff_member_required
 @require_http_methods(["POST"])
@@ -1234,87 +1240,90 @@ from django.contrib import messages
 from decimal import Decimal
 from .models import Material, MaterialOutput
 
+# views.py - material_output funksiyasida
+
 @login_required
 @staff_member_required
 def material_output(request):
-    """Materialni ombordan chiqarish - To'liq to'g'rilangan variant"""
-    
     if request.method == "POST":
         m_id = request.POST.get('material_id')
-        
-        if not m_id:
-            messages.error(request, "Iltimos, materialni ro'yxatdan tanlang!")
-            return redirect('material_output')
-            
         material = get_object_or_404(Material, id=m_id)
         
-        try:
-            # 1. Miqdorni olish va Decimalga o'tkazish
-            quantity_str = request.POST.get('quantity', '0')
-            quantity = Decimal(quantity_str)
-            
-            # Formadan kelayotgan boshqa ma'lumotlar
-            recipient = request.POST.get('recipient', '').strip()
-            reason = request.POST.get('reason', '').strip()
-            
-            # 2. Validatsiya
-            if quantity <= 0:
-                messages.error(request, "Chiqarish miqdori 0 dan katta bo'lishi kerak!")
-                return redirect('material_output')
-            
-            if quantity > material.quantity:
-                messages.error(request, f"Omborda yetarli emas! Bor: {material.quantity} {material.unit}")
-                return redirect('material_output')
+        quantity = Decimal(request.POST.get('quantity', '0'))
+        recipient = request.POST.get('recipient', '').strip()
+        reason = request.POST.get('reason', '').strip()
+        
+        # ✅ Sana va vaqtni olish
+        output_date = request.POST.get('output_date')
+        output_time = request.POST.get('output_time')
+        
+        # Sana va vaqtni birlashtirish
+        from datetime import datetime
+        if output_date and output_time:
+            output_datetime = datetime.strptime(f"{output_date} {output_time}", "%Y-%m-%d %H:%M")
+        else:
+            output_datetime = timezone.now()
+        
+        # ... materialni chiqarish ...
+        
+        # Chiqarish tarixiga saqlash (agar modelda created_at fieldi bo'lsa, uni o'rniga ishlatish)
+        MaterialOutput.objects.create(
+            material=material,
+            quantity=quantity,
+            reason=f"Qabul qildi: {recipient}. Izoh: {reason}",
+            user=request.user,
+            created_at=output_datetime  # ✅ Sana va vaqtni saqlash
+        )
+        
+        messages.success(request, f"{material.name} dan {quantity} muvaffaqiyatli chiqarildi!")
+        return redirect('warehouse_dashboard')
 
-            # 3. AMALNI BAJARISH: Ombordan ayirish
-            material.quantity -= quantity
-            material.save()
-            
-            # 4. TARIXGA YOZISH: Xatolikni oldini olish uchun faqat bor maydonlarni ishlatamiz
-            # DIQQAT: Agar modelingizda 'recipient' ustuni bo'lmasa, 'reason' ichiga qo'shib yuboramiz
-            full_reason = f"Qabul qildi: {recipient}. Izoh: {reason}"
-            
-            MaterialOutput.objects.create(
-                material=material,
-                quantity=quantity,
-                reason=full_reason, # Ko'pincha bu maydon barcha modellarda bo'ladi
-                user=request.user
-            )
-            
-            messages.success(request, f"{material.name} dan {quantity} muvaffaqiyatli chiqarildi!")
-            return redirect('warehouse_dashboard')
-            
-        except Exception as e:
-            # Agar ayirish bajarilib, tarixda xato bersa, terminalda ko'ramiz
-            print(f"--- KRITIK XATO: {e} ---")
-            messages.error(request, f"Tizimda xatolik: {str(e)}")
-            return redirect('material_output')
-    
-    # GET so'rovi: materiallarni yuborish
-    materials = Material.objects.filter(quantity__gt=0).order_by('name')
-    return render(request, 'orders/material_output.html', {'materials': materials})
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
-from .models import MaterialOutput
+# views.py - output_history funksiyasini yangilang
+
+from django.db.models import Sum
+from itertools import groupby
+from datetime import datetime
 
 @login_required
 @staff_member_required
 def output_history(request):
     """
-    Chiqarish tarixi: 
-    - Material va Foydalanuvchi ma'lumotlarini bitta so'rovda oladi (select_related).
-    - Eng yangi amallarni ro'yxatning tepasiga chiqaradi (-created_at).
+    Chiqarish tarixi - sanalar bo'yicha guruhlangan
     """
+    outputs = MaterialOutput.objects.select_related('material', 'user').order_by('-created_at')
     
-    # Agar 'created_at' xato bersa, '-id' deb o'zgartirib ko'ring
-    try:
-        outputs = MaterialOutput.objects.select_related('material', 'user').order_by('-created_at')
-    except:
-        # Ba'zi modellarda sana 'date_output' yoki 'id' bo'lishi mumkin
-        outputs = MaterialOutput.objects.select_related('material', 'user').order_by('-id')
+    # Sanalar bo'yicha guruhlash
+    grouped = {}
+    user_set = set()
+    
+    for output in outputs:
+        date_key = output.created_at.date()
+        if date_key not in grouped:
+            grouped[date_key] = []
+        grouped[date_key].append(output)
+        if output.user:
+            user_set.add(output.user.username)
+    
+    # Guruhlarni sorted list ga o'tkazish (eng yangi sana birinchi)
+    grouped_outputs = []
+    for date, items in sorted(grouped.items(), reverse=True):
+        total_quantity = sum(item.quantity for item in items)
+        grouped_outputs.append({
+            'date': date,
+            'items': items,
+            'total_quantity': total_quantity,
+        })
+    
+    context = {
+        'grouped_outputs': grouped_outputs,
+        'outputs': outputs,
+        'user_count': len(user_set),
+    }
+    
+    return render(request, 'orders/output_history.html', context)
 
-    return render(request, 'orders/output_history.html', {'outputs': outputs})
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from django.http import HttpResponse
@@ -1555,15 +1564,17 @@ def order_picking_list(request, order_id):
     return render(request, 'orders/picking_list.html', context)
 from django.shortcuts import render, redirect
 from .models import Material, Category
+# orders/views.py - add_material funksiyasini yangilang
 
 @login_required
 def add_material(request):
     if request.method == "POST":
-        name = request.POST.get('name').strip() # Nomdagi bo'shliqlarni olib tashlaymiz
-        category_name = request.POST.get('category_name')
+        name = request.POST.get('name', '').strip()
+        category_name = request.POST.get('category_name', '').strip()
         quantity = float(request.POST.get('quantity', 0))
-        unit = request.POST.get('unit')
+        unit = request.POST.get('unit', 'dona')
         min_stock = request.POST.get('min_stock', 0)
+        note = request.POST.get('note', '').strip()  # ✅ IZOHNI QABUL QILISH
 
         # Kategoriya mantiqi
         category_obj = None
@@ -1571,31 +1582,28 @@ def add_material(request):
             category_obj, created = Category.objects.get_or_create(name=category_name.strip())
 
         # MAHSULOTNI TEKSHIRISH VA SAQLASH
-        # Nomiga qarab bazadan qidiramiz
         material, created = Material.objects.get_or_create(
             name=name,
             defaults={
                 'category': category_obj,
                 'quantity': quantity,
                 'unit': unit,
-                'min_stock_level': min_stock
+                'min_stock_level': min_stock,
+                'note': note  # ✅ IZOHNI SAQLASH
             }
         )
 
-        # Agar mahsulot allaqachon bor bo'lsa (created=False), shunchaki miqdorini qo'shamiz
+        # Agar mahsulot allaqachon bor bo'lsa, miqdorini qo'shamiz va izohni yangilaymiz
         if not created:
             material.quantity = float(material.quantity) + quantity
+            if note:  # Agar izoh yozilgan bo'lsa, yangilaymiz
+                material.note = note
             material.save()
 
-        # Redirect qilishda xato bermasligi uchun loyiha nomini tekshiring
-        try:
-            return redirect('warehouse_dashboard')
-        except:
-            return redirect('warehouse_dashboard')
+        return redirect('warehouse_dashboard')
 
     categories = Category.objects.all()
     return render(request, 'orders/add_material.html', {'categories': categories})
-
 
 @login_required
 def guard_dashboard(request):
