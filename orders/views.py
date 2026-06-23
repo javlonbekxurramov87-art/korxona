@@ -8167,7 +8167,7 @@ def cash_api_debt_edit(request, debt_id):
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_debt_delete(request, debt_id):
-    """Qarzdorni o'chirish (faqat qolgan qarz 0 bo'lsa)"""
+    """Qarzdorni o'chirish - Qolgan qarz bo'lsa ham o'chirish mumkin"""
     
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Method not allowed'}, status=405)
@@ -8175,21 +8175,24 @@ def cash_api_debt_delete(request, debt_id):
     try:
         debt = Debt.objects.get(debt_id=debt_id, is_active=True)
         
-        if debt.remaining > 0:
-            return JsonResponse({
-                'success': False,
-                'message': f"Bu qarzdorning hali {debt.remaining:,.2f} {debt.currency} qarzi bor! Avval to'lashing kerak."
-            })
+        # ❌ QOLGAN QARZNI TEKSHIRMAYMIZ - O'CHIRISH MUMKIN
+        # if debt.remaining > 0:
+        #     return JsonResponse({
+        #         'success': False,
+        #         'message': f"Bu qarzdorning hali {debt.remaining:,.2f} {debt.currency} qarzi bor! Avval to'lashing kerak."
+        #     })
         
+        # ✅ Qarzdorni o'chirish (faqat statusini o'zgartiramiz)
         debt.is_active = False
         debt.save()
+        
+        # Qarzdor bilan bog'liq qarz operatsiyalarini ham o'chirish (yoki faqat qarzdorni)
+        # DebtTransaction.objects.filter(debt=debt).delete()
         
         return JsonResponse({'success': True, 'message': 'Qarzdor o\'chirildi'})
         
     except Debt.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Qarzdor topilmadi'}, status=404)
-
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_debt_payment(request):
