@@ -1174,7 +1174,6 @@ function deleteDebt(debtId) {
         .catch(function() { hideLoading(); showToast('Server xatoligi', 'error'); });
     }
 }
-
 function openPaymentModal(debtId) {
     fetch('/orders/cash/api/debt/' + debtId + '/json/')
         .then(function(r) { return r.json(); })
