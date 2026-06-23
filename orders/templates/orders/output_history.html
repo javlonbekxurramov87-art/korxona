@@ -26,6 +26,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
@@ -35,6 +37,18 @@
             display: flex;
             align-items: center;
             gap: 12px;
+        }
+        
+        .header-title p {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .btn-back {
@@ -57,6 +71,26 @@
             transform: translateX(-5px);
         }
 
+        .btn-excel {
+            text-decoration: none;
+            background: #16a34a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-excel:hover {
+            background: #15803d;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+        }
+
         .card {
             background: white;
             border-radius: 20px;
@@ -65,12 +99,79 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
         }
 
-        table { width: 100%; border-collapse: collapse; text-align: left; }
+        /* ============ SANA GURUHI ============ */
+        .date-group {
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .date-group:last-child {
+            border-bottom: none;
+        }
+
+        .date-header {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid #bbf7d0;
+            user-select: none;
+        }
+        
+        .date-header:hover {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        }
+        
+        .date-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .date-header .date-main {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        
+        .date-header .date-day {
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        .date-header .date-badge {
+            background: #16a34a;
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .date-header .toggle-icon {
+            color: #16a34a;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+        
+        .date-header .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        /* ============ JADVAL ============ */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            text-align: left; 
+        }
         
         th {
             background: #f8fafc;
-            padding: 18px 20px;
-            font-size: 12px;
+            padding: 14px 20px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: #64748b;
@@ -78,23 +179,23 @@
         }
 
         td {
-            padding: 16px 20px;
+            padding: 14px 20px;
             border-bottom: 1px solid #f1f5f9;
             font-size: 14px;
             color: #334155;
         }
 
-        tr:hover { background: #f9fef9; }
-
-        .date-badge {
-            display: inline-block;
-            background: #f1f5f9;
-            padding: 6px 12px;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
+        tr:last-child td {
+            border-bottom: none;
         }
 
-        .time-text {
+        tr:hover td { background: #f9fef9; }
+
+        .date-badge-cell {
+            white-space: nowrap;
+        }
+        
+        .date-badge-cell .time-text {
             display: block;
             font-size: 12px;
             color: #64748b;
@@ -108,6 +209,7 @@
             border-radius: 10px;
             font-weight: 700;
             border: 1px solid #fef3c7;
+            display: inline-block;
         }
 
         .user-tag { 
@@ -118,12 +220,130 @@
             font-size: 12px;
             font-weight: 500;
             border: 1px solid #dcfce7;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
         
         .empty-state {
-            padding: 80px;
+            padding: 80px 20px;
             text-align: center;
             color: #94a3b8;
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.2;
+            color: #16a34a;
+        }
+        
+        .empty-state h3 {
+            color: #475569;
+            margin-bottom: 8px;
+        }
+        
+        /* ============ TEPADAGI STATISTIKA ============ */
+        .stats-bar {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            padding: 12px 0 4px 0;
+        }
+        
+        .stats-bar .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #475569;
+        }
+        
+        .stats-bar .stat-item strong {
+            color: #0f172a;
+            font-size: 18px;
+        }
+        
+        .stats-bar .stat-item i {
+            color: #16a34a;
+            font-size: 18px;
+        }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 768px) {
+            .header-section {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 16px 20px;
+            }
+            
+            .header-actions {
+                justify-content: stretch;
+            }
+            
+            .header-actions a {
+                flex: 1;
+                justify-content: center;
+            }
+            
+            .date-header {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .date-header-left {
+                flex-wrap: wrap;
+            }
+            
+            .stats-bar {
+                gap: 16px;
+            }
+            
+            .stats-bar .stat-item {
+                font-size: 12px;
+            }
+            
+            .stats-bar .stat-item strong {
+                font-size: 15px;
+            }
+            
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            
+            thead tr {
+                display: none;
+            }
+            
+            tr {
+                padding: 12px 16px;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            td {
+                padding: 6px 0;
+                border: none;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: #64748b;
+                font-size: 12px;
+                text-transform: uppercase;
+            }
+            
+            .date-badge-cell .time-text {
+                display: inline;
+                margin-left: 8px;
+            }
+            
+            .date-header .date-main {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
@@ -133,72 +353,147 @@
     <div class="header-section">
         <div class="header-title">
             <h1><i class="fas fa-history" style="color: #16a34a;"></i> Chiqarish Tarixi</h1>
+            <p><i class="fas fa-archive"></i> Jami: <strong>{{ outputs|length }}</strong> ta chiqarish amali</p>
         </div>
-        <a href="{% url 'warehouse_dashboard' %}" class="btn-back">
-            <i class="fas fa-arrow-left"></i> Dashboardga qaytish
-        </a>
-        <a href="{% url 'export_outputs_excel' %}" class="btn-back" style="background: #16a34a; color: white; border: none;">
-            <i class="fas fa-file-excel"></i> Excelga yuklash
-        </a>
+        <div class="header-actions">
+            <a href="{% url 'warehouse_dashboard' %}" class="btn-back">
+                <i class="fas fa-arrow-left"></i> Dashboard
+            </a>
+            <a href="{% url 'export_outputs_excel' %}" class="btn-excel">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+        </div>
     </div>
 
     <div class="card">
-        <table>
-            <thead>
-                <tr>
-                    <th><i class="far fa-calendar-alt"></i> Sana va Vaqt</th>
-                    <th><i class="fas fa-cube"></i> Material</th>
-                    <th><i class="fas fa-balance-scale"></i> Miqdor</th>
-                    <th><i class="fas fa-info-circle"></i> Tafsilotlar (Kimga / Sabab)</th>
-                    <th><i class="fas fa-user-shield"></i> Mas'ul Admin</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for output in outputs %}
-                <tr>
-                    <td style="white-space: nowrap;">
-                        <div class="date-badge">
-                            <strong>{{ output.created_at|date:"d.m.Y" }}</strong>
-                            <span class="time-text"><i class="far fa-clock"></i> {{ output.created_at|date:"H:i" }}</span>
-                        </div>
-                    </td>
-                    <td>
-                        <div style="font-weight: 700; color: #0f172a; font-size: 15px;">{{ output.material.name }}</div>
-                        <div style="font-size: 12px; color: #16a34a; font-weight: 500;">
-                            <i class="fas fa-tag"></i> {{ output.material.category.name|default:"Kategoriyasiz" }}
-                        </div>
-                    </td>
-                    <td>
-                        <span class="badge-qty">
-                            {{ output.quantity|floatformat:3 }} {{ output.material.unit|upper }}
+        <!-- ===== STATISTIKA ===== -->
+        <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;">
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <i class="fas fa-calendar"></i>
+                    <span>Jami kunlar: <strong>{{ grouped_outputs|length }}</strong></span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-boxes"></i>
+                    <span>Jami materiallar: <strong>{{ outputs|length }}</strong></span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-user"></i>
+                    <span>Mas'ullar: <strong>{{ user_count|default:0 }}</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== GURUHLANGAN RO'YXAT ===== -->
+        {% if grouped_outputs %}
+            {% for group in grouped_outputs %}
+            <div class="date-group">
+                <!-- Sana sarlavhasi -->
+                <div class="date-header" onclick="toggleGroup(this)">
+                    <div class="date-header-left">
+                        <span class="date-main">{{ group.date|date:"d F Y" }}</span>
+                        <span class="date-day">{{ group.date|date:"l" }}</span>
+                        <span class="date-badge">{{ group.items|length }} ta chiqarish</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 14px; color: #475569; margin-right: 12px;">
+                            <i class="fas fa-weight-hanging"></i> 
+                            Jami: {{ group.total_quantity|floatformat:2 }} birlik
                         </span>
-                    </td>
-                    <td>
-                        <div style="max-width: 350px;">
-                            <p style="color: #334155; line-height: 1.4;">{{ output.reason|default:"Tafsilotlar yo'q" }}</p>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="user-tag">
-                            <i class="fas fa-user-check"></i> {{ output.user.username }}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5">
-                        <div class="empty-state">
-                            <i class="fas fa-clipboard-list fa-4x" style="margin-bottom: 20px; opacity: 0.2; color: #16a34a;"></i>
-                            <h3>Hali yozuvlar mavjud emas</h3>
-                            <p>Ombordan material chiqarilganda, barcha tarix shu yerda ko'rinadi.</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                </div>
+                
+                <!-- Jadval -->
+                <div class="date-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;"><i class="far fa-clock"></i> Vaqt</th>
+                                <th><i class="fas fa-cube"></i> Material</th>
+                                <th style="width: 120px;"><i class="fas fa-balance-scale"></i> Miqdor</th>
+                                <th><i class="fas fa-info-circle"></i> Tafsilotlar</th>
+                                <th style="width: 140px;"><i class="fas fa-user-shield"></i> Mas'ul</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for output in group.items %}
+                            <tr>
+                                <td data-label="Vaqt" style="white-space: nowrap;">
+                                    <div>
+                                        <strong>{{ output.created_at|date:"H:i" }}</strong>
+                                        <span class="time-text"><i class="far fa-clock"></i> {{ output.created_at|date:"H:i" }}</span>
+                                    </div>
+                                </td>
+                                <td data-label="Material">
+                                    <div style="font-weight: 600; color: #0f172a;">{{ output.material.name }}</div>
+                                    <div style="font-size: 12px; color: #16a34a; font-weight: 500;">
+                                        <i class="fas fa-tag"></i> {{ output.material.category.name|default:"Kategoriyasiz" }}
+                                    </div>
+                                </td>
+                                <td data-label="Miqdor">
+                                    <span class="badge-qty">
+                                        {{ output.quantity|floatformat:3 }} {{ output.material.unit|upper }}
+                                    </span>
+                                </td>
+                                <td data-label="Tafsilotlar">
+                                    <div style="max-width: 320px; line-height: 1.4; font-size: 13px; color: #475569;">
+                                        {{ output.reason|default:"<span style='color:#94a3b8;font-style:italic;'>Izoh yo'q</span>"|safe }}
+                                    </div>
+                                </td>
+                                <td data-label="Mas'ul">
+                                    <span class="user-tag">
+                                        <i class="fas fa-user-check"></i> {{ output.user.username|default:"Admin" }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <h3>Hali yozuvlar mavjud emas</h3>
+                <p>Ombordan material chiqarilganda, barcha tarix shu yerda ko'rinadi.</p>
+            </div>
+        {% endif %}
     </div>
 </div>
+
+<script>
+    // ===== SANALARNI YIG'ISH / YOPISH =====
+    function toggleGroup(headerElement) {
+        const content = headerElement.nextElementSibling;
+        const icon = headerElement.querySelector('.toggle-icon');
+        
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.classList.remove('collapsed');
+            icon.style.transform = 'rotate(0deg)';
+        } else {
+            content.style.display = 'none';
+            icon.classList.add('collapsed');
+            icon.style.transform = 'rotate(-90deg)';
+        }
+    }
+
+    // ===== BARCHA GURUHLARNI OCHIQ HOLATDA BOSHLASH =====
+    document.addEventListener('DOMContentLoaded', function() {
+        // Barcha date-content larni ko'rsatish
+        document.querySelectorAll('.date-content').forEach(el => {
+            el.style.display = 'block';
+        });
+        
+        // Ikonkalarni to'g'ri holatga keltirish
+        document.querySelectorAll('.toggle-icon').forEach(icon => {
+            icon.classList.remove('collapsed');
+            icon.style.transform = 'rotate(0deg)';
+        });
+    });
+</script>
 
 </body>
 </html>
