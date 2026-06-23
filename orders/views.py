@@ -7979,11 +7979,10 @@ def cash_api_debts(request):
     
     return JsonResponse(data)
 
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_debt_create(request):
-    """AJAX orqali yangi qarzdor qo'shish"""
+    """AJAX orqali yangi qarzdor qo'shish - Kassa balansiga ta'sir qilmaydi"""
     from decimal import Decimal
     import uuid
     
@@ -8022,25 +8021,23 @@ def cash_api_debt_create(request):
         full_name=full_name,
         phone=phone or None,
         amount=amount,
-        remaining=amount,  # Dastlab qolgan qarz = jami qarz
+        remaining=amount,
         currency=currency,
         due_date=due_date,
         description=description,
         created_by=request.user
     )
     
-    # 🔥 Kassa qoldig'idan chiqim (qarz berilgan)
-    balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+    # ❌ KASSA BALANSIGA TA'SIR QILMAYDI - OLIB TASHLANDI
+    # balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+    # if currency == 'USD':
+    #     balance.cash_balance_usd -= amount
+    # else:
+    #     balance.cash_balance -= amount
+    # balance.updated_by = request.user
+    # balance.save()
     
-    if currency == 'USD':
-        balance.cash_balance_usd -= amount
-    else:
-        balance.cash_balance -= amount
-    
-    balance.updated_by = request.user
-    balance.save()
-    
-    # 🔥 Qarz operatsiyasini yozish
+    # 🔥 Qarz operatsiyasini yozish (faqat tarix uchun)
     DebtTransaction.objects.create(
         debt=debt,
         transaction_type='DEBT_GIVEN',
@@ -8053,7 +8050,7 @@ def cash_api_debt_create(request):
     
     return JsonResponse({
         'success': True,
-        'message': f"✅ {full_name} ga {amount:,.2f} {currency} qarz berildi!",
+        'message': f"✅ {full_name} ga {amount:,.2f} {currency} qarz berildi! (Kassa balansiga ta'sir qilmaydi)",
         'debt': {
             'id': str(debt.debt_id),
             'full_name': debt.full_name,
@@ -8063,7 +8060,6 @@ def cash_api_debt_create(request):
             'due_date': debt.due_date.strftime('%Y-%m-%d'),
         }
     })
-
 
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
@@ -8098,7 +8094,7 @@ def cash_api_debt_json(request, debt_id):
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_debt_edit(request, debt_id):
-    """Qarzdor ma'lumotlarini tahrirlash"""
+    """Qarzdor ma'lumotlarini tahrirlash - Kassa balansiga ta'sir qilmaydi"""
     from decimal import Decimal
     
     try:
@@ -8132,18 +8128,17 @@ def cash_api_debt_edit(request, debt_id):
         except:
             return JsonResponse({'success': False, 'message': "Sana noto'g'ri formatda!"})
         
-        # 🔥 Qarz summasini o'zgartirganda kassa balansini yangilash
-        old_amount = debt.amount
-        balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
-        
-        if old_amount != new_amount:
-            difference = new_amount - old_amount
-            if debt.currency == 'USD':
-                balance.cash_balance_usd -= difference
-            else:
-                balance.cash_balance -= difference
-            balance.updated_by = request.user
-            balance.save()
+        # ❌ KASSA BALANSIGA TA'SIR QILMAYDI - OLIB TASHLANDI
+        # old_amount = debt.amount
+        # balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
+        # if old_amount != new_amount:
+        #     difference = new_amount - old_amount
+        #     if debt.currency == 'USD':
+        #         balance.cash_balance_usd -= difference
+        #     else:
+        #         balance.cash_balance -= difference
+        #     balance.updated_by = request.user
+        #     balance.save()
         
         # Qarzdorni yangilash
         debt.full_name = full_name
@@ -8156,10 +8151,9 @@ def cash_api_debt_edit(request, debt_id):
         
         return JsonResponse({
             'success': True,
-            'message': f"✅ {full_name} ma'lumotlari yangilandi!"
+            'message': f"✅ {full_name} ma'lumotlari yangilandi! (Kassa balansiga ta'sir qilmaydi)"
         })
     
-    # GET so'rovi uchun ma'lumotlarni qaytarish
     data = {
         'success': True,
         'full_name': debt.full_name,
@@ -8170,8 +8164,6 @@ def cash_api_debt_edit(request, debt_id):
         'description': debt.description or '',
     }
     return JsonResponse(data)
-
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_api_debt_delete(request, debt_id):
