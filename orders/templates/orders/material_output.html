@@ -31,12 +31,41 @@
         .info-label { font-weight: 600; color: #166534; }
         .info-value { font-weight: 700; color: #0f172a; }
         
-        .btn-success { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 600; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; }
-        .btn-secondary { background: white; color: #4b5563; border: 1.5px solid #e2e8f0; padding: 12px 24px; border-radius: 12px; text-decoration: none; display: block; text-align: center; margin-top: 12px; font-weight: 600; }
+        .btn-success { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 600; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; transition: all 0.2s; }
+        .btn-secondary { background: white; color: #4b5563; border: 1.5px solid #e2e8f0; padding: 12px 24px; border-radius: 12px; text-decoration: none; display: block; text-align: center; margin-top: 12px; font-weight: 600; transition: all 0.2s; }
         .btn-success:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2); }
+        .btn-secondary:hover { background: #f9fafb; border-color: #16a34a; }
         
         .required { color: #ef4444; }
         .helper-text { font-size: 12px; color: #166534; margin-top: 6px; font-weight: 500; }
+        
+        /* Sana va vaqt uchun maxsus stillar */
+        .datetime-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .datetime-grid .form-group {
+            margin-bottom: 0;
+        }
+        input[type="date"],
+        input[type="time"] {
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        @media (max-width: 640px) {
+            .datetime-grid {
+                grid-template-columns: 1fr;
+            }
+            .card-body { padding: 20px; }
+            .header { padding: 16px 20px; }
+            .header h1 { font-size: 22px; }
+        }
     </style>
 </head>
 <body>
@@ -102,6 +131,20 @@
                     </div>
                 </div>
 
+                <!-- ✅ YANGI: SANA VA VAQT QISMI -->
+                <div class="datetime-grid">
+                    <div class="form-group">
+                        <label for="output_date"><i class="fas fa-calendar-day"></i> Chiqarish sanasi <span class="required">*</span></label>
+                        <input type="date" id="output_date" name="output_date" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="output_time"><i class="fas fa-clock"></i> Chiqarish vaqti <span class="required">*</span></label>
+                        <input type="time" id="output_time" name="output_time" class="form-control" required>
+                    </div>
+                </div>
+                <!-- SANA VA VAQT QISMI TUGADI -->
+
                 <div class="form-group">
                     <label for="recipient"><i class="fas fa-user-check"></i> Kim qabul qildi? <span class="required">*</span></label>
                     <input type="text" id="recipient" name="recipient" class="form-control" required placeholder="Xodim ismi yoki bo'lim">
@@ -130,6 +173,25 @@
     const maxHelper = document.getElementById('max-helper');
     const quantityInput = document.getElementById('quantity');
     const unitSelect = document.getElementById('output_unit');
+
+    // ✅ Sana va vaqtni avtomatik to'ldirish
+    function setDateTime() {
+        const now = new Date();
+        
+        // Sanani formatlash: YYYY-MM-DD
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        // Vaqtni formatlash: HH:MM
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const timeStr = `${hours}:${minutes}`;
+        
+        document.getElementById('output_date').value = dateStr;
+        document.getElementById('output_time').value = timeStr;
+    }
 
     // 1. ASOSIY TANLASH VA LINKNI TEKSHIRISH MANTIG'I
     function handleSelection() {
@@ -201,14 +263,37 @@
         infoBox.style.display = 'block';
     }
 
+    // ✅ Miqdorni tekshirish (ombordagi qoldiqdan oshmasligi uchun)
+    quantityInput.addEventListener('input', function() {
+        const max = parseFloat(this.max);
+        const val = parseFloat(this.value);
+        if (val > max) {
+            this.value = max;
+            maxHelper.style.color = '#ef4444';
+            maxHelper.textContent = `⚠️ Omborda atigi ${max.toFixed(3)} birlik bor!`;
+        } else {
+            maxHelper.style.color = '#166534';
+            const unit = unitSelect.options[unitSelect.selectedIndex]?.value || '';
+            maxHelper.textContent = `Omborda: ${max.toFixed(3)} ${unit}`;
+        }
+    });
+
     // Skaner har bir harfni yozganda ishlaydi
     searchInput.addEventListener('input', handleSelection);
 
     // URL orqali (telefonda) ochilganda
     document.addEventListener('DOMContentLoaded', function() {
+        // Sana va vaqtni o'rnatish
+        setDateTime();
+        
         const urlParams = new URLSearchParams(window.location.search);
         const mId = urlParams.get('material_id');
         if (mId) selectById(mId);
+        
+        // Agar material skaner orqali tanlansa, miqdor maydoniga fokus
+        if (mId) {
+            setTimeout(() => quantityInput.focus(), 100);
+        }
     });
 </script>
 </body>
