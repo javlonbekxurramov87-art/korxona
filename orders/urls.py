@@ -111,32 +111,26 @@ urlpatterns = [
     path('projects/<int:pk>/download-svg/', views.download_svg, name='download_svg'),
     
     # ==================== KASSA (YAGONA VA TO'LIQ) ====================
-    # Asosiy kassa sahifasi
     path('cash/management/', views.cash_management, name='cash_management'),
-    
-    # Operatsiyalar
     path('cash/transaction/create/', views.cash_transaction_create, name='cash_transaction_create'),
     path('cash/transactions/', views.cash_transaction_list, name='cash_transaction_list'),
     path('cash/transaction/<str:transaction_id>/json/', views.cash_transaction_json, name='cash_transaction_json'),
     path('cash/transaction/<str:transaction_id>/edit/', views.cash_transaction_edit, name='cash_transaction_edit'),
     path('cash/transaction/<str:transaction_id>/delete/', views.cash_transaction_delete, name='cash_transaction_delete'),
-    
-    # Kunlik hisobotlar
     path('cash/daily-report/create/', views.daily_report_create, name='daily_report_create'),
     path('cash/daily-report/<int:pk>/', views.daily_report_detail, name='daily_report_detail'),
     path('cash/daily-reports/', views.daily_report_list, name='daily_report_list'),
     path('cash/daily-report/<int:pk>/json/', views.daily_report_json, name='daily_report_json'),
-    
-    # Excel export
     path('cash/export/excel/', views.export_cash_report_excel, name='export_cash_report_excel'),
-    
-    # AJAX API endpointlar
     path('cash/api/stats/', views.cash_api_stats, name='cash_api_stats'),
     path('cash/api/transactions/', views.cash_api_transactions, name='cash_api_transactions'),
     path('cash/api/transaction/create/', views.cash_api_transaction_create, name='cash_api_transaction_create'),
     path('cash/api/daily-report/create/', views.cash_api_daily_report_create, name='cash_api_daily_report_create'),
     
-    # Tashqi to'lovlar (Click/Payme)
+    # ==================== TASHQI TO'LOVLAR ====================
     path('order/<int:order_id>/payment/click/', views.order_payment_click, name='order_payment_click'),
     path('order/<int:order_id>/payment/payme/', views.order_payment_payme, name='order_payment_payme'),
+    
+    # ==================== OMBORCHI UCHUN ====================
+    path('order/receive-warehouse/<int:pk>/', views.order_receive_warehouse, name='order_receive_warehouse'),
 ]
