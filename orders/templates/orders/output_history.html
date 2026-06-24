@@ -128,6 +128,7 @@
             display: flex;
             align-items: center;
             gap: 16px;
+            flex-wrap: wrap;
         }
         
         .date-header .date-main {
@@ -191,14 +192,21 @@
 
         tr:hover td { background: #f9fef9; }
 
-        .date-badge-cell {
+        /* ===== VAQT KO'RINISHI ===== */
+        .datetime-cell {
             white-space: nowrap;
         }
         
-        .date-badge-cell .time-text {
+        .datetime-cell .time-main {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 16px;
+        }
+        
+        .datetime-cell .time-sub {
             display: block;
             font-size: 12px;
-            color: #64748b;
+            color: #94a3b8;
             margin-top: 2px;
         }
 
@@ -224,6 +232,21 @@
             align-items: center;
             gap: 4px;
         }
+
+        /* ===== QABUL QILGAN SHAXS UCHUN STIL ===== */
+        .recipient-tag {
+            background: #eff6ff;
+            color: #1e40af;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #bfdbfe;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 4px;
+        }
         
         .empty-state {
             padding: 80px 20px;
@@ -243,7 +266,7 @@
             margin-bottom: 8px;
         }
         
-        /* ============ TEPADAGI STATISTIKA ============ */
+        /* ============ STATISTIKA ============ */
         .stats-bar {
             display: flex;
             gap: 32px;
@@ -336,7 +359,7 @@
                 text-transform: uppercase;
             }
             
-            .date-badge-cell .time-text {
+            .datetime-cell .time-sub {
                 display: inline;
                 margin-left: 8px;
             }
@@ -344,6 +367,13 @@
             .date-header .date-main {
                 font-size: 16px;
             }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .header-section { padding: 12px 16px; }
+            .date-header { padding: 12px 16px; }
+            th, td { padding: 10px 16px; }
         }
     </style>
 </head>
@@ -409,20 +439,34 @@
                     <table>
                         <thead>
                             <tr>
-                                <th style="width: 120px;"><i class="far fa-clock"></i> Vaqt</th>
+                                <th style="width: 140px;"><i class="far fa-clock"></i> Sana / Vaqt</th>
                                 <th><i class="fas fa-cube"></i> Material</th>
                                 <th style="width: 120px;"><i class="fas fa-balance-scale"></i> Miqdor</th>
                                 <th><i class="fas fa-info-circle"></i> Tafsilotlar</th>
-                                <th style="width: 140px;"><i class="fas fa-user-shield"></i> Mas'ul</th>
+                                <th style="width: 150px;"><i class="fas fa-user-shield"></i> Mas'ul / Qabul qilgan</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for output in group.items %}
                             <tr>
-                                <td data-label="Vaqt" style="white-space: nowrap;">
+                                <td data-label="Sana / Vaqt" class="datetime-cell">
                                     <div>
-                                        <strong>{{ output.created_at|date:"H:i" }}</strong>
-                                        <span class="time-text"><i class="far fa-clock"></i> {{ output.created_at|date:"H:i" }}</span>
+                                        <span class="time-main">
+                                            <i class="far fa-clock"></i> 
+                                            {% if output.output_time %}
+                                                {{ output.output_time|date:"H:i" }}
+                                            {% else %}
+                                                {{ output.created_at|date:"H:i" }}
+                                            {% endif %}
+                                        </span>
+                                        <span class="time-sub">
+                                            <i class="far fa-calendar-alt"></i> 
+                                            {% if output.output_date %}
+                                                {{ output.output_date|date:"d.m.Y" }}
+                                            {% else %}
+                                                {{ output.created_at|date:"d.m.Y" }}
+                                            {% endif %}
+                                        </span>
                                     </div>
                                 </td>
                                 <td data-label="Material">
@@ -441,10 +485,18 @@
                                         {{ output.reason|default:"<span style='color:#94a3b8;font-style:italic;'>Izoh yo'q</span>"|safe }}
                                     </div>
                                 </td>
-                                <td data-label="Mas'ul">
-                                    <span class="user-tag">
-                                        <i class="fas fa-user-check"></i> {{ output.user.username|default:"Admin" }}
-                                    </span>
+                                <td data-label="Mas'ul / Qabul qilgan">
+                                    <div>
+                                        <span class="user-tag">
+                                            <i class="fas fa-user-cog"></i> {{ output.user.username|default:"Admin" }}
+                                        </span>
+                                        {% if output.recipient %}
+                                        <br>
+                                        <span class="recipient-tag">
+                                            <i class="fas fa-user-check"></i> Qabul qildi: {{ output.recipient }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -482,15 +534,13 @@
 
     // ===== BARCHA GURUHLARNI OCHIQ HOLATDA BOSHLASH =====
     document.addEventListener('DOMContentLoaded', function() {
-        // Barcha date-content larni ko'rsatish
         document.querySelectorAll('.date-content').forEach(el => {
             el.style.display = 'block';
         });
         
-        // Ikonkalarni to'g'ri holatga keltirish
         document.querySelectorAll('.toggle-icon').forEach(icon => {
             icon.classList.remove('collapsed');
-            icon.style.transform = 'rotate(0deg)';
+            icon.style.transform = 'rotate(0deg)');
         });
     });
 </script>
