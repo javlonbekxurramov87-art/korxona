@@ -1643,32 +1643,44 @@
                 </div>
                 {% endif %}
 
-                <!-- Storekeeper Panel -->
-                {% if request.user.username == "Omborchi" or "omborchi" in request.user.username|lower %}
-                <div class="storekeeper-panel">
-                    <div class="storekeeper-header">
-                        <div class="storekeeper-icon">
-                            <i class="fas fa-warehouse"></i>
-                        </div>
-                        <h2 class="storekeeper-title">Ombor Boshqaruvi</h2>
-                    </div>
-                    
-                    <div class="action-grid">
-                        <a href="{% url 'warehouse_dashboard' %}" class="action-card">
-                            <div class="action-card-content">
-                                <div class="action-icon" style="background: #e8f5e9; color: #198754;">
-                                    <i class="fas fa-truck-loading"></i>
-                                </div>
-                                <div class="action-details">
-                                    <h4>Mahsulot Topshirish</h4>
-                                    <p>Tayyor mahsulotlarni yuklash va yopish</p>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
+      <!-- Storekeeper Panel -->
+{% if request.user.username == "Omborchi" or "omborchi" in request.user.username|lower %}
+<div class="storekeeper-panel">
+    <div class="storekeeper-header">
+        <div class="storekeeper-icon">
+            <i class="fas fa-warehouse"></i>
+        </div>
+        <h2 class="storekeeper-title">Ombor Boshqaruvi</h2>
+    </div>
+    
+    <div class="action-grid">
+        <a href="{% url 'warehouse_dashboard' %}" class="action-card">
+            <div class="action-card-content">
+                <div class="action-icon" style="background: #e8f5e9; color: #198754;">
+                    <i class="fas fa-truck-loading"></i>
                 </div>
-                {% endif %}
+                <div class="action-details">
+                    <h4>Mahsulot Topshirish</h4>
+                    <p>Tayyor mahsulotlarni yuklash va yopish</p>
+                </div>
+            </div>
+        </a>
 
+        <!-- YANGI: ARXIV TUGMASI -->
+        <a href="{% url 'order_archive' %}" class="action-card">
+            <div class="action-card-content">
+                <div class="action-icon" style="background: #fef3c7; color: #92400e;">
+                    <i class="fas fa-archive"></i>
+                </div>
+                <div class="action-details">
+                    <h4>Arxivlanganlar</h4>
+                    <p>Yopilgan va arxivdagi buyurtmalar ({{ archived_count }})</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endif %}
                 {% if "qorovul" in request.user.username|lower %}
                 <div class="storekeeper-panel" style="background: #fff5f5; border: 1px solid #feb2b2;">
                     <div class="storekeeper-header">
@@ -1818,17 +1830,7 @@
                                     </div>
                                 </a>
                                 {% endif %}
-                                {% if is_glavniy_admin or is_manager %}
-<a href="{% url 'cash_management' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s;">
-    <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
-        <i class="fas fa-money-bill-wave"></i>
-    </div>
-    <div>
-        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">Kassa</h4>
-        <p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.8);">Kirim/chiqim</p>
-    </div>
-</a>
-{% endif %}
+
                             </div>
                         </div>
                     {% endif %}
@@ -2163,25 +2165,96 @@
                                     </span>
                                 </div>
                                 
-<div class="actions-grid">
-    {% if is_observer %}
-        <!-- Observer faqat ko'radi -->
-        <a href="{% url 'order_detail' order.pk %}" class="action-btn btn-view">
-            <i class="fas fa-eye"></i> Ko'rish
-        </a>
-    
-    {% elif is_worker %}
-        <!-- USTA MAIN ORDERLARDA FAQAT KO'RISHI MUMKIN -->
-        <a href="{% url 'order_detail' order.pk %}" class="action-btn btn-view" style="background: #6366f1; color: white;">
-            <i class="fas fa-eye"></i> Ko'rish
-        </a>
-        <!-- HECH QANDAY HARAKAT TUGMALARI YO'Q -->
-    
-    {% elif is_manager or is_production_boss or is_glavniy_admin %}
-        <!-- Admin/Manager actions -->
-        ...
-    {% endif %}
-</div>
+                                <div class="actions-grid">
+                                    <!-- Actions based on user role -->
+                                    {% if is_observer %}
+                                        <a href="{% url 'order_detail' order.pk %}" class="action-btn btn-view">
+                                            <i class="fas fa-eye"></i> Ko'rish
+                                        </a>
+                                    {% elif is_worker and request.user.worker_profile in order.assigned_workers.all %}
+                                        <!-- Worker actions -->
+                                        {% if status_code == 'tasdiqlandi' or status_code == 'kiritildi' %}
+                                            <a href="{% url 'order_worker_accept' order.pk %}" class="action-btn btn-usta-qabul"
+                                                onclick="return confirm('Tovarlarni qabul qilganingizni tasdiqlaysizmi? Status: USTA QABUL QILDI. ENDI CHIZMANI KOʻRA OLASIZ.')">
+                                                <i class="fas fa-check"></i> Qabul
+                                            </a>
+                                        {% elif status_code == 'usta_qabul_qildi' %}
+                                            {% if order.start_image %} 
+                                                <a href="{% url 'order_worker_start' order.pk %}" class="action-btn btn-usta-boshla"
+                                                    onclick="return confirm('Ishni boshlashni tasdiqlaysizmi? Status: USTA BOSHLADI.')">
+                                                    <i class="fas fa-play"></i> Boshlash
+                                                </a>
+                                            {% else %}
+                                                <a href="{% url 'order_detail' order.pk %}" class="action-btn" style="background: #fca5a5; color: #991b1b;">
+                                                    <i class="fas fa-camera"></i> Boshlash rasmi
+                                                </a>
+                                            {% endif %}
+                                            {% if order.pdf_file %}
+                                                <a href="{{ order.pdf_file.url }}" target="_blank" class="action-btn" style="background: var(--gradient-secondary); color: white;">
+                                                    <i class="fas fa-file-pdf"></i> Chizma
+                                                </a>
+                                            {% endif %}
+                                        {% elif status_code == 'usta_boshla' or status_code == 'ishda' %}
+                                            {% if order.finish_image %}
+                                                <a href="{% url 'order_worker_finish' order.pk %}" class="action-btn btn-usta-tugat"
+                                                    onclick="return confirm('Ishni tugatganingizni tasdiqlaysizmi? Status: USTA YAKUNLADI.')">
+                                                    <i class="fas fa-check-double"></i> Tugatdim
+                                                </a>
+                                            {% else %}
+                                                <a href="{% url 'order_detail' order.pk %}" class="action-btn" style="background: #fca5a5; color: #991b1b;">
+                                                    <i class="fas fa-image"></i> Tugatish rasmi
+                                                </a>
+                                            {% endif %}
+                                            {% if order.pdf_file %}
+                                                <a href="{{ order.pdf_file.url }}" target="_blank" class="action-btn" style="background: var(--gradient-secondary); color: white;">
+                                                    <i class="fas fa-file-pdf"></i> Chizma
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% elif is_manager or is_production_boss or is_glavniy_admin %}
+                                        <!-- Admin/Manager actions -->
+                                        {% if is_glavniy_admin %} 
+                                            <a href="{% url 'order_edit' order.pk %}" class="action-btn btn-edit">
+                                                <i class="fas fa-edit"></i> Tahrir
+                                            </a>
+                                            <a href="{% url 'order_delete' order.pk %}" class="action-btn btn-delete">
+                                                <i class="fas fa-trash"></i> O'chirish
+                                            </a>
+                                        {% endif %}
+                                        {% if is_manager or is_glavniy_admin %}
+                                            {% if status_code == 'kiritildi' %}
+                                                <a href="{% url 'order_confirm' order.pk %}" class="action-btn btn-confirm">
+                                                    <i class="fas fa-check"></i> Qabul
+                                                </a>
+                                                <a href="{% url 'order_reject' order.pk %}" class="action-btn btn-reject">
+                                                    <i class="fas fa-times"></i> Rad
+                                                </a>
+                                            {% elif status_code == 'tayyor' %}
+                                                <a href="{% url 'order_complete' order.pk %}" class="action-btn btn-complete">
+                                                    <i class="fas fa-check-double"></i> Bajarildi
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if is_production_boss or is_glavniy_admin %}
+                                            {% if status_code == 'tasdiqlandi' or status_code == 'usta_qabul_qildi' %}
+                                                <a href="{% url 'order_start_production' order.pk %}" class="action-btn btn-start">
+                                                    <i class="fas fa-play"></i> Ishga berish
+                                                </a>
+                                            {% elif status_code == 'ishda' or status_code == 'usta_tugatdi' %}
+                                                <a href="{% url 'order_finish' order.pk %}" class="action-btn btn-finish">
+                                                    <i class="fas fa-check"></i> Tayyor
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+
+                                    <!-- Detail button for all non-observers -->
+                                    {% if not is_observer %}
+                                        <a href="{% url 'order_detail' order.pk %}" class="action-btn btn-details">
+                                            <i class="fas fa-info-circle"></i> Batafsil
+                                        </a>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                         {% endwith %}
