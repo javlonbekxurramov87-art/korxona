@@ -215,9 +215,6 @@ class CustomLoginView(LoginView):
     redirect_authenticated_user = True
     success_url = reverse_lazy('order_list') 
 
-# ----------------------------------------------------------------------
-# ASOSIY SAHIFA / RO'YXAT
-# ----------------------------------------------------------------------
 @login_required 
 def order_list(request):
     user = request.user
@@ -610,8 +607,36 @@ def order_list(request):
     
     return render(request, 'orders/order_list.html', context)
 
-
-
+@login_required
+def order_receive_warehouse(request, pk):
+    """Omborchi buyurtmani omborga qabul qiladi (USTA_TUGATDI -> TAYYOR)"""
+    
+    if not (request.user.username.lower() == 'omborchi' or 'warehouse' in request.user.username.lower() or 'store' in request.user.username.lower()):
+        messages.error(request, "Sizga bu amalni bajarish uchun ruxsat yo'q!")
+        return redirect('order_list')
+    
+    order = get_object_or_404(Order, pk=pk)
+    
+    if order.status == 'USTA_TUGATDI':
+        order.status = 'TAYYOR'
+        order.save()
+        
+        from django.contrib.admin.models import LogEntry, CHANGE
+        from django.contrib.contenttypes.models import ContentType
+        LogEntry.objects.create(
+            user_id=request.user.id,
+            content_type_id=ContentType.objects.get_for_model(order).pk,
+            object_id=order.pk,
+            object_repr=str(order),
+            action_flag=CHANGE,
+            change_message=f"Omborchi tomonidan qabul qilindi: USTA_TUGATDI -> TAYYOR"
+        )
+        
+        messages.success(request, f"✅ Buyurtma №{order.order_number} omborga qabul qilindi! (TAYYOR)")
+    else:
+        messages.warning(request, f"Bu buyurtma 'USTA_TUGATDI' holatida emas!")
+    
+    return redirect('order_list')
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.shortcuts import render
@@ -625,12 +650,12 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta, date
 from django.utils import timezone
-
+from django.db.models import Q
+from django.db.models.functions import Coalesce
 
 def is_in_group(user, group_name):
     """Foydalanuvchi berilgan guruhga tegishli ekanligini tekshiradi"""
     return user.groups.filter(name=group_name).exists()
-
 
 @login_required
 def order_archive(request):
@@ -642,10 +667,16 @@ def order_archive(request):
     
     archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
     
-    # Asosiy queryset
+    # ========== ASOSIY QUERYSET - TARTIB TUZATILDI ==========
+    from django.db.models.functions import Coalesce
+    from django.db.models import Q
+    
     main_orders = Order.objects.filter(
         status__in=archived_statuses
-    ).order_by('-worker_finished_at', '-created_at')
+    ).annotate(
+        # worker_finished_at NULL bo'lsa created_at ishlatiladi
+        sort_date=Coalesce('worker_finished_at', 'created_at')
+    ).order_by('-sort_date')  # Eng yangisi birinchi
     
     # ==================== FILTRLAR ====================
     search_query = request.GET.get('q', '').strip()
@@ -697,18 +728,12 @@ def order_archive(request):
             except (ValueError, TypeError):
                 date_to = None
     
-    # --- SANA FILTRI (worker_finished_at NULL bo'lsa created_at ishlatiladi) ---
+    # --- SANA FILTRI (sort_date bo'yicha) ---
     if date_from:
-        main_orders = main_orders.filter(
-            Q(worker_finished_at__date__gte=date_from) |
-            Q(worker_finished_at__isnull=True, created_at__date__gte=date_from)
-        )
+        main_orders = main_orders.filter(sort_date__date__gte=date_from)
     
     if date_to:
-        main_orders = main_orders.filter(
-            Q(worker_finished_at__date__lte=date_to) |
-            Q(worker_finished_at__isnull=True, created_at__date__lte=date_to)
-        )
+        main_orders = main_orders.filter(sort_date__date__lte=date_to)
     
     # --- USTA TURI FILTRI ---
     if not is_worker and worker_filter:
@@ -799,6 +824,8 @@ def order_archive(request):
     }
     
     return render(request, 'orders/order_archive.html', context)
+
+
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -1226,57 +1253,108 @@ from django.http import JsonResponse
 from .models import Material, MaterialOutput, Category
 import json
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.admin.views.decorators import staff_member_required
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from .models import Material, MaterialOutput, Category
-from django.shortcuts import render, redirect, get_object_or_404 # Mana buni tekshiring
+# orders/views.py - material_output funksiyasini to'liq yangilang
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
-from django.contrib import messages
 from decimal import Decimal
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from django.utils import timezone
 from .models import Material, MaterialOutput
-
-# views.py - material_output funksiyasida
 
 @login_required
 @staff_member_required
 def material_output(request):
+    """Materialni ombordan chiqarish"""
+    
     if request.method == "POST":
         m_id = request.POST.get('material_id')
-        material = get_object_or_404(Material, id=m_id)
         
-        quantity = Decimal(request.POST.get('quantity', '0'))
-        recipient = request.POST.get('recipient', '').strip()
-        reason = request.POST.get('reason', '').strip()
+        if not m_id:
+            messages.error(request, "Iltimos, materialni ro'yxatdan tanlang!")
+            return redirect('material_output')
         
-        # ✅ Sana va vaqtni olish
-        output_date = request.POST.get('output_date')
-        output_time = request.POST.get('output_time')
-        
-        # Sana va vaqtni birlashtirish
-        from datetime import datetime
-        if output_date and output_time:
-            output_datetime = datetime.strptime(f"{output_date} {output_time}", "%Y-%m-%d %H:%M")
-        else:
-            output_datetime = timezone.now()
-        
-        # ... materialni chiqarish ...
-        
-        # Chiqarish tarixiga saqlash (agar modelda created_at fieldi bo'lsa, uni o'rniga ishlatish)
-        MaterialOutput.objects.create(
-            material=material,
-            quantity=quantity,
-            reason=f"Qabul qildi: {recipient}. Izoh: {reason}",
-            user=request.user,
-            created_at=output_datetime  # ✅ Sana va vaqtni saqlash
-        )
-        
-        messages.success(request, f"{material.name} dan {quantity} muvaffaqiyatli chiqarildi!")
-        return redirect('warehouse_dashboard')
+        try:
+            material = get_object_or_404(Material, id=m_id)
+            
+            # Miqdorni olish
+            quantity_str = request.POST.get('quantity', '0').strip()
+            if not quantity_str:
+                messages.error(request, "Iltimos, miqdorni kiriting!")
+                return redirect('material_output')
+            
+            try:
+                quantity = Decimal(quantity_str)
+            except:
+                messages.error(request, "Miqdor noto'g'ri formatda! Iltimos, son kiriting.")
+                return redirect('material_output')
+            
+            # Forma ma'lumotlari
+            recipient = request.POST.get('recipient', '').strip()  # ✅ Qabul qilgan shaxs
+            reason = request.POST.get('reason', '').strip()
+            
+            # Sana va vaqt
+            output_date = request.POST.get('output_date')
+            output_time = request.POST.get('output_time')
+            
+            # Validatsiya
+            if quantity <= 0:
+                messages.error(request, "Chiqarish miqdori 0 dan katta bo'lishi kerak!")
+                return redirect('material_output')
+            
+            # Ombordagi joriy qoldiqni tekshirish
+            current_quantity = material.quantity
+            if quantity > current_quantity:
+                messages.error(
+                    request, 
+                    f"Omborda yetarli emas! Joriy qoldiq: {current_quantity:.3f} {material.unit}. "
+                    f"So'ralgan: {quantity:.3f}"
+                )
+                return redirect('material_output')
+
+            # Ombordan ayirish
+            material.quantity = material.quantity - quantity
+            material.save()
+            
+            # Tarixga yozish
+            MaterialOutput.objects.create(
+                material=material,
+                quantity=quantity,
+                recipient=recipient,  # ✅ Qabul qilgan shaxs
+                reason=reason,
+                user=request.user,
+                output_date=output_date,
+                output_time=output_time,
+            )
+            
+            messages.success(
+                request, 
+                f"✅ {material.name} dan {quantity:.3f} {material.unit} muvaffaqiyatli chiqarildi! "
+                f"Yangi qoldiq: {material.quantity:.3f} {material.unit}"
+            )
+            return redirect('warehouse_dashboard')
+            
+        except Material.DoesNotExist:
+            messages.error(request, "Material topilmadi!")
+            return redirect('material_output')
+            
+        except Exception as e:
+            print(f"❌ Xatolik: {str(e)}")
+            messages.error(request, f"Tizimda xatolik: {str(e)}")
+            return redirect('material_output')
+    
+    # GET so'rovi: materiallarni yuborish
+    materials = Material.objects.filter(quantity__gt=0).order_by('name')
+    return render(request, 'orders/material_output.html', {'materials': materials})
+
+
+
+
+
+
+
+
 
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
