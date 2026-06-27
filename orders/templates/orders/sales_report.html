@@ -491,13 +491,21 @@
                     Ortga
                 </a>
                 
-                {% if is_glavniy_admin or not is_observer %}
-                <a href="{% url 'export_orders_csv' %}?start_date={{ start_date|default:'' }}&end_date={{ end_date|default:'' }}" 
-                   class="btn btn-export">
-                    <i class="fas fa-file-export"></i>
-                    Eksport
-                </a>
-                {% endif %}
+              {% if is_glavniy_admin or not is_observer %}
+<div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <a href="{% url 'export_sales_excel' %}?start_date={{ start_date|default:'' }}&end_date={{ end_date|default:'' }}" 
+       class="btn" style="background: #217346; color: white; padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+        <i class="fas fa-file-excel"></i>
+        Excel Export
+    </a>
+    
+    <a href="{% url 'export_orders_csv' %}?start_date={{ start_date|default:'' }}&end_date={{ end_date|default:'' }}" 
+       class="btn btn-export">
+        <i class="fas fa-file-export"></i>
+        CSV Export
+    </a>
+</div>
+{% endif %}
             </div>
         </div>
 
