@@ -130,7 +130,8 @@ urlpatterns = [
     # ==================== TASHQI TO'LOVLAR ====================
     path('order/<int:order_id>/payment/click/', views.order_payment_click, name='order_payment_click'),
     path('order/<int:order_id>/payment/payme/', views.order_payment_payme, name='order_payment_payme'),
-    
+    # urls.py ga qo'shimcha
+    path('export-sales-excel/', views.export_sales_report_excel, name='export_sales_excel'),
     # ==================== OMBORCHI UCHUN ====================
     path('order/receive-warehouse/<int:pk>/', views.order_receive_warehouse, name='order_receive_warehouse'),
 ]
