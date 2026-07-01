@@ -1,209 +1,885 @@
-{% extends 'base.html' %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patrul Nazorati</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<div class="container py-4">
-  <div class="card border-0 shadow-lg rounded-4 overflow-hidden patrol-card">
-    <div class="card-header text-white text-center py-4 patrol-header">
-      <div class="header-icon-wrap mx-auto mb-2">
-        <i class="fas fa-shield-alt"></i>
-      </div>
-      <h3 class="fw-bold mb-0">Patrul Nazorati</h3>
-      <div class="mt-2 small opacity-90">
-        Hozirgi vaqt: {{ current_time|date:"H:i" }}
-      </div>
-    </div>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-    <div class="card-body p-4">
-      <div class="row g-3">
-        {% for s in slots %}
-        <div class="col-12">
-          <div class="slot-card {% if s.is_active %}is-active{% else %}is-inactive{% endif %}">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-              <div class="d-flex align-items-center gap-3">
-                <div class="slot-icon">
-                  {% if s.is_active %}
-                    <i class="fas fa-bolt"></i>
-                  {% else %}
-                    <i class="fas fa-clock"></i>
-                  {% endif %}
+        .patrol-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .patrol-header {
+            background: #ffffff;
+            border-radius: 16px 16px 0 0;
+            padding: 1.5rem 2rem;
+            border-bottom: 3px solid #10b981;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: white;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+        }
+
+        .header-title .subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .live-badge {
+            background: #ef4444;
+            color: white;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-badge .dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .time-display {
+            color: #475569;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: #f1f5f9;
+            padding: 6px 14px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .patrol-body {
+            background: #ffffff;
+            padding: 1.5rem 2rem;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .stat-number.green { color: #10b981; }
+        .stat-number.red { color: #ef4444; }
+        .stat-number.blue { color: #3b82f6; }
+        .stat-number.orange { color: #f59e0b; }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .slot-card {
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+
+        .slot-card.completed {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+        .slot-card.completed .slot-left-border {
+            background: #10b981;
+        }
+
+        .slot-card.overdue {
+            background: #fef2f2;
+            border-color: #fca5a5;
+        }
+        .slot-card.overdue .slot-left-border {
+            background: #ef4444;
+        }
+
+        .slot-card.active {
+            background: #eff6ff;
+            border-color: #93c5fd;
+        }
+        .slot-card.active .slot-left-border {
+            background: #3b82f6;
+        }
+
+        .slot-card.default {
+            background: #fafbfc;
+        }
+        .slot-card.default .slot-left-border {
+            background: #94a3b8;
+        }
+
+        .slot-card-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .slot-left-part {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slot-left-border {
+            width: 4px;
+            height: 40px;
+            border-radius: 4px;
+        }
+
+        .slot-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .slot-card.completed .slot-icon {
+            background: rgba(16, 185, 129, 0.12);
+            color: #10b981;
+        }
+
+        .slot-card.overdue .slot-icon {
+            background: rgba(239, 68, 68, 0.12);
+            color: #ef4444;
+        }
+
+        .slot-card.active .slot-icon {
+            background: rgba(59, 130, 246, 0.12);
+            color: #3b82f6;
+        }
+
+        .slot-name {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .slot-status-text {
+            font-size: 0.8rem;
+        }
+
+        .slot-status-text.completed { color: #10b981; }
+        .slot-status-text.overdue { color: #ef4444; font-weight: 600; }
+        .slot-status-text.active { color: #3b82f6; }
+        .slot-status-text.default { color: #94a3b8; }
+
+        .slot-badges {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .badge-custom {
+            padding: 3px 12px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-completed { background: #10b981; color: white; }
+        .badge-overdue { background: #ef4444; color: white; }
+        .badge-active { background: #3b82f6; color: white; }
+        .badge-pending { background: #f59e0b; color: white; }
+
+        .slot-form {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 0.75rem;
+        }
+
+        @media (max-width: 576px) {
+            .upload-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .upload-item {
+            text-align: center;
+        }
+
+        .upload-item .upload-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #64748b;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .file-custom-btn {
+            width: 100%;
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            background: #fafbfc;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 20px;
+        }
+
+        .file-custom-btn:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+            color: #10b981;
+        }
+
+        .file-custom-btn.filled {
+            border-style: solid;
+            border-color: #10b981;
+            background: #10b981;
+            color: white;
+        }
+
+        .file-custom-btn.loading {
+            border-color: #3b82f6;
+            background: #3b82f6;
+            color: white;
+        }
+
+        .preview-wrap {
+            margin-top: 6px;
+        }
+
+        .preview-wrap.d-none {
+            display: none !important;
+        }
+
+        .preview-img {
+            width: 100%;
+            border-radius: 10px;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+            border: 2px solid #e2e8f0;
+        }
+
+        .retake-btn {
+            margin-top: 4px;
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            width: 100%;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .retake-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: white;
+            background: #e2e8f0;
+            cursor: not-allowed;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-submit.active {
+            background: #10b981;
+            cursor: pointer;
+        }
+
+        .btn-submit.active:hover {
+            background: #059669;
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.5;
+        }
+
+        .slot-message {
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .slot-message.success {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #065f46;
+        }
+
+        .slot-message.danger {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #94a3b8;
+            font-size: 0.7rem;
+            margin-top: 1rem;
+            justify-content: center;
+            padding-top: 10px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .auto-refresh .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .patrol-header {
+                padding: 1rem 1.25rem;
+            }
+            .patrol-body {
+                padding: 1rem 1.25rem;
+            }
+            .slot-card {
+                padding: 1rem 1.25rem;
+            }
+            .header-title h1 {
+                font-size: 1.2rem;
+            }
+            .header-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .slot-card-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .slot-badges {
+                width: 100%;
+            }
+            .upload-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="patrol-wrapper">
+    <div class="patrol-header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="header-icon">
+                    <i class="fas fa-shield-alt"></i>
                 </div>
-                <div>
-                  <div class="fw-bold fs-5 mb-0">{{ s.label }}</div>
-                  <div class="small text-muted">
-                    {% if s.is_active %}Hozir faol slot{% else %}Faol emas{% endif %}
-                  </div>
+                <div class="header-title">
+                    <h1>Patrul Nazorati</h1>
+                    <p class="subtitle">Vaqt oralig'i bo'yicha nazorat</p>
                 </div>
-              </div>
-
-              <div class="d-flex align-items-center gap-2">
-                {% if s.is_completed %}
-                  <span class="badge bg-success rounded-pill px-3 py-2">
-                    <i class="fas fa-check-circle me-1"></i> TEKSHIRILDI
-                  </span>
-                {% else %}
-                  <span class="badge bg-danger rounded-pill px-3 py-2">
-                    <i class="fas fa-times-circle me-1"></i> TEKSHIRILMADI
-                  </span>
-                {% endif %}
-
-                {% if s.is_active %}
-                  <span class="badge bg-emerald rounded-pill px-3 py-2">ACTIVE</span>
-                {% endif %}
-              </div>
             </div>
-
-            {% if s.is_active %}
-              {% if s.is_completed %}
-                <div class="mt-3 alert alert-success border-0 mb-0">
-                  <i class="fas fa-check-double me-2"></i> Bu vaqt uchun bugun hisobot topshirilgan ✅
+            <div class="header-right">
+                <div class="live-badge">
+                    <span class="dot"></span> LIVE
                 </div>
-              {% else %}
-                <hr class="my-3">
-                <form id="patrolForm" method="POST" enctype="multipart/form-data">
-                  {% csrf_token %}
-                  <input type="hidden" name="lat" id="lat">
-                  <input type="hidden" name="lng" id="lng">
-                  <input type="hidden" name="slot" value="{{ s.label }}">
-
-                  <div class="row g-3 mb-3 text-center">
-                    {% for i in "1234" %}
-                    <div class="col-6 col-md-3">
-                      <label class="small fw-bold">Rasm {{ i }}</label>
-                      <div class="upload-area mt-2">
-                        <button type="button" class="file-custom-btn" data-target="img{{ i }}">
-                          <i class="fas fa-camera fa-lg"></i>
-                        </button>
-                        <input type="file" id="img{{ i }}" name="img{{ i }}" class="form-control file-input d-none" accept="image/*" capture="environment" required>
-                        <div class="preview-wrap mt-2 d-none" id="previewWrap{{ i }}">
-                          <img class="preview-img" id="previewImg{{ i }}" alt="preview {{ i }}">
-                          <button type="button" class="btn btn-sm btn-outline-success w-100 mt-2 retake-btn" data-target="img{{ i }}">Qayta olish</button>
-                        </div>
-                      </div>
-                    </div>
-                    {% endfor %}
-                  </div>
-
-                  <button type="submit" id="submitBtn" class="btn-patrol-submit" disabled>
-                    <i class="fas fa-check-double"></i> <span>TEKSHIRDIM</span>
-                  </button>
-                </form>
-              {% endif %}
-            {% endif %}
-          </div>
+                <div class="time-display">
+                    <i class="far fa-clock"></i>
+                    <span id="currentTime">{{ current_time|date:"H:i:s" }}</span>
+                </div>
+            </div>
         </div>
-        {% endfor %}
-      </div>
     </div>
-  </div>
+
+    <div class="patrol-body">
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-number green">{{ slots|length }}</div>
+                <div class="stat-label">Jami slotlar</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number green" id="completedCount">0</div>
+                <div class="stat-label">Tekshirilgan</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number orange" id="pendingCount">0</div>
+                <div class="stat-label">Kutilmoqda</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number red" id="overdueCount">0</div>
+                <div class="stat-label">Vaqti o'tgan</div>
+            </div>
+        </div>
+
+        <div id="slotList">
+            {% for s in slots %}
+            <div class="slot-card 
+                {% if s.is_completed %}completed
+                {% elif s.is_overdue %}overdue
+                {% elif s.is_active %}active
+                {% else %}default{% endif %}"
+                data-completed="{{ s.is_completed|yesno:'true,false' }}"
+                data-overdue="{{ s.is_overdue|yesno:'true,false' }}">
+                
+                <div class="slot-card-inner">
+                    <div class="slot-left-part">
+                        <div class="slot-left-border"></div>
+                        <div class="slot-icon">
+                            {% if s.is_completed %}
+                                <i class="fas fa-check"></i>
+                            {% elif s.is_overdue %}
+                                <i class="fas fa-exclamation"></i>
+                            {% elif s.is_active %}
+                                <i class="fas fa-bolt"></i>
+                            {% else %}
+                                <i class="fas fa-clock"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="slot-name">{{ s.label }}</div>
+                            <div class="slot-status-text 
+                                {% if s.is_completed %}completed
+                                {% elif s.is_overdue %}overdue
+                                {% elif s.is_active %}active
+                                {% else %}default{% endif %}">
+                                {% if s.is_completed %}
+                                    Tekshirildi
+                                {% elif s.is_overdue %}
+                                    Vaqti o'tgan
+                                {% elif s.is_active %}
+                                    Hozir faol
+                                {% else %}
+                                    Kutilmoqda
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="slot-badges">
+                        {% if s.is_completed %}
+                            <span class="badge-custom badge-completed">Tekshirildi</span>
+                        {% elif s.is_overdue %}
+                            <span class="badge-custom badge-overdue">Vaqti o'tgan</span>
+                        {% elif s.is_active %}
+                            <span class="badge-custom badge-active">Faol</span>
+                        {% else %}
+                            <span class="badge-custom badge-pending">Kutilmoqda</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- FORM - faqat faol va tekshirilmagan va vaqti o'tmagan bo'lsa -->
+                {% if s.is_active and not s.is_completed and not s.is_overdue %}
+                <div class="slot-form">
+                    <form method="POST" enctype="multipart/form-data" class="patrol-form" action="{% url 'guard_patrol' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="lat" class="lat-input" value="">
+                        <input type="hidden" name="lng" class="lng-input" value="">
+                        <input type="hidden" name="slot" value="{{ s.label }}">
+
+                        <div class="upload-grid">
+                            {% for i in "1234" %}
+                            <div class="upload-item">
+                                <span class="upload-label">Rasm {{ i }}</span>
+                                <button type="button" class="file-custom-btn" data-target="img{{ i }}_{{ forloop.parentloop.counter0 }}">
+                                    <i class="fas fa-camera"></i>
+                                </button>
+                                <input type="file" id="img{{ i }}_{{ forloop.parentloop.counter0 }}" 
+                                       name="img{{ i }}" class="file-input d-none" 
+                                       accept="image/*" capture="environment" required>
+                                <div class="preview-wrap d-none" id="previewWrap{{ i }}_{{ forloop.parentloop.counter0 }}">
+                                    <img class="preview-img" id="previewImg{{ i }}_{{ forloop.parentloop.counter0 }}" alt="preview">
+                                    <button type="button" class="retake-btn" data-target="img{{ i }}_{{ forloop.parentloop.counter0 }}">
+                                        Qayta olish
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <button type="submit" class="btn-submit" disabled>
+                            <i class="fas fa-check"></i> Tasdiqlash
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <!-- MESSAGES -->
+                {% if s.is_completed %}
+                <div class="slot-message success">
+                    <i class="fas fa-check-circle"></i> Bu slot uchun hisobot topshirilgan
+                </div>
+                {% endif %}
+
+                {% if s.is_overdue and not s.is_completed %}
+                <div class="slot-message danger">
+                    <i class="fas fa-exclamation-triangle"></i> Bu slot uchun vaqt o'tgan, tekshirish o'tkazilmadi
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="auto-refresh">
+            <div class="spinner"></div>
+            <span>Avtomatik yangilanmoqda</span>
+            <span id="refreshCountdown" style="color: #10b981; font-weight: 600;">30</span>
+            <span>soniya</span>
+        </div>
+    </div>
 </div>
 
-<style>
-  :root{
-    --emerald-50:#ecfdf5; --emerald-600:#059669; --emerald-700:#047857; --slate-50:#f8fafc; --slate-200:#e2e8f0;
-  }
-  .patrol-header{ background: linear-gradient(135deg, var(--emerald-700) 0%, var(--emerald-600) 100%); }
-  .header-icon-wrap{ width: 56px; height: 56px; border-radius: 18px; background: rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; font-size: 26px; }
-  .slot-card{ border-radius: 16px; padding: 16px; border: 1px solid rgba(0,0,0,0.08); background: #fff; transition: .2s ease; }
-  .slot-card.is-active{ border: 2px solid rgba(16, 185, 129, 0.35); background: linear-gradient(0deg, rgba(16,185,129,0.07), rgba(16,185,129,0.07)), #fff; box-shadow: 0 10px 20px rgba(16, 185, 129, 0.12); }
-  .slot-icon{ width: 44px; height: 44px; border-radius: 14px; display:flex; align-items:center; justify-content:center; background: rgba(16,185,129,0.14); color: var(--emerald-700); }
-  .bg-emerald{ background: var(--emerald-600) !important; }
-  .file-custom-btn{ width: 100%; aspect-ratio: 1/1; display:flex; align-items:center; justify-content:center; border: 2px dashed rgba(16,185,129,0.55); border-radius: 14px; color: var(--emerald-700); background: var(--emerald-50); cursor: pointer; padding: 0; }
-  .file-custom-btn.filled{ border-style: solid; background: var(--emerald-600); color: #fff; }
-  .preview-img{ width: 100%; border-radius: 12px; object-fit: cover; aspect-ratio: 1/1; border: 1px solid var(--slate-200); }
-  .btn-patrol-submit{ width: 100%; padding: 16px; border: none; border-radius: 14px; color: white; font-weight: 800; background: #d1d5db; cursor: not-allowed; }
-  .btn-patrol-submit.active{ background: linear-gradient(135deg, var(--emerald-700) 0%, var(--emerald-600) 100%); cursor: pointer; }
-</style>
-
 <script>
-async function addWatermarkToFile(file) {
-  const MAX_W = 1024; // RAMni tejash uchun o'lchamni kichraytirdik
-  const QUALITY = 0.75; 
+(function() {
+    // ============ UPDATE STATS ============
+    function updateStats() {
+        const cards = document.querySelectorAll('.slot-card');
+        let completed = 0, overdue = 0, pending = 0;
 
-  const bitmap = await createImageBitmap(file);
-  const w = bitmap.width;
-  const h = bitmap.height;
-  const scale = Math.min(1, MAX_W / w);
-  const nw = Math.round(w * scale);
-  const nh = Math.round(h * scale);
+        cards.forEach(card => {
+            if (card.dataset.completed === 'true') completed++;
+            else if (card.dataset.overdue === 'true') overdue++;
+            else pending++;
+        });
 
-  const canvas = document.createElement("canvas");
-  canvas.width = nw;
-  canvas.height = nh;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  ctx.drawImage(bitmap, 0, 0, nw, nh);
-  
-  // BITMAPNI DARHOL YOPAMIZ (RAMni bo'shatish)
-  bitmap.close(); 
+        const completedEl = document.getElementById('completedCount');
+        const overdueEl = document.getElementById('overdueCount');
+        const pendingEl = document.getElementById('pendingCount');
+        
+        if (completedEl) completedEl.textContent = completed;
+        if (overdueEl) overdueEl.textContent = overdue;
+        if (pendingEl) pendingEl.textContent = pending;
+    }
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("uz-UZ");
-  const timeStr = now.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+    // ============ GEOLOCATION ============
+    function updateLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    document.querySelectorAll('.lat-input').forEach(function(el) {
+                        el.value = pos.coords.latitude;
+                    });
+                    document.querySelectorAll('.lng-input').forEach(function(el) {
+                        el.value = pos.coords.longitude;
+                    });
+                },
+                function(err) {
+                    console.log('Geolocation error:', err);
+                }
+            );
+        }
+    }
 
-  const text1 = "ECO PROM";
-  const text2 = `${dateStr} ${timeStr}`;
-  const fontSize = Math.max(18, Math.floor(nw * 0.045));
-  const padding = Math.floor(nw * 0.02);
+    // ============ FILE HANDLERS ============
+    function setupFileHandlers() {
+        // Camera button click
+        document.querySelectorAll('.file-custom-btn').forEach(function(btn) {
+            btn.removeEventListener('click', handleFileBtnClick);
+            btn.addEventListener('click', handleFileBtnClick);
+        });
 
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(0, nh - (fontSize * 2.5), nw * 0.4, fontSize * 2.5);
-  ctx.fillStyle = "#fff";
-  ctx.font = `800 ${fontSize}px Arial`;
-  ctx.fillText(text1, padding, nh - fontSize * 1.2);
-  ctx.font = `600 ${fontSize * 0.7}px Arial`;
-  ctx.fillText(text2, padding, nh - padding);
+        // Retake button click
+        document.querySelectorAll('.retake-btn').forEach(function(btn) {
+            btn.removeEventListener('click', handleRetakeClick);
+            btn.addEventListener('click', handleRetakeClick);
+        });
 
-  const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", QUALITY));
-  
-  // CANVASNI TOZALASH
-  canvas.width = 0; canvas.height = 0;
+        // File input change
+        document.querySelectorAll('.file-input').forEach(function(input) {
+            input.removeEventListener('change', handleFileChange);
+            input.addEventListener('change', handleFileChange);
+        });
+    }
 
-  return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
-}
+    function handleFileBtnClick(e) {
+        e.preventDefault();
+        var input = document.getElementById(this.dataset.target);
+        if (input) input.click();
+    }
 
-const btn = document.getElementById('submitBtn');
-const inputs = document.querySelectorAll('.file-input');
+    function handleRetakeClick(e) {
+        e.preventDefault();
+        var targetId = this.dataset.target;
+        var input = document.getElementById(targetId);
+        if (input) {
+            input.value = '';
+            var previewWrap = document.getElementById('previewWrap' + targetId);
+            if (previewWrap) previewWrap.classList.add('d-none');
+            var label = input.parentElement.querySelector('.file-custom-btn');
+            if (label) {
+                label.classList.remove('filled');
+                label.innerHTML = '<i class="fas fa-camera"></i>';
+            }
+            updateSubmitButtons();
+        }
+    }
 
-function updateSubmitState() {
-  if (!btn) return;
-  const allFilled = Array.from(inputs).every(i => i.files && i.files.length > 0);
-  btn.disabled = !allFilled;
-  allFilled ? btn.classList.add('active') : btn.classList.remove('active');
-}
+    function handleFileChange(e) {
+        var input = this;
+        if (!input.files || !input.files.length) return;
 
-if (btn && inputs.length) {
-  navigator.geolocation.getCurrentPosition(p => {
-    document.getElementById('lat').value = p.coords.latitude;
-    document.getElementById('lng').value = p.coords.longitude;
-  });
+        var label = input.parentElement.querySelector('.file-custom-btn');
+        if (label) {
+            label.classList.add('loading');
+            label.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
 
-  document.querySelectorAll('.file-custom-btn, .retake-btn').forEach(b => {
-    b.addEventListener('click', () => document.getElementById(b.dataset.target).click());
-  });
+        var file = input.files[0];
+        var reader = new FileReader();
+        var targetId = input.id;
+        
+        reader.onload = function(e) {
+            var previewWrap = document.getElementById('previewWrap' + targetId);
+            var previewImg = document.getElementById('previewImg' + targetId);
+            
+            if (previewWrap) previewWrap.classList.remove('d-none');
+            if (previewImg) previewImg.src = e.target.result;
+            
+            if (label) {
+                label.classList.remove('loading');
+                label.classList.add('filled');
+                label.innerHTML = '<i class="fas fa-check"></i>';
+            }
+            
+            updateSubmitButtons();
+        };
+        
+        reader.onerror = function() {
+            alert('Rasmni yuklashda xatolik yuz berdi');
+            if (label) {
+                label.classList.remove('loading');
+                label.innerHTML = '<i class="fas fa-camera"></i>';
+            }
+        };
+        
+        reader.readAsDataURL(file);
+    }
 
-  inputs.forEach(input => {
-    input.addEventListener('change', async function() {
-      if (!this.files.length) return;
-      const label = this.parentElement.querySelector('.file-custom-btn');
-      label.classList.add('filled');
-      label.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-      
-      try {
-        const wmFile = await addWatermarkToFile(this.files[0]);
-        const dt = new DataTransfer();
-        dt.items.add(wmFile);
-        this.files = dt.files;
+    // ============ SUBMIT BUTTON ============
+    function updateSubmitButtons() {
+        document.querySelectorAll('.patrol-form').forEach(function(form) {
+            var inputs = form.querySelectorAll('.file-input');
+            var btn = form.querySelector('.btn-submit');
+            if (!btn) return;
+            
+            var allFilled = true;
+            inputs.forEach(function(input) {
+                if (!input.files || input.files.length === 0) {
+                    allFilled = false;
+                }
+            });
+            
+            btn.disabled = !allFilled;
+            if (allFilled) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
 
-        const idx = this.id.replace('img','');
-        document.getElementById(`previewImg${idx}`).src = URL.createObjectURL(wmFile);
-        document.getElementById(`previewWrap${idx}`).classList.remove('d-none');
-        label.innerHTML = '<i class="fas fa-check"></i>';
-      } catch (e) {
-        alert("Xatolik: Xotira yetmadi. Brauzer varaqlarni yopib qayta urinib ko'ring.");
-        label.innerHTML = '<i class="fas fa-camera"></i>';
-      }
-      updateSubmitState();
+    // ============ CLOCK ============
+    function updateClock() {
+        var now = new Date();
+        var timeStr = now.toLocaleTimeString('uz-UZ', { hour12: false });
+        var el = document.getElementById('currentTime');
+        if (el) el.textContent = timeStr;
+    }
+
+    // ============ AUTO REFRESH ============
+    var countdown = 30;
+    var refreshInterval = null;
+
+    function startCountdown() {
+        var el = document.getElementById('refreshCountdown');
+        if (!el) return;
+        
+        if (refreshInterval) clearInterval(refreshInterval);
+        
+        countdown = 30;
+        el.textContent = countdown;
+        
+        refreshInterval = setInterval(function() {
+            countdown--;
+            el.textContent = countdown;
+            if (countdown <= 0) {
+                clearInterval(refreshInterval);
+                refreshPage();
+            }
+        }, 1000);
+    }
+
+    function refreshPage() {
+        fetch(window.location.href)
+            .then(function(response) {
+                return response.text();
+            })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var newList = doc.querySelector('#slotList');
+                if (newList) {
+                    document.querySelector('#slotList').innerHTML = newList.innerHTML;
+                    setupFileHandlers();
+                    updateSubmitButtons();
+                    updateStats();
+                    updateLocation();
+                }
+            })
+            .catch(function() {})
+            .finally(function() {
+                startCountdown();
+            });
+    }
+
+    // ============ INIT ============
+    document.addEventListener('DOMContentLoaded', function() {
+        updateClock();
+        updateStats();
+        updateLocation();
+        setupFileHandlers();
+        updateSubmitButtons();
+        startCountdown();
+
+        setInterval(updateClock, 1000);
+        setInterval(updateLocation, 5000);
     });
-  });
-}
+
+    // ============ EXPOSE ============
+    window.updateStats = updateStats;
+    window.refreshPage = refreshPage;
+    window.setupFileHandlers = setupFileHandlers;
+    window.updateSubmitButtons = updateSubmitButtons;
+})();
 </script>
-{% endblock %}
+
+</body>
+</html>
