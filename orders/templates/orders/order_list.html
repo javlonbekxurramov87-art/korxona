@@ -1643,7 +1643,7 @@
                 </div>
                 {% endif %}
 
-      <!-- Storekeeper Panel -->
+<!-- Storekeeper Panel -->
 {% if request.user.username == "Omborchi" or "omborchi" in request.user.username|lower %}
 <div class="storekeeper-panel">
     <div class="storekeeper-header">
@@ -1654,6 +1654,7 @@
     </div>
     
     <div class="action-grid">
+        <!-- 1. Mahsulot Topshirish -->
         <a href="{% url 'warehouse_dashboard' %}" class="action-card">
             <div class="action-card-content">
                 <div class="action-icon" style="background: #e8f5e9; color: #198754;">
@@ -1666,7 +1667,31 @@
             </div>
         </a>
 
-        <!-- YANGI: ARXIV TUGMASI -->
+        <!-- 2. TUGATILGAN BUYURTMALAR (YANGI) -->
+        <a href="{% url 'completed_orders_for_loading' %}" class="action-card" style="border: 2px solid #f59e0b;">
+            <div class="action-card-content">
+                <div class="action-icon" style="background: #fef3c7; color: #92400e;">
+                    <i class="fas fa-check-double"></i>
+                </div>
+                <div class="action-details">
+                    <h4>Tugatilgan buyurtmalar 
+                        {% if completed_count %}
+                        <span style="background: #f59e0b; color: white; padding: 0.1rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 700; margin-left: 4px;">
+                            {{ completed_count }}
+                        </span>
+                        {% endif %}
+                    </h4>
+                    <p>Yuklashga tayyor buyurtmalar</p>
+                    {% if completed_count %}
+                        <span style="color: #f59e0b; font-size: 0.8rem; font-weight: 600;">
+                            <i class="fas fa-clock"></i> {{ completed_count }} ta yuklash kutilmoqda
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+
+        <!-- 3. Arxivlanganlar -->
         <a href="{% url 'order_archive' %}" class="action-card">
             <div class="action-card-content">
                 <div class="action-icon" style="background: #fef3c7; color: #92400e;">
@@ -1675,6 +1700,24 @@
                 <div class="action-details">
                     <h4>Arxivlanganlar</h4>
                     <p>Yopilgan va arxivdagi buyurtmalar ({{ archived_count }})</p>
+                </div>
+            </div>
+        </a>
+
+        <!-- 4. Ortib bo'linganlar (YANGI) -->
+        <a href="{% url 'completed_orders_for_loading' %}#loaded-section" class="action-card" style="border: 2px solid #10b981;">
+            <div class="action-card-content">
+                <div class="action-icon" style="background: #d1fae5; color: #065f46;">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="action-details">
+                    <h4>Ortib bo'linganlar</h4>
+                    <p>Mashinaga ortib bo'lingan buyurtmalar</p>
+                    {% if loaded_count %}
+                        <span style="color: #10b981; font-size: 0.8rem; font-weight: 600;">
+                            <i class="fas fa-history"></i> {{ loaded_count }} ta ortilgan
+                        </span>
+                    {% endif %}
                 </div>
             </div>
         </a>
@@ -1840,7 +1883,18 @@
     </div>
 </a>
 {% endif %}
-                            </div>
+{% if is_glavniy_admin or is_manager %}
+<a href="{% url 'kitchen_dashboard' %}" style="text-decoration: none; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 8px 15px; border-radius: 8px; min-width: 200px; flex: 1; max-width: 260px; transition: 0.2s; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+    <div style="background: rgba(255,255,255,0.2); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;">
+        <i class="fas fa-money-bill-wave"></i>
+    </div>
+    <div>
+        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: white;">oshxona</h4>
+    </div>
+</a>
+{% endif %}
+
+                            </div>  
                         </div>
                     {% endif %}
                 {% endif %}
@@ -2033,20 +2087,21 @@
                                         </span>
                                     </div>
                                     {% endif %}
-
-                                    <div class="detail-row">
-                                        <span class="detail-label">
-                                            <i class="fas fa-ruler-combined"></i>
-                                            <span>O'lchamlar</span>
-                                        </span>
-                                        <span class="detail-value">
-                                            {% if is_worker and request.user.worker_profile not in order.assigned_workers.all %}
-                                                <span class="text-masked">***</span>
-                                            {% else %}
-                                                {{ order.panel_thickness|default:"0" }} sm | {{ order.panel_kvadrat|floatformat:2 }} m²
-                                            {% endif %}
-                                        </span>
-                                    </div>
+<div class="detail-row">
+    <span class="detail-label">
+        <i class="fas fa-ruler-combined"></i>
+        <span>O'lchamlar</span>
+    </span>
+    <span class="detail-value">
+        {% if is_worker and request.user.worker_profile not in order.assigned_workers.all %}
+            <span class="text-masked">***</span>
+        {% else %}
+            {{ order.panel_thickness|default:"0" }} sm
+            {% if order.panel_balandligi %} | Balandligi: {{ order.panel_balandligi }} m{% endif %}
+            | {{ order.panel_kvadrat|floatformat:2 }} m²
+        {% endif %}
+    </span>
+</div>
 
                                     {% if not is_worker %}
                                     <div class="detail-row">
@@ -2401,22 +2456,27 @@
                                                 {% endif %}
                                             </span>
                                         </div>
-
-                                        {% if order.eshik_turi %}
-                                        <div class="detail-row">
-                                            <span class="detail-label">
-                                                <i class="fas fa-door-open"></i>
-                                                <span>Eshik Turi</span>
-                                            </span>
-                                            <span class="detail-value">
-                                                {% if is_worker and request.user.worker_profile not in order.assigned_workers.all %}
-                                                    <span class="text-masked">***</span>
-                                                {% else %}
-                                                    <span style="font-weight: 600;">{{ order.eshik_turi }}</span>
-                                                {% endif %}
-                                            </span>
-                                        </div>
-                                        {% endif %}
+{% if order.eshik_turi %}
+<div class="detail-row">
+    <span class="detail-label">
+        <i class="fas fa-door-open"></i>
+        <span>Eshik Turi</span>
+    </span>
+    <span class="detail-value">
+        {% if is_worker and request.user.worker_profile not in order.assigned_workers.all %}
+            <span class="text-masked">***</span>
+        {% else %}
+            <span style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end;">
+                {% for tur, soni in order.get_eshik_turi_list %}
+                    <span style="background: #dbeafe; color: #1e40af; padding: 3px 10px; border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
+                        {{ tur }}{% if soni > 1 %} × {{ soni }}{% endif %}
+                    </span>
+                {% endfor %}
+            </span>
+        {% endif %}
+    </span>
+</div>
+{% endif %}
 
                                         {% if order.panel_type %}
                                         <div class="detail-row">
@@ -2435,18 +2495,20 @@
                                         {% endif %}
 
                                         <div class="detail-row">
-                                            <span class="detail-label">
-                                                <i class="fas fa-ruler-combined"></i>
-                                                <span>O'lchamlar</span>
-                                            </span>
-                                            <span class="detail-value">
-                                                {% if is_worker and request.user.worker_profile not in order.assigned_workers.all %}
-                                                    <span class="text-masked">***</span>
-                                                {% else %}
-                                                    {{ order.panel_thickness|default:"0" }} sm | {{ order.panel_kvadrat|floatformat:2 }} m²
-                                                {% endif %}
-                                            </span>
-                                        </div>
+    <span class="detail-label">
+        <i class="fas fa-ruler-combined"></i>
+        <span>O'lchamlar</span>
+    </span>
+    <span class="detail-value">
+        {% if is_worker and request.user.worker_profile not in order.assigned_workers.all %}
+            <span class="text-masked">***</span>
+        {% else %}
+            {{ order.panel_thickness|default:"0" }} sm
+            {% if order.panel_balandligi %} | Balandligi: {{ order.panel_balandligi }} m{% endif %}
+            | {{ order.panel_kvadrat|floatformat:2 }} m²
+        {% endif %}
+    </span>
+</div>
 
                                         {% if not is_worker %}
                                         <div class="detail-row">
