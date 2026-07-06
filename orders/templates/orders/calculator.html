@@ -1,104 +1,709 @@
-{% extends 'orders/base.html' %}
 
-{% block content %}
-<div class="container-fluid py-4 px-lg-5" style="background: #f0f4f9; min-height: 100vh;">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 no-print gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <a href="{% url 'order_list' %}" class="btn btn-light bg-white shadow-sm border-0 rounded-3 px-3 py-2 d-flex align-items-center gap-2">
-                <i class="fas fa-arrow-left text-primary fw-bold"></i>
-                <span class="d-none d-sm-inline fw-semibold">Orqaga</span>
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulyatsiya - Materiallar Hisobi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f0f4f9;
+            min-height: 100vh;
+            padding: 0;
+            color: #1f2937;
+        }
+
+        .container-fluid {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 32px;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .page-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+            gap: 16px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-back {
+            background: white;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .btn-back:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .header-title h1 {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #111827;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title h1 i {
+            color: #3b82f6;
+        }
+
+        .header-title .badge-count {
+            background: #e0e7ff;
+            color: #4338ca;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .header-title p {
+            color: #6b7280;
+            font-size: 0.85rem;
+            margin: 4px 0 0 0;
+            font-weight: 500;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-outline-print {
+            background: white;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .btn-outline-print:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+        }
+
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.35);
+            color: white;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 18px 22px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        }
+
+        .stat-info .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6b7280;
+            font-weight: 700;
+        }
+
+        .stat-info .stat-value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #111827;
+            margin: 2px 0 0 0;
+            line-height: 1.2;
+        }
+
+        .stat-info .stat-sub {
+            font-size: 0.7rem;
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .stat-icon.blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .stat-icon.green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .stat-icon.yellow { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .stat-icon.red { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        /* Main Table Card */
+        .table-card {
+            background: white;
+            border-radius: 20px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            overflow: hidden;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 720px;
+        }
+
+        .custom-table thead th {
+            background: #f8fafc;
+            padding: 14px 18px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            font-weight: 700;
+            border-bottom: 2px solid #e5e7eb;
+            text-align: left;
+        }
+
+        .custom-table thead th.text-center {
+            text-align: center;
+        }
+
+        .custom-table tbody tr {
+            border-bottom: 1px solid #f3f4f6;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .custom-table tbody tr:hover {
+            background: #f1f5f9;
+        }
+
+        .custom-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .custom-table tbody td {
+            padding: 14px 18px;
+            font-size: 0.9rem;
+            vertical-align: middle;
+        }
+
+        .custom-table tbody td.ps-4 {
+            padding-left: 24px;
+        }
+
+        .custom-table tbody td.pe-4 {
+            padding-right: 24px;
+        }
+
+        .order-number {
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .customer-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .product-name {
+            color: #6b7280;
+            font-size: 0.8rem;
+        }
+
+        .dim-box {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            padding: 6px 14px;
+            border-radius: 10px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .dim-box .kvadrat {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #1f2937;
+        }
+
+        .dim-box .kvadrat small {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        .dim-box .length {
+            font-size: 0.7rem;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .value-primary {
+            font-weight: 700;
+            color: #3b82f6;
+        }
+
+        .value-success {
+            font-weight: 700;
+            color: #10b981;
+        }
+
+        .badge-custom {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge-yellow {
+            background: rgba(245, 158, 11, 0.12);
+            color: #b45309;
+        }
+
+        .badge-red {
+            background: rgba(239, 68, 68, 0.1);
+            color: #b91c1c;
+        }
+
+        .badge-yellow i, .badge-red i {
+            margin-right: 4px;
+        }
+
+        /* Footer */
+        .table-footer {
+            background: white;
+            padding: 14px 24px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .footer-note {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+
+        .footer-note strong {
+            color: #1f2937;
+        }
+
+        .footer-note i {
+            color: #3b82f6;
+        }
+
+        .footer-date {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        /* Modal */
+        .modal-content-custom {
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+
+        .modal-header-custom {
+            border-bottom: none;
+            padding: 24px 28px 0 28px;
+        }
+
+        .modal-header-custom h5 {
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .modal-body-custom {
+            padding: 20px 28px 28px 28px;
+            text-align: center;
+        }
+
+        .modal-body-custom .modal-order-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .modal-body-custom .modal-customer {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+
+        .modal-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .modal-stat-item {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .modal-stat-item .label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .modal-stat-item .value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        .modal-stat-item .value.blue { color: #3b82f6; }
+        .modal-stat-item .value.green { color: #10b981; }
+
+        .modal-footer-custom {
+            border-top: none;
+            padding: 0 28px 28px 28px;
+        }
+
+        .modal-footer-custom .btn-dark-custom {
+            background: #1f2937;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .modal-footer-custom .btn-dark-custom:hover {
+            background: #111827;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #d1d5db;
+            margin-bottom: 16px;
+        }
+
+        .empty-state h5 {
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 992px) {
+            .container-fluid {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container-fluid {
+                padding: 16px;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .header-left {
+                flex-wrap: wrap;
+            }
+
+            .header-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .header-right {
+                justify-content: stretch;
+            }
+
+            .header-right .btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+
+            .stat-card {
+                padding: 14px 18px;
+            }
+
+            .stat-info .stat-value {
+                font-size: 1.3rem;
+            }
+
+            .custom-table tbody td {
+                padding: 10px 14px;
+                font-size: 0.8rem;
+            }
+
+            .custom-table thead th {
+                padding: 10px 14px;
+                font-size: 0.65rem;
+            }
+
+            .table-footer {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .modal-stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-title h1 {
+                font-size: 1.1rem;
+                flex-wrap: wrap;
+            }
+
+            .header-title .badge-count {
+                font-size: 0.65rem;
+                padding: 2px 10px;
+            }
+
+            .dim-box .kvadrat {
+                font-size: 0.9rem;
+            }
+
+            .custom-table {
+                min-width: 600px;
+            }
+
+            .btn-outline-print, .btn-primary-custom, .btn-back {
+                font-size: 0.8rem;
+                padding: 8px 16px;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+
+            .container-fluid {
+                padding: 20px !important;
+            }
+
+            .table-card {
+                border: 1px solid #ddd !important;
+                box-shadow: none !important;
+            }
+
+            .custom-table thead th {
+                background: #f5f5f5 !important;
+            }
+
+            .stat-card {
+                border: 1px solid #ddd !important;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-left">
+            <a href="{% url 'order_list' %}" class="btn-back no-print">
+                <i class="fas fa-arrow-left"></i>
+                <span>Orqaga</span>
             </a>
-            <div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <h1 class="display-6 fw-bold text-dark mb-0" style="font-size: 1.7rem;">
-                        <i class="fas fa-chalkboard-user text-primary me-2"></i>Kalkulyatsiya
-                    </h1>
-                    <div class="stat-badge">
-                        <i class="far fa-clipboard me-1"></i> {{ data|length }} ta buyurtma (Asosiy)
-                    </div>
-                </div>
-                <p class="text-secondary-emphasis mt-1 mb-0 small fw-medium">
-                    <i class="fas fa-cubes me-1"></i> Xomashyo hisobi | faqat asosiy panellar uchun
-                </p>
+            <div class="header-title">
+                <h1>
+                    <i class="fas fa-chalkboard-user"></i>
+                    Kalkulyatsiya
+                    <span class="badge-count">{{ data|length }} ta buyurtma</span>
+                </h1>
+                <p><i class="fas fa-cubes"></i> Xomashyo hisobi | faqat asosiy panellar uchun</p>
             </div>
         </div>
-        <div class="d-flex gap-2">
-            <button onclick="window.print();" class="btn btn-outline-secondary bg-white shadow-sm rounded-3 px-4">
-                <i class="fas fa-print me-2"></i> Chop etish
+        <div class="header-right no-print">
+            <button onclick="window.print();" class="btn-outline-print">
+                <i class="fas fa-print"></i> Chop etish
             </button>
-            <a href="{% url 'order_list' %}" class="btn btn-primary shadow-sm px-4 rounded-3">
-                <i class="fas fa-plus-circle me-2"></i> Buyurtmalar
+            <a href="{% url 'order_list' %}" class="btn-primary-custom">
+                <i class="fas fa-plus-circle"></i> Buyurtmalar
             </a>
         </div>
     </div>
 
-    <div class="row g-3 mb-4 no-print">
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted text-uppercase small fw-bold">Jami List</span>
-                        <h3 class="fw-bold mb-0 mt-1">{{ total_list_all|floatformat:2 }}</h3>
-                        <small class="text-success">m² (zapas bilan)</small>
-                    </div>
-                    <div class="bg-primary bg-opacity-10 p-3 rounded-circle">
-                        <i class="fas fa-tablets text-primary fs-5"></i>
-                    </div>
-                </div>
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-label">Jami List</div>
+                <div class="stat-value">{{ total_list_all|floatformat:2 }}</div>
+                <div class="stat-sub">m² (zapas bilan)</div>
+            </div>
+            <div class="stat-icon blue">
+                <i class="fas fa-tablets"></i>
             </div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted text-uppercase small fw-bold">Siryo (kg)</span>
-                        <h3 class="fw-bold mb-0 mt-1">{{ total_siryo_all|floatformat:1 }}</h3>
-                        <small class="text-success">kg</small>
-                    </div>
-                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
-                        <i class="fas fa-flask text-success fs-5"></i>
-                    </div>
-                </div>
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-label">Siryo</div>
+                <div class="stat-value">{{ total_siryo_all|floatformat:1 }}</div>
+                <div class="stat-sub">kg</div>
+            </div>
+            <div class="stat-icon green">
+                <i class="fas fa-flask"></i>
             </div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted text-uppercase small fw-bold">Zamok</span>
-                        <h3 class="fw-bold mb-0 mt-1">{{ total_zamok_all }}</h3>
-                        <small class="text-muted">dona</small>
-                    </div>
-                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle">
-                        <i class="fas fa-lock text-warning fs-5"></i>
-                    </div>
-                </div>
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-label">Zamok</div>
+                <div class="stat-value">{{ total_zamok_all }}</div>
+                <div class="stat-sub">dona</div>
+            </div>
+            <div class="stat-icon yellow">
+                <i class="fas fa-lock"></i>
             </div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card border-0 shadow-sm rounded-4 p-2 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted text-uppercase small fw-bold">Stakanchik</span>
-                        <h3 class="fw-bold mb-0 mt-1">{{ total_stakanchik_all }}</h3>
-                        <small class="text-muted">dona</small>
-                    </div>
-                    <div class="bg-danger bg-opacity-10 p-3 rounded-circle">
-                        <i class="fas fa-cup-straw text-danger fs-5"></i>
-                    </div>
-                </div>
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-label">Stakanchik</div>
+                <div class="stat-value">{{ total_stakanchik_all }}</div>
+                <div class="stat-sub">dona</div>
+            </div>
+            <div class="stat-icon red">
+                <i class="fas fa-cup-straw"></i>
             </div>
         </div>
     </div>
 
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+    <!-- Main Table -->
+    <div class="table-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 custom-calc-table" style="min-width: 720px;">
+            <table class="custom-table">
                 <thead>
                     <tr>
-                        <th class="ps-4" style="width: 12%;">№ Buyurtma</th>
-                        <th style="width: 22%;">Mijoz & Mahsulot</th>
-                        <th class="text-center" style="width: 18%;">Kvadratura / Boʻyi</th>
+                        <th class="ps-4" style="width: 12%;">Buyurtma</th>
+                        <th style="width: 22%;">Mijoz va Mahsulot</th>
+                        <th class="text-center" style="width: 18%;">Kvadratura / Boyi</th>
                         <th class="text-center" style="width: 12%;">List (m²)</th>
                         <th class="text-center" style="width: 12%;">Siryo (kg)</th>
                         <th class="text-center" style="width: 12%;">Zamok</th>
@@ -109,7 +714,6 @@
                     {% for item in data %}
                     <tr class="order-row" 
                         onclick="showOrderDetails(this)" 
-                        style="cursor: pointer;"
                         data-order="{{ item.order.order_number }}"
                         data-customer="{{ item.order.customer_name }}"
                         data-product="{{ item.order.product_name|default:'Panel' }}"
@@ -122,100 +726,102 @@
                         data-thickness="{{ item.order.panel_thickness|default:'10' }}">
                         
                         <td class="ps-4">
-                            <span class="fw-bold text-dark">#{{ item.order.order_number }}</span>
+                            <span class="order-number">#{{ item.order.order_number }}</span>
                         </td>
                         <td>
-                            <div class="d-flex flex-column">
-                                <span class="fw-bold">{{ item.order.customer_name }}</span>
-                                <span class="text-muted small">{{ item.order.product_name|default:"Panel" }}</span>
-                            </div>
+                            <div class="customer-name">{{ item.order.customer_name }}</div>
+                            <div class="product-name">{{ item.order.product_name|default:"Panel" }}</div>
                         </td>
                         <td class="text-center">
-                            <div class="dim-box-modern d-inline-block">
-                                <div class="kv-val-large">{{ item.order.panel_kvadrat|floatformat:1 }} <small>m²</small></div>
-                                <div class="len-val-sm"><i class="fas fa-ruler-horizontal me-1"></i>{{ item.boyi|floatformat:1 }} m</div>
+                            <div class="dim-box">
+                                <div class="kvadrat">{{ item.order.panel_kvadrat|floatformat:1 }} <small>m²</small></div>
+                                <div class="length"><i class="fas fa-ruler-horizontal"></i> {{ item.boyi|floatformat:1 }} m</div>
                             </div>
                         </td>
-                        <td class="text-center fw-bold text-primary">{{ item.list|floatformat:2 }}</td>
-                        <td class="text-center fw-bold text-success">{{ item.siryo|floatformat:1 }}</td>
+                        <td class="text-center value-primary">{{ item.list|floatformat:2 }}</td>
+                        <td class="text-center value-success">{{ item.siryo|floatformat:1 }}</td>
                         <td class="text-center">
-                            <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-3 py-2">
-                                <i class="fas fa-key me-1"></i>{{ item.zamok }}
+                            <span class="badge-custom badge-yellow">
+                                <i class="fas fa-key"></i> {{ item.zamok }}
                             </span>
                         </td>
                         <td class="text-center pe-4">
-                            <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill px-3 py-2">
-                                <i class="fas fa-cog me-1"></i>{{ item.stakanchik }}
+                            <span class="badge-custom badge-red">
+                                <i class="fas fa-cog"></i> {{ item.stakanchik }}
                             </span>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-5 text-muted bg-white">Hozircha buyurtmalar mavjud emas.</td>
+                        <td colspan="7" class="empty-state">
+                            <i class="fas fa-calculator"></i>
+                            <h5>Hozircha buyurtmalar mavjud emas</h5>
+                            <p>Kalkulyatsiya uchun asosiy buyurtmalar qo'shilgan</p>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <div class="card-footer bg-white border-0 py-3 px-4 no-print d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="table-footer no-print">
             <div class="footer-note">
-                <i class="fas fa-info-circle me-1"></i> 
-                <strong>Formula:</strong> Har bir buyurtma uchun List = Kvadratura × 2. Jami uchun bir marta +10 m² zapas qo'shilgan.
+                <i class="fas fa-info-circle"></i> 
+                <strong>Formula:</strong> Har bir buyurtma uchun List = Kvadratura x 2. Jami uchun bir marta +10 m² zapas qo'shilgan.
             </div>
-            <div class="text-muted small" id="currentDateSpan"></div>
+            <div class="footer-date" id="currentDateSpan"></div>
         </div>
     </div>
 </div>
 
+<!-- Modal -->
 <div class="modal fade" id="orderCalcModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-header border-0 pt-4 px-4">
+        <div class="modal-content modal-content-custom">
+            <div class="modal-header modal-header-custom">
                 <h5 class="modal-title fw-bold">Kalkulyatsiya tafsiloti</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4 pt-0 text-center">
-                <h2 class="fw-bold mb-1" id="m-order-num">---</h2>
-                <p class="text-muted mb-4" id="m-customer">---</p>
-                <div class="row g-3">
-                    <div class="col-6"><div class="p-3 bg-light rounded-3"><strong>List:</strong><br><span id="m-list" class="text-primary fs-4">0</span> m²</div></div>
-                    <div class="col-6"><div class="p-3 bg-light rounded-3"><strong>Siryo:</strong><br><span id="m-siryo" class="text-success fs-4">0</span> kg</div></div>
+            <div class="modal-body modal-body-custom">
+                <div class="modal-order-number" id="m-order-num">---</div>
+                <div class="modal-customer" id="m-customer">---</div>
+                <div class="modal-stats-grid">
+                    <div class="modal-stat-item">
+                        <div class="label">List</div>
+                        <div class="value blue" id="m-list">0</div>
+                    </div>
+                    <div class="modal-stat-item">
+                        <div class="label">Siryo</div>
+                        <div class="value green" id="m-siryo">0</div>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer border-0 p-4">
-                <button type="button" class="btn btn-dark w-100 py-2 rounded-3" data-bs-dismiss="modal">Yopish</button>
+            <div class="modal-footer modal-footer-custom">
+                <button type="button" class="btn-dark-custom" data-bs-dismiss="modal">Yopish</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    // JS orqali yig'indini hisoblash (updateTotals) butunlay olib tashlandi, 
-    // chunki Python tayyor raqamlarni beryapti.
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    window.showOrderDetails = function(rowElement) {
+<script>
+    function showOrderDetails(rowElement) {
         const d = rowElement.dataset;
         document.getElementById('m-order-num').innerText = '#' + d.order;
         document.getElementById('m-customer').innerText = d.customer;
         document.getElementById('m-list').innerText = parseFloat(d.list).toFixed(2);
         document.getElementById('m-siryo').innerText = parseFloat(d.siryo).toFixed(1);
+        
         const modal = new bootstrap.Modal(document.getElementById('orderCalcModal'));
         modal.show();
     }
 
     document.addEventListener('DOMContentLoaded', function() {
         const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        document.getElementById('currentDateSpan').innerText = "Hisobot vaqti: " + new Date().toLocaleDateString('uz-UZ', options);
+        const now = new Date();
+        document.getElementById('currentDateSpan').innerText = 'Hisobot vaqti: ' + now.toLocaleDateString('uz-UZ', options);
     });
 </script>
 
-<style>
-    .stat-badge { background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-    .dim-box-modern { background: white; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 12px; }
-    .kv-val-large { font-size: 1.2rem; font-weight: 800; color: #1e293b; }
-    .len-val-sm { font-size: 0.75rem; color: #3b82f6; font-weight: 600; }
-    .custom-calc-table thead th { background: #f8fafc; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; color: #64748b; padding: 15px; }
-    .footer-note { font-size: 0.75rem; color: #64748b; }
-    .order-row:hover { background-color: #f1f5f9 !important; }
-</style>
-{% endblock %}
+</body>
+</html>
