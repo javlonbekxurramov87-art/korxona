@@ -1,0 +1,164 @@
+{% extends "orders/base.html" %}
+{% load static %}
+
+{% block title %}Masalliqlar ro'yxati{% endblock %}
+
+{% block content %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #2D3436 0%, #636E72 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        color: white;
+    }
+    .page-header h1 {
+        margin: 0;
+        font-weight: 700;
+    }
+    .page-header p {
+        margin: 0;
+        opacity: 0.8;
+    }
+    .table-container {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+    }
+    .btn-primary-custom {
+        background: #6C5CE7;
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-primary-custom:hover {
+        background: #5A4BD1;
+        transform: translateY(-2px);
+        color: white;
+    }
+    .btn-outline-custom {
+        background: transparent;
+        border: 2px solid #6C5CE7;
+        color: #6C5CE7;
+        padding: 0.5rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-outline-custom:hover {
+        background: #6C5CE7;
+        color: white;
+        transform: translateY(-2px);
+    }
+    .badge-low {
+        background: #E17055;
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .badge-ok {
+        background: #00B894;
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h1><i class="fas fa-warehouse me-2"></i>Masalliqlar</h1>
+                <p>Oshxona masalliqlari ro'yxati va holati</p>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <a href="{% url 'kitchen_ingredient_add' %}" class="btn btn-primary-custom">
+                    <i class="fas fa-plus me-1"></i> Yangi masalliq
+                </a>
+                <a href="{% url 'kitchen_dashboard' %}" class="btn btn-outline-custom ms-2">
+                    <i class="fas fa-arrow-left me-1"></i> Orqaga
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <form method="GET" class="d-flex">
+                <input type="text" name="search" class="form-control me-2" placeholder="Qidirish..." value="{{ search }}" style="border-radius: 10px;">
+                <button type="submit" class="btn btn-primary-custom"><i class="fas fa-search"></i></button>
+            </form>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <a href="{% url 'kitchen_ingredient_list' %}" class="btn btn-outline-custom">
+                <i class="fas fa-sync me-1"></i> Tozalash
+            </a>
+            <a href="{% url 'kitchen_ingredient_list' %}?filter=low" class="btn btn-outline-custom ms-2">
+                <i class="fas fa-exclamation-triangle me-1"></i> Kamayganlar
+            </a>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nomi</th>
+                        <th>O'lchov birligi</th>
+                        <th>Miqdori</th>
+                        <th>Minimal</th>
+                        <th>Holat</th>
+                        <th>Harakatlar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ingredient in ingredients %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td><strong>{{ ingredient.name }}</strong></td>
+                        <td>{{ ingredient.get_unit_display }}</td>
+                        <td>{{ ingredient.quantity }}</td>
+                        <td>{{ ingredient.min_quantity }}</td>
+                        <td>
+                            {% if ingredient.is_low %}
+                                <span class="badge-low">Kamaygan</span>
+                            {% else %}
+                                <span class="badge-ok">Yetarli</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'kitchen_ingredient_edit' ingredient.id %}" class="btn btn-sm btn-warning me-1">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{% url 'kitchen_ingredient_add_quantity' ingredient.id %}" class="btn btn-sm btn-success">
+                                <i class="fas fa-plus"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <i class="fas fa-box-open" style="font-size: 2rem; color: #D0D0D0;"></i>
+                            <p class="mt-2">Masalliqlar mavjud emas</p>
+                            <a href="{% url 'kitchen_ingredient_add' %}" class="btn btn-primary-custom btn-sm">
+                                <i class="fas fa-plus me-1"></i> Birinchi masalliqni qo'shish
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "orders/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    .form-container {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .form-container h2 {
+        margin-bottom: 1.5rem;
+        color: #2D3436;
+    }
+    .form-container label {
+        font-weight: 600;
+        color: #2D3436;
+    }
+    .form-container .form-control {
+        border-radius: 10px;
+        border: 2px solid #E0E0E0;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s;
+    }
+    .form-container .form-control:focus {
+        border-color: #6C5CE7;
+        box-shadow: 0 0 0 0.2rem rgba(108, 92, 231, 0.15);
+    }
+    .btn-save {
+        background: #6C5CE7;
+        color: white;
+        border: none;
+        padding: 0.6rem 2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-save:hover {
+        background: #5A4BD1;
+        transform: translateY(-2px);
+        color: white;
+    }
+    .btn-cancel {
+        background: #E0E0E0;
+        color: #2D3436;
+        border: none;
+        padding: 0.6rem 2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-cancel:hover {
+        background: #D0D0D0;
+        transform: translateY(-2px);
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="form-container">
+        <h2><i class="fas fa-box me-2" style="color: #6C5CE7;"></i>{{ title }}</h2>
+        <hr>
+
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">Nomi</label>
+                {{ form.name }}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">O'lchov birligi</label>
+                {{ form.unit }}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Miqdori</label>
+                {{ form.quantity }}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Minimal miqdor</label>
+                {{ form.min_quantity }}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Birlik narxi</label>
+                {{ form.price_per_unit }}
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn-save">
+                    <i class="fas fa-save me-1"></i> Saqlash
+                </button>
+                <a href="{% url 'kitchen_ingredient_list' %}" class="btn-cancel">
+                    <i class="fas fa-times me-1"></i> Bekor qilish
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

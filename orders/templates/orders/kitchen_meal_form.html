@@ -1,0 +1,250 @@
+{% extends "orders/base.html" %}
+{% load static %}
+
+{% block title %}Yangi ovqat qo'shish{% endblock %}
+
+{% block content %}
+<style>
+    .form-container {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+    }
+    .form-container h2 {
+        margin-bottom: 1.5rem;
+        color: #2D3436;
+    }
+    .form-container label {
+        font-weight: 600;
+        color: #2D3436;
+    }
+    .form-container .form-control {
+        border-radius: 10px;
+        border: 2px solid #E0E0E0;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s;
+    }
+    .form-container .form-control:focus {
+        border-color: #6C5CE7;
+        box-shadow: 0 0 0 0.2rem rgba(108, 92, 231, 0.15);
+    }
+    .ingredient-form {
+        background: #F8F9FA;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid #E0E0E0;
+    }
+    .btn-add-ingredient {
+        background: #6C5CE7;
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-add-ingredient:hover {
+        background: #5A4BD1;
+        transform: translateY(-2px);
+        color: white;
+    }
+    .btn-save {
+        background: #6C5CE7;
+        color: white;
+        border: none;
+        padding: 0.6rem 2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    .btn-save:hover {
+        background: #5A4BD1;
+        transform: translateY(-2px);
+        color: white;
+    }
+    .required-star {
+        color: #E17055;
+        margin-left: 3px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="form-container">
+                <h2><i class="fas fa-utensils me-2" style="color: #6C5CE7;"></i>Yangi ovqat qo'shish</h2>
+                <hr>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="post" id="mealForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Sana <span class="required-star">*</span></label>
+                                <input type="date" name="date" class="form-control" id="id_date" required>
+                                {% if form.date.errors %}
+                                    <div class="text-danger">{{ form.date.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Ovqat turi <span class="required-star">*</span></label>
+                                <select name="meal_type" class="form-control" id="id_meal_type" required>
+                                    <option value="BREAKFAST">Nonushta</option>
+                                    <option value="LUNCH" selected>Tushlik</option>
+                                    <option value="DINNER">Kechki ovqat</option>
+                                    <option value="SNACK">Perekus</option>
+                                </select>
+                                {% if form.meal_type.errors %}
+                                    <div class="text-danger">{{ form.meal_type.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Ovqat nomi <span class="required-star">*</span></label>
+                                <input type="text" name="meal_name" class="form-control" id="id_meal_name" placeholder="Ovqat nomini kiriting..." required>
+                                {% if form.meal_name.errors %}
+                                    <div class="text-danger">{{ form.meal_name.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Odam soni <span class="required-star">*</span></label>
+                                <input type="number" name="person_count" class="form-control" id="id_person_count" min="1" placeholder="Masalan: 10" required>
+                                {% if form.person_count.errors %}
+                                    <div class="text-danger">{{ form.person_count.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Izoh</label>
+                        <textarea name="description" class="form-control" id="id_description" rows="2" placeholder="Qo'shimcha ma'lumot..."></textarea>
+                        {% if form.description.errors %}
+                            <div class="text-danger">{{ form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <hr>
+                    <h5 class="mb-3"><i class="fas fa-box me-2" style="color: #6C5CE7;"></i>Masalliqlar <span class="required-star">*</span></h5>
+
+                    <div id="ingredient-forms">
+                        {{ formset.management_form }}
+                        {% for form in formset %}
+                            <div class="ingredient-form">
+                                <div class="row">
+                                    <div class="col-md-7">
+                                        <label class="form-label">Masalliq</label>
+                                        {{ form.ingredient }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">1 kishiga (birlik)</label>
+                                        {{ form.quantity_per_person }}
+                                    </div>
+                                    <div class="col-md-1 d-flex align-items-end">
+                                        {% if form.instance.pk %}
+                                            <label class="form-label">&nbsp;</label>
+                                            {{ form.DELETE }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="button" class="btn-add-ingredient mt-2" id="add-ingredient">
+                        <i class="fas fa-plus me-1"></i> Yana masalliq qo'shish
+                    </button>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn-save">
+                            <i class="fas fa-save me-1"></i> Saqlash
+                        </button>
+                        <a href="{% url 'kitchen_dashboard' %}" class="btn btn-secondary" style="border-radius: 10px; font-weight: 600;">
+                            <i class="fas fa-times me-1"></i> Bekor qilish
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Hozirgi sanani avtomatik qo'yish
+        const dateInput = document.getElementById('id_date');
+        if (dateInput) {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            dateInput.value = `${year}-${month}-${day}`;
+        }
+
+        // Masalliq qo'shish
+        const addButton = document.getElementById('add-ingredient');
+        const formsContainer = document.getElementById('ingredient-forms');
+        
+        addButton.addEventListener('click', function() {
+            const totalForms = document.getElementById('id_ingredients-TOTAL_FORMS');
+            const formCount = parseInt(totalForms.value);
+            const lastForm = formsContainer.querySelector('.ingredient-form:last-child');
+            
+            if (lastForm) {
+                const newForm = lastForm.cloneNode(true);
+                
+                // Yangi form uchun ID va name larni yangilash
+                const formRegex = new RegExp(`ingredients-${formCount-1}`, 'g');
+                newForm.innerHTML = newForm.innerHTML.replace(formRegex, `ingredients-${formCount}`);
+                
+                newForm.querySelectorAll('input, select, textarea').forEach(input => {
+                    if (input.type !== 'hidden' && input.type !== 'submit') {
+                        input.value = '';
+                    }
+                    if (input.id) {
+                        input.id = input.id.replace(formRegex, `ingredients-${formCount}`);
+                    }
+                    if (input.name) {
+                        input.name = input.name.replace(formRegex, `ingredients-${formCount}`);
+                    }
+                });
+                
+                newForm.querySelectorAll('label').forEach(label => {
+                    if (label.htmlFor) {
+                        label.htmlFor = label.htmlFor.replace(formRegex, `ingredients-${formCount}`);
+                    }
+                });
+                
+                // DELETE checkbox ni olib tashlash (yangi form uchun)
+                const deleteCheck = newForm.querySelector('[type="checkbox"]');
+                if (deleteCheck) {
+                    deleteCheck.remove();
+                }
+                
+                formsContainer.appendChild(newForm);
+                totalForms.value = formCount + 1;
+            }
+        });
+    });
+</script>
+{% endblock %}

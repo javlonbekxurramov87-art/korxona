@@ -1,0 +1,552 @@
+{% extends "orders/base.html" %}
+{% load static %}
+
+{% block title %}Oshxona Dashboard{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --kitchen-primary: #2D3436;
+        --kitchen-secondary: #FD79A8;
+        --kitchen-accent: #6C5CE7;
+        --kitchen-success: #00B894;
+        --kitchen-warning: #FDCB6E;
+        --kitchen-danger: #E17055;
+        --kitchen-info: #0984E3;
+        --kitchen-bg: #F8F9FA;
+        --kitchen-card-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        --kitchen-radius: 16px;
+        --kitchen-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .kitchen-header {
+        background: linear-gradient(135deg, #2D3436 0%, #636E72 100%);
+        border-radius: var(--kitchen-radius);
+        padding: 2.5rem 2rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .kitchen-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 300px;
+        height: 300px;
+        background: rgba(253, 121, 168, 0.1);
+        border-radius: 50%;
+    }
+
+    .kitchen-header::after {
+        content: '';
+        position: absolute;
+        bottom: -40%;
+        left: 20%;
+        width: 200px;
+        height: 200px;
+        background: rgba(108, 92, 231, 0.08);
+        border-radius: 50%;
+    }
+
+    .kitchen-header-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .kitchen-header h1 {
+        color: white;
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.5px;
+    }
+
+    .kitchen-header p {
+        color: rgba(255,255,255,0.8);
+        font-size: 1.1rem;
+        margin: 0;
+    }
+
+    .kitchen-stat-card {
+        background: white;
+        border-radius: var(--kitchen-radius);
+        padding: 1.5rem;
+        box-shadow: var(--kitchen-card-shadow);
+        transition: var(--kitchen-transition);
+        border: none;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .kitchen-stat-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 15px 50px rgba(0,0,0,0.12);
+    }
+
+    .kitchen-stat-card .stat-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .kitchen-stat-card .stat-icon.green { background: #E8F8F5; color: #00B894; }
+    .kitchen-stat-card .stat-icon.blue { background: #EBF5FB; color: #0984E3; }
+    .kitchen-stat-card .stat-icon.orange { background: #FEF9E7; color: #FDCB6E; }
+    .kitchen-stat-card .stat-icon.red { background: #FDEDEC; color: #E17055; }
+
+    .kitchen-stat-card .stat-number {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #2D3436;
+        margin-bottom: 0.25rem;
+        line-height: 1;
+    }
+
+    .kitchen-stat-card .stat-label {
+        color: #636E72;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .kitchen-stat-card .stat-change {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        display: inline-block;
+        margin-top: 0.25rem;
+    }
+
+    .stat-change.up { background: #E8F8F5; color: #00B894; }
+    .stat-change.down { background: #FDEDEC; color: #E17055; }
+
+    .kitchen-card {
+        background: white;
+        border-radius: var(--kitchen-radius);
+        box-shadow: var(--kitchen-card-shadow);
+        border: none;
+        overflow: hidden;
+        transition: var(--kitchen-transition);
+    }
+
+    .kitchen-card:hover {
+        box-shadow: 0 15px 50px rgba(0,0,0,0.12);
+    }
+
+    .kitchen-card .card-header {
+        background: white;
+        border-bottom: 1px solid #F0F0F0;
+        padding: 1.25rem 1.5rem;
+        font-weight: 600;
+        color: #2D3436;
+    }
+
+    .kitchen-card .card-body {
+        padding: 1.5rem;
+    }
+
+    .kitchen-btn-primary {
+        background: linear-gradient(135deg, #6C5CE7 0%, #A29BFE 100%);
+        border: none;
+        color: white;
+        padding: 0.6rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: var(--kitchen-transition);
+    }
+
+    .kitchen-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(108, 92, 231, 0.35);
+        color: white;
+    }
+
+    .kitchen-btn-outline {
+        background: transparent;
+        border: 2px solid #E0E0E0;
+        color: #2D3436;
+        padding: 0.6rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: var(--kitchen-transition);
+    }
+
+    .kitchen-btn-outline:hover {
+        border-color: #6C5CE7;
+        color: #6C5CE7;
+        transform: translateY(-2px);
+    }
+
+    .kitchen-table {
+        margin: 0;
+    }
+
+    .kitchen-table thead th {
+        background: #F8F9FA;
+        color: #636E72;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #E0E0E0;
+        padding: 1rem 0.75rem;
+    }
+
+    .kitchen-table tbody td {
+        padding: 0.9rem 0.75rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #F0F0F0;
+    }
+
+    .kitchen-table tbody tr:hover {
+        background: #F8F9FA;
+    }
+
+    .kitchen-badge {
+        padding: 0.35rem 0.9rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    .kitchen-badge.primary { background: #EBF5FB; color: #0984E3; }
+    .kitchen-badge.success { background: #E8F8F5; color: #00B894; }
+    .kitchen-badge.warning { background: #FEF9E7; color: #FDCB6E; }
+    .kitchen-badge.danger { background: #FDEDEC; color: #E17055; }
+
+    .kitchen-ingredient-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #F0F0F0;
+    }
+
+    .kitchen-ingredient-item:last-child {
+        border-bottom: none;
+    }
+
+    .kitchen-ingredient-item .ingredient-name {
+        font-weight: 500;
+        color: #2D3436;
+    }
+
+    .kitchen-ingredient-item .ingredient-quantity {
+        font-weight: 600;
+        color: #636E72;
+    }
+
+    .kitchen-quick-link {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        background: #F8F9FA;
+        border-radius: 12px;
+        transition: var(--kitchen-transition);
+        text-decoration: none;
+        color: #2D3436;
+    }
+
+    .kitchen-quick-link:hover {
+        background: #6C5CE7;
+        color: white;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(108, 92, 231, 0.25);
+        text-decoration: none;
+    }
+
+    .kitchen-quick-link .link-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        background: white;
+        flex-shrink: 0;
+    }
+
+    .kitchen-quick-link:hover .link-icon {
+        background: rgba(255,255,255,0.2);
+        color: white;
+    }
+
+    .kitchen-quick-link .link-text {
+        flex: 1;
+    }
+
+    .kitchen-quick-link .link-text h6 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .kitchen-quick-link .link-text small {
+        color: #636E72;
+        font-size: 0.8rem;
+    }
+
+    .kitchen-quick-link:hover .link-text small {
+        color: rgba(255,255,255,0.8);
+    }
+
+    .kitchen-empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+    }
+
+    .kitchen-empty-state .empty-icon {
+        font-size: 3.5rem;
+        color: #D0D0D0;
+        margin-bottom: 1rem;
+    }
+
+    .kitchen-empty-state h5 {
+        color: #2D3436;
+        margin-bottom: 0.5rem;
+    }
+
+    .kitchen-empty-state p {
+        color: #636E72;
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .kitchen-header {
+            padding: 1.5rem;
+        }
+        .kitchen-header h1 {
+            font-size: 1.5rem;
+        }
+        .kitchen-stat-card .stat-number {
+            font-size: 1.6rem;
+        }
+    }
+</style>
+
+<div class="container-fluid py-4">
+
+    <!-- Premium Header -->
+    <div class="kitchen-header">
+        <div class="kitchen-header-content">
+            <h1>Oshxona Boshqaruvi</h1>
+            <p>Bugungi ovqatlar va masalliq holatini kuzating</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="kitchen-stat-card">
+                <div class="stat-icon green">
+                    <i class="fas fa-utensils"></i>
+                </div>
+                <div class="stat-number">{{ today_meals|length }}</div>
+                <div class="stat-label">Bugungi ovqatlar</div>
+                <span class="stat-change up">
+                    <i class="fas fa-arrow-up"></i> 12%
+                </span>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="kitchen-stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-number">{{ today_total_persons }}</div>
+                <div class="stat-label">Odamlar soni</div>
+                <span class="stat-change up">
+                    <i class="fas fa-arrow-up"></i> 8%
+                </span>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="kitchen-stat-card">
+                <div class="stat-icon orange">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="stat-number">{{ ingredients|length }}</div>
+                <div class="stat-label">Masalliqlar</div>
+                <span class="stat-change down">
+                    <i class="fas fa-arrow-down"></i> 2%
+                </span>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="kitchen-stat-card">
+                <div class="stat-icon red">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-number">{{ low_count }}</div>
+                <div class="stat-label">Kamaygan masalliqlar</div>
+                <span class="stat-change down">
+                    <i class="fas fa-arrow-up"></i> 5%
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row g-4 mt-2">
+
+        <!-- Today's Meals -->
+        <div class="col-lg-8">
+            <div class="kitchen-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-clipboard-list me-2" style="color: #6C5CE7;"></i>Bugungi ovqatlar</span>
+                    <a href="{% url 'daily_meal_create' %}" class="kitchen-btn-primary btn btn-sm">
+                        <i class="fas fa-plus me-1"></i> Qo'shish
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if today_meals %}
+                        <div class="table-responsive">
+                            <table class="table kitchen-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ovqat turi</th>
+                                        <th>Nomi</th>
+                                        <th>Odam soni</th>
+                                        <th>Izoh</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for meal in today_meals %}
+                                    <tr>
+                                        <td>
+                                            <span class="kitchen-badge primary">{{ meal.get_meal_type_display }}</span>
+                                        </td>
+                                        <td><strong>{{ meal.meal_name }}</strong></td>
+                                        <td>
+                                            <span class="badge bg-dark rounded-pill">{{ meal.person_count }}</span>
+                                        </td>
+                                        <td>{{ meal.description|default:"—" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="kitchen-empty-state">
+                            <div class="empty-icon">
+                                <i class="fas fa-utensils"></i>
+                            </div>
+                            <h5>Bugungi ovqatlar yo'q</h5>
+                            <p>Hozircha ovqat qo'shilmagan. Yangi ovqat qo'shish uchun tugmani bosing.</p>
+                            <a href="{% url 'daily_meal_create' %}" class="kitchen-btn-primary btn mt-3">
+                                <i class="fas fa-plus me-1"></i> Birinchi ovqatni qo'shish
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Low Ingredients -->
+        <div class="col-lg-4">
+            <div class="kitchen-card">
+                <div class="card-header">
+                    <span><i class="fas fa-exclamation-triangle me-2" style="color: #E17055;"></i>Kamaygan masalliqlar</span>
+                </div>
+                <div class="card-body">
+                    {% if low_ingredients %}
+                        <div class="mb-3">
+                            {% for ing in low_ingredients %}
+                            <div class="kitchen-ingredient-item">
+                                <span class="ingredient-name">{{ ing.name }}</span>
+                                <span class="ingredient-quantity">
+                                    <span class="badge bg-danger">{{ ing.quantity }} {{ ing.get_unit_display }}</span>
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <a href="{% url 'kitchen_ingredient_list' %}?filter=low" class="kitchen-btn-outline btn w-100 btn-sm">
+                            <i class="fas fa-eye me-1"></i> Hammasini ko'rish
+                        </a>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle" style="font-size: 3rem; color: #00B894;"></i>
+                            <h6 class="mt-3 text-success">Barcha masalliqlar yetarli</h6>
+                            <p class="text-muted small">Hozircha kamaygan masalliq yo'q</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Quick Links -->
+    <div class="row g-4 mt-2">
+        <div class="col-12">
+            <div class="kitchen-card">
+                <div class="card-header">
+                    <span><i class="fas fa-bolt me-2" style="color: #FDCB6E;"></i>Tezkor havolalar</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'kitchen_ingredient_list' %}" class="kitchen-quick-link">
+                                <div class="link-icon" style="background: #E8F8F5; color: #00B894;">
+                                    <i class="fas fa-warehouse"></i>
+                                </div>
+                                <div class="link-text">
+                                    <h6>Masalliqlar</h6>
+                                    <small>Barcha masalliqlarni ko'rish</small>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #D0D0D0;"></i>
+                            </a>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'kitchen_ingredient_add' %}" class="kitchen-quick-link">
+                                <div class="link-icon" style="background: #EBF5FB; color: #0984E3;">
+                                    <i class="fas fa-plus-circle"></i>
+                                </div>
+                                <div class="link-text">
+                                    <h6>Yangi masalliq</h6>
+                                    <small>Masalliq qo'shish</small>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #D0D0D0;"></i>
+                            </a>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'kitchen_order_list' %}" class="kitchen-quick-link">
+                                <div class="link-icon" style="background: #FEF9E7; color: #FDCB6E;">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </div>
+                                <div class="link-text">
+                                    <h6>Buyurtmalar</h6>
+                                    <small>Masalliq buyurtmalari</small>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #D0D0D0;"></i>
+                            </a>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'daily_meal_list' %}" class="kitchen-quick-link">
+                                <div class="link-icon" style="background: #FDEDEC; color: #E17055;">
+                                    <i class="fas fa-history"></i>
+                                </div>
+                                <div class="link-text">
+                                    <h6>Barcha ovqatlar</h6>
+                                    <small>Ovqatlar tarixi</small>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #D0D0D0;"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
