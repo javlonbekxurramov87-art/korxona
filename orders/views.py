@@ -2525,6 +2525,13 @@ def order_create(request):
 
 # orders/views.py - completed_orders_for_loading funksiyasini tuzatamiz
 
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.utils import timezone
+from django.db.models import Q
+from datetime import datetime
+
 @login_required
 def completed_orders_for_loading(request):
     """Omborchi uchun tugatilgan va yuklashga tayyor buyurtmalar"""
@@ -2535,12 +2542,46 @@ def completed_orders_for_loading(request):
         return redirect('order_list')
     
     try:
+        # Filtr parametrlarini olish
+        search_query = request.GET.get('search', '').strip()
+        date_from = request.GET.get('date_from', '')
+        date_to = request.GET.get('date_to', '')
+        
         # BARCHA TUGATILGAN STATUSLAR: USTA_TUGATDI, TAYYOR, BAJARILDI
         completed_orders = Order.objects.filter(
-            Q(status='USTA_TUGATDI') | Q(status='TAYYOR') | Q(status='BAJARILDI')
-        ).order_by('-work_finished_at')
+            Q(status='USTA_TUGATDI') | Q(status='TAYYOR') | Q(status='BAJARILDI'),
+            is_loaded=False
+        )
         
-        # Ortib bo'lingan buyurtmalar
+        # Qidiruv bo'yicha filtr (mijoz nomi yoki ID)
+        if search_query:
+            completed_orders = completed_orders.filter(
+                Q(customer_name__icontains=search_query) | 
+                Q(customer_unique_id__icontains=search_query) |
+                Q(order_number__icontains=search_query)
+            )
+        
+        # Sana bo'yicha filtr (created_at)
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                completed_orders = completed_orders.filter(created_at__gte=date_from_obj)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+                # Kun oxirigacha bo'lgan vaqtni olish uchun
+                date_to_obj = date_to_obj.replace(hour=23, minute=59, second=59)
+                completed_orders = completed_orders.filter(created_at__lte=date_to_obj)
+            except ValueError:
+                pass
+        
+        # Tartiblash
+        completed_orders = completed_orders.order_by('-work_finished_at')
+        
+        # Ortib bo'lingan buyurtmalar (tarix)
         loaded_orders = Order.objects.filter(
             Q(status='ORTILDI') | Q(is_loaded=True)
         ).order_by('-loaded_at')[:50]
@@ -2550,13 +2591,15 @@ def completed_orders_for_loading(request):
             'loaded_orders': loaded_orders,
             'completed_count': completed_orders.count(),
             'loaded_count': loaded_orders.count(),
+            'search_query': search_query,
+            'date_from': date_from,
+            'date_to': date_to,
         }
         return render(request, 'orders/completed_orders_for_loading.html', context)
     
     except Exception as e:
         messages.error(request, f"Xatolik yuz berdi: {str(e)}")
         return redirect('order_list')
-
 
 @login_required
 def mark_order_as_loaded(request, order_id):
