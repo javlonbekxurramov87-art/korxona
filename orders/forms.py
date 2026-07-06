@@ -49,12 +49,12 @@ class OrderForm(forms.ModelForm):
             ('LIST', 'List Ustasi (PIR/PUR Panel)'),
             ('ESHIK', 'Eshik Ustasi'),
             ('LIST_ESHIK', 'List va Eshik Ustasi (Universal)'),
+            ('KOMPLEKT', 'Komplekt Sotuvi'),
         ],
         required=True,
         label="Ish Turi",
         widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_worker_type'})
     )
-
 
     eshik_qalinligi = forms.TypedChoiceField(
         choices=ESHIK_QALINLIK_CHOICES,
@@ -62,19 +62,62 @@ class OrderForm(forms.ModelForm):
         required=False,
         label="Eshik qalinligi",
         widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_eshik_qalinligi'})
-
     )
+
+    # Eshik turi endi CHEKLANMAGAN — select2 (tags) orqali template'da to'ldiriladi
+    eshik_turi = forms.CharField(
+        required=False,
+        label="Eshik Turi",
+        max_length=255,
+        widget=forms.HiddenInput(attrs={'id': 'id_eshik_turi_hidden'})
+    )
+
+    # Komplekt maydonlari — YANGI
+    komplekt_turi = forms.CharField(
+        required=False,
+        label="Komplekt Turi",
+        max_length=255,
+        widget=forms.HiddenInput(attrs={'id': 'id_komplekt_turi_hidden'})
+    )
+    komplekt_custom = forms.BooleanField(
+        required=False,
+        label="Custom Komplekt",
+        widget=forms.HiddenInput(attrs={'id': 'id_komplekt_custom'})
+    )
+    komplekt_kenglik = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        label="Komplekt kengligi (m)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_komplekt_kenglik'})
+    )
+    komplekt_balandligi = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        label="Komplekt balandligi (m)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_komplekt_balandligi'})
+    )
+    komplekt_kvadrat = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        label="Komplekt kvadrati (m²)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_komplekt_kvadrat_input'})
+    )
+
     class Meta:
         model = Order
         fields = [
-            'pdf_file', 'customer_unique_id','customer_name', 'product_name', 
-            'worker_type', 'eshik_turi', 'parog_turi', 'eshik_yonalishi', 
+            'pdf_file', 'customer_unique_id', 'customer_name', 'product_name',
+            'worker_type', 'eshik_turi', 'parog_turi', 'eshik_yonalishi',
             'balandligi', 'eni', 'zamokli_eshik',
-            'panel_type', 'panel_subtype', 'panel_thickness', 'panel_kvadrat',
-            'total_price', 'prepayment', 'deadline', 'assigned_workers', 
-            'comment', 'status', 'needs_manager_approval','eshik_qalinligi', 
+            'panel_type', 'panel_subtype', 'panel_thickness', 'panel_kvadrat','panel_balandligi', 
+            'komplekt_turi', 'komplekt_custom', 'komplekt_kenglik', 'komplekt_balandligi', 'komplekt_kvadrat',
+            'total_price', 'prepayment', 'deadline', 'assigned_workers',
+            'comment', 'status', 'needs_manager_approval', 'eshik_qalinligi',
         ]
-        
+
         widgets = {
             'assigned_workers': forms.CheckboxSelectMultiple(attrs={'id': 'id_assigned_workers'}),
             'deadline': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
@@ -85,9 +128,9 @@ class OrderForm(forms.ModelForm):
             'panel_subtype': forms.Select(attrs={'class': 'form-control', 'id': 'id_panel_subtype'}),
             'panel_thickness': forms.Select(attrs={'class': 'form-control', 'id': 'id_panel_thickness'}),
             'panel_kvadrat': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'panel_balandligi': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_panel_balandligi'}),
             'total_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_total_price'}),
             'prepayment': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_prepayment'}),
-            'eshik_turi': forms.Select(attrs={'class': 'form-control', 'id': 'id_eshik_turi'}),
             'parog_turi': forms.Select(attrs={'class': 'form-control'}),
             'eshik_yonalishi': forms.Select(attrs={'class': 'form-control'}),
             'balandligi': forms.NumberInput(attrs={'class': 'form-control'}),
@@ -101,38 +144,30 @@ class OrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         # Faqat LIST, ESHIK va LIST_ESHIK rolli ustalarni olish
         target_roles = ['LIST', 'ESHIK', 'LIST_ESHIK']
         filtered_workers = Worker.objects.filter(role__in=target_roles)
-        
-        # Maydonni filtrlangun queryset bilan to'ldirish
+
         self.fields['assigned_workers'].queryset = filtered_workers
         self.fields['assigned_workers'].label_from_instance = lambda obj: f"{str(obj)} ({obj.role})"
-        
+
         self.fields['status'].initial = 'KIRITILDI'
-        
-        # Majburiy emas deb belgilash
-        optional_fields = ['panel_type', 'panel_thickness', 'eshik_turi', 
-                           'panel_subtype', 'status', 'parog_turi', 
-                           'eshik_yonalishi', 'balandligi', 'eni', 'prepayment', 'panel_kvadrat', 'customer_unique_id',
-        'assigned_workers']
+
+        optional_fields = [
+            'panel_type', 'panel_thickness', 'eshik_turi',
+            'panel_subtype', 'status', 'parog_turi',
+            'eshik_yonalishi', 'balandligi', 'eni', 'prepayment', 'panel_kvadrat', 'panel_balandligi', 'customer_unique_id',
+            'komplekt_turi', 'komplekt_custom', 'komplekt_kenglik', 'komplekt_balandligi', 'komplekt_kvadrat',
+            'assigned_workers',
+        ]
         for field in optional_fields:
             if field in self.fields:
                 self.fields[field].required = False
 
-       
         worker_type = self.data.get('worker_type') if self.data else (self.instance.worker_type if self.instance else None)
         all_workers = Worker.objects.all()
-
-        # if worker_type == 'LIST':
-        #     self.fields['assigned_workers'].queryset = all_workers.filter(role__in=['LIST', 'LIST_ESHIK'])
-        # elif worker_type == 'ESHIK':
-        #     self.fields['assigned_workers'].queryset = all_workers.filter(role__in=['ESHIK', 'LIST_ESHIK'])
-        # elif worker_type == 'LIST_ESHIK':
-        #     self.fields['assigned_workers'].queryset = all_workers.filter(role__in=['LIST', 'ESHIK', 'LIST_ESHIK'])
-        # else:
-        #     self.fields['assigned_workers'].queryset = all_workers
+        # (filtrlash logikasi kerak bo'lsa shu yerga qo'shiladi)
 
     def clean_prepayment(self):
         """Zalog kiritilmasa yoki bo'sh bo'lsa, uni 0 deb qaytaradi"""
@@ -141,6 +176,11 @@ class OrderForm(forms.ModelForm):
             return 0
         return prepayment
 
+    def clean_komplekt_custom(self):
+        """Checkbox/hidden 'True'/'False' matnini boolean'ga aylantirish"""
+        value = self.data.get('komplekt_custom')
+        return str(value).strip().lower() in ('true', '1', 'on', 'yes')
+
     def clean(self):
         cleaned_data = super().clean()
         worker_type = cleaned_data.get('worker_type')
@@ -148,8 +188,6 @@ class OrderForm(forms.ModelForm):
         total_price = cleaned_data.get('total_price') or 0
         prepayment = cleaned_data.get('prepayment') or 0
 
-        # Zalog mantiqi: Agar zalog kiritilmagan bo'lsa, u avtomatik 0 bo'ladi
-        # Shunda qarz (Total - Prepayment) avtomatik Total summaning o'ziga teng bo'ladi
         if not assigned_workers:
             self.add_error('assigned_workers', "Kamida bitta usta tanlashingiz shart!")
 
@@ -163,8 +201,6 @@ class OrderForm(forms.ModelForm):
                 if not cleaned_data.get(field):
                     self.add_error(field, "Ushbu maydon to'ldirilishi shart!")
 
-        
-
         # 2. Panel mantiqi tekshiruvi
         if worker_type in ['LIST', 'LIST_ESHIK']:
             if not cleaned_data.get('panel_type'):
@@ -172,8 +208,16 @@ class OrderForm(forms.ModelForm):
             if not cleaned_data.get('panel_thickness'):
                 self.add_error('panel_thickness', "Panel qalinligini tanlang!")
 
-        return cleaned_data
+        # 3. Komplekt mantiqi tekshiruvi — YANGI
+        if worker_type == 'KOMPLEKT':
+            if not cleaned_data.get('komplekt_turi'):
+                self.add_error('komplekt_turi', "Komplekt turini tanlang yoki yangisini kiriting!")
+            if cleaned_data.get('komplekt_custom'):
+                for f in ['komplekt_kenglik', 'komplekt_balandligi', 'komplekt_kvadrat']:
+                    if not cleaned_data.get(f):
+                        self.add_error(f, "Custom komplekt uchun bu maydon to'ldirilishi shart!")
 
+        return cleaned_data
 class EshikForm(forms.ModelForm):
     """Eshik buyurtmalari uchun maxsus form"""
     
@@ -789,4 +833,101 @@ class DailyReportForm(forms.ModelForm):
                 'rows': 3,
                 'placeholder': 'Qoshimcha malumot...'
             }),
+        }
+# orders/forms.py - Oshxona uchun
+
+from django import forms
+from django.forms import inlineformset_factory
+from .models import KitchenIngredient, DailyMeal, DailyMealIngredient, KitchenOrder
+
+class KitchenIngredientForm(forms.ModelForm):
+    class Meta:
+        model = KitchenIngredient
+        fields = ['name', 'unit', 'quantity', 'min_quantity', 'price_per_unit']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'unit': forms.Select(attrs={'class': 'form-control'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'min_quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'price_per_unit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        }
+
+# orders/forms.py - DailyMealForm
+
+class DailyMealForm(forms.ModelForm):
+    class Meta:
+        model = DailyMeal
+        fields = ['date', 'meal_type', 'meal_name', 'person_count', 'description']
+        widgets = {
+            'date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'required': True
+            }),
+            'meal_type': forms.Select(attrs={
+                'class': 'form-control',
+                'required': True
+            }),
+            'meal_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ovqat nomini kiriting...',
+                'required': True
+            }),
+            'person_count': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1,
+                'required': True,
+                'placeholder': 'Masalan: 10'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Qo\'shimcha ma\'lumot...'
+            }),
+        }
+# orders/forms.py
+
+from django import forms
+from django.forms import inlineformset_factory
+from .models import DailyMeal, DailyMealIngredient
+
+# orders/forms.py
+
+from django import forms
+from django.forms import inlineformset_factory
+from .models import DailyMeal, DailyMealIngredient
+
+class DailyMealIngredientForm(forms.ModelForm):
+    class Meta:
+        model = DailyMealIngredient
+        fields = ['ingredient', 'quantity_per_person']
+        widgets = {
+            'ingredient': forms.Select(attrs={'class': 'form-control'}),
+            'quantity_per_person': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['ingredient'].required = True
+        self.fields['quantity_per_person'].required = True
+
+# ✅ MUHIM: extra=1 va min_num ni olib tashlang
+DailyMealIngredientFormSet = inlineformset_factory(
+    DailyMeal,
+    DailyMealIngredient,
+    form=DailyMealIngredientForm,
+    extra=1,  # 1 ta bo'sh form ko'rsatish
+    can_delete=True,
+    min_num=0,  # ✅ 0 ga o'zgartirildi
+    validate_min=False,  # ✅ False ga o'zgartirildi
+)
+
+class KitchenOrderForm(forms.ModelForm):
+    class Meta:
+        model = KitchenOrder
+        fields = ['ingredient', 'quantity', 'description']
+        widgets = {
+            'ingredient': forms.Select(attrs={'class': 'form-control'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
