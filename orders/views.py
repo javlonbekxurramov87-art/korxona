@@ -2419,7 +2419,6 @@ def order_create(request):
     
     all_unique_ids = set(list(db_customers.keys()) + [str(uid).strip() for uid in order_ids if uid])
     
-    # Select2 uchun ma'lumotlar ro'yxati
     customers_data = []
     for uid in all_unique_ids:
         name = db_customers.get(uid)
@@ -2432,8 +2431,6 @@ def order_create(request):
     if request.method == 'POST':
         form = OrderForm(request.POST, request.FILES)
         
-        # MUHIM: Select2 dan kelayotgan IDni to'g'ridan-to'g'ri POST'dan olamiz
-        # Chunki form.is_valid() yangi IDni "yaroqsiz" deb topishi mumkin
         customer_unique_id = request.POST.get('customer_unique_id', '').strip()
         customer_name = request.POST.get('customer_name', '').strip()
         customer_phone = request.POST.get('customer_phone', '').strip() or None
@@ -2446,14 +2443,11 @@ def order_create(request):
                 if not customer_unique_id:
                     messages.error(request, "❌ Iltimos, mijoz uchun unikal raqam kiriting.")
                 else:
-                    # 2. Mijozni bazadan qidirish yoki yangi yaratish
-                    # update_or_create emas, get_or_create ishlatamiz (ism o'zgarmasligi uchun)
                     customer, created = Customer.objects.get_or_create(
                         unique_id=customer_unique_id,
                         defaults={'name': customer_name, 'phone': customer_phone}
                     )
                     
-                    # Agar mijoz bazada bo'lsa-yu, lekin ismi yo'q bo'lsa (Noma'lum bo'lsa), yangilash
                     if not created and customer_name and (not customer.name or customer.name == "Noma'lum mijoz"):
                         customer.name = customer_name
                         customer.save()
@@ -2462,15 +2456,39 @@ def order_create(request):
                     order.customer_unique_id = customer_unique_id
                     order.status = 'KIRITILDI'
 
-                    # 3. Ish turi logikasi (Panel usta tayinlash)
+                    # MUHIM: eshik_turi va komplekt_* maydonlari HiddenInput orqali keladi,
+                    # shuning uchun ularni to'g'ridan-to'g'ri POST'dan olamiz (select2 tag muammosi bo'lmasin)
                     worker_type = form.cleaned_data.get('worker_type', 'LIST')
-                    if worker_type == 'ESHIK':
-                        eshik_turi = form.cleaned_data.get('eshik_turi', '')
+
+                    # ================= ESHIK LOGIKASI =================
+                    if worker_type in ['ESHIK', 'LIST_ESHIK']:
+                        eshik_turi = request.POST.get('eshik_turi', '').strip() or None
                         zamokli_eshik = form.cleaned_data.get('zamokli_eshik', False)
                         if eshik_turi and '(' not in str(eshik_turi):
                             zamok_status = "Zamokli" if zamokli_eshik else "Zamoksiz"
                             order.eshik_turi = f"{eshik_turi} ({zamok_status})"
+                        else:
+                            order.eshik_turi = eshik_turi
 
+                    # ================= KOMPLEKT LOGIKASI (YANGI) =================
+                    if worker_type == 'KOMPLEKT':
+                        komplekt_turi = request.POST.get('komplekt_turi', '').strip() or None
+                        komplekt_custom_raw = request.POST.get('komplekt_custom', 'False')
+                        komplekt_custom = str(komplekt_custom_raw).strip().lower() in ('true', '1', 'on', 'yes')
+
+                        order.komplekt_turi = komplekt_turi
+                        order.komplekt_custom = komplekt_custom
+
+                        if komplekt_custom:
+                            order.komplekt_kenglik = request.POST.get('komplekt_kenglik') or None
+                            order.komplekt_balandligi = request.POST.get('komplekt_balandligi') or None
+                            order.komplekt_kvadrat = request.POST.get('komplekt_kvadrat') or None
+                        else:
+                            order.komplekt_kenglik = None
+                            order.komplekt_balandligi = None
+                            order.komplekt_kvadrat = None
+
+                    # ================= PANEL LOGIKASI =================
                     if worker_type == 'PANEL':
                         try:
                             u1 = User.objects.get(username='panel_usta')
@@ -2480,11 +2498,9 @@ def order_create(request):
                         except User.DoesNotExist:
                             pass 
 
-                    # 4. Saqlash
                     order.save()
                     form.save_m2m()
                     
-                    # Bildirishnoma yuborish
                     try:
                         from .utils import send_notifications_for_new_order 
                         send_notifications_for_new_order(order)
@@ -2506,6 +2522,115 @@ def order_create(request):
         'existing_customer_ids': list(all_unique_ids)
     }
     return render(request, 'orders/order_create.html', context)
+
+# orders/views.py - completed_orders_for_loading funksiyasini tuzatamiz
+
+@login_required
+def completed_orders_for_loading(request):
+    """Omborchi uchun tugatilgan va yuklashga tayyor buyurtmalar"""
+    
+    # Faqat omborchi yoki adminlar ko'ra oladi
+    if not request.user.is_superuser and "omborchi" not in request.user.username.lower():
+        messages.error(request, "Bu sahifaga faqat omborchi kirishi mumkin!")
+        return redirect('order_list')
+    
+    try:
+        # BARCHA TUGATILGAN STATUSLAR: USTA_TUGATDI, TAYYOR, BAJARILDI
+        completed_orders = Order.objects.filter(
+            Q(status='USTA_TUGATDI') | Q(status='TAYYOR') | Q(status='BAJARILDI')
+        ).order_by('-work_finished_at')
+        
+        # Ortib bo'lingan buyurtmalar
+        loaded_orders = Order.objects.filter(
+            Q(status='ORTILDI') | Q(is_loaded=True)
+        ).order_by('-loaded_at')[:50]
+        
+        context = {
+            'completed_orders': completed_orders,
+            'loaded_orders': loaded_orders,
+            'completed_count': completed_orders.count(),
+            'loaded_count': loaded_orders.count(),
+        }
+        return render(request, 'orders/completed_orders_for_loading.html', context)
+    
+    except Exception as e:
+        messages.error(request, f"Xatolik yuz berdi: {str(e)}")
+        return redirect('order_list')
+
+
+@login_required
+def mark_order_as_loaded(request, order_id):
+    """Buyurtmani ortildi deb belgilash"""
+    
+    # Faqat omborchi yoki adminlar
+    if not request.user.is_superuser and "omborchi" not in request.user.username.lower():
+        messages.error(request, "Bu amalni faqat omborchi bajarishi mumkin!")
+        return redirect('order_list')
+    
+    if request.method == 'POST':
+        try:
+            order = get_object_or_404(Order, id=order_id)
+            
+            # BARCHA TUGATILGAN STATUSLARNI TEKSHIRAMIZ
+            if order.status not in ['USTA_TUGATDI', 'TAYYOR', 'BAJARILDI']:
+                messages.error(request, f"{order.order_number} buyurtmasi hali tugatilmagan! Status: {order.status}")
+                return redirect('completed_orders_for_loading')
+            
+            # Ortish amalini bajarish
+            order.status = 'ORTILDI'  # Statusni yangilaymiz
+            order.is_loaded = True
+            order.loaded_at = timezone.now()
+            order.loaded_by = request.user
+            order.loaded_notes = request.POST.get('loaded_notes', '').strip()
+            
+            order.save()
+            
+            messages.success(request, f"✅ {order.order_number} buyurtmasi ortildi deb belgilandi!")
+            return redirect('completed_orders_for_loading')
+        
+        except Exception as e:
+            messages.error(request, f"Xatolik yuz berdi: {str(e)}")
+            return redirect('completed_orders_for_loading')
+    
+    return redirect('completed_orders_for_loading')
+
+
+@login_required
+def unload_order(request, order_id):
+    """Ortilgan buyurtmani qaytarish (xato bo'lsa)"""
+    
+    # Faqat omborchi yoki adminlar
+    if not request.user.is_superuser and "omborchi" not in request.user.username.lower():
+        messages.error(request, "Bu amalni faqat omborchi bajarishi mumkin!")
+        return redirect('order_list')
+    
+    if request.method == 'POST':
+        try:
+            order = get_object_or_404(Order, id=order_id)
+            
+            if order.status != 'ORTILDI' and not order.is_loaded:
+                messages.warning(request, f"{order.order_number} buyurtmasi hali ortilmagan!")
+                return redirect('completed_orders_for_loading')
+            
+            # Ortishni bekor qilish - TAYYOR holatiga qaytaramiz
+            order.status = 'TAYYOR'
+            order.is_loaded = False
+            order.loaded_at = None
+            order.loaded_by = None
+            order.loaded_notes = ""
+            
+            order.save()
+            
+            messages.info(request, f"{order.order_number} buyurtmasi ortishdan qaytarildi!")
+            return redirect('completed_orders_for_loading')
+        
+        except Exception as e:
+            messages.error(request, f"Xatolik yuz berdi: {str(e)}")
+            return redirect('completed_orders_for_loading')
+    
+    return redirect('completed_orders_for_loading')
+
+
 
 @login_required
 def order_edit(request, pk):
@@ -4675,40 +4800,17 @@ class MyOrdersAPIView(APIView):
             for o in orders
         ]
         return Response(data)
+# orders/views.py - boshida import qismiga qo'shing
 
-import math  # <--- Mana shu qatorni qo'shing
-import math
-from decimal import Decimal
-import math
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP  # <-- BU NI QO'SHING
 
-import math
 from decimal import Decimal, ROUND_HALF_UP
-import math
-from decimal import Decimal, ROUND_HALF_UP
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from decimal import Decimal, ROUND_HALF_UP
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from .models import Order
-from decimal import Decimal, ROUND_HALF_UP
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from .models import Order
-from decimal import Decimal, ROUND_HALF_UP
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from .models import Order
-from decimal import Decimal, ROUND_HALF_UP
-from django.shortcuts import render
-from django.db.models import Sum
-from .models import Order
+
 
 def order_calculator_list(request):
     # Faqat asosiy panellarni olamiz (parent buyurtmalar)
     orders = Order.objects.filter(parent_order__isnull=True).order_by('-id')
-    
+
     # Qalinlik bo'yicha koeffitsientlar lug'ati
     SIRYO_COEFFICIENTS = {
         '5': Decimal('2'),
@@ -4716,6 +4818,8 @@ def order_calculator_list(request):
         '10': Decimal('4'),
         '15': Decimal('6'),
     }
+
+    DEFAULT_HEIGHT = Decimal('3.00')  # Balandlik kiritilmagan bo'lsa ishlatiladigan standart qiymat
 
     calculated_data = []
     total_kvadrat_all = Decimal('0')
@@ -4727,20 +4831,43 @@ def order_calculator_list(request):
         kv = Decimal(str(order.panel_kvadrat or 0))
         # Qalinlikni string ko'rinishida olamiz (masalan: "10")
         thickness = str(order.panel_thickness or "10").strip()
-        
+
+        # Panel balandligi (height) — kiritilmagan bo'lsa standart qiymat olinadi
+        balandlik = Decimal(str(order.panel_balandligi)) if order.panel_balandligi else DEFAULT_HEIGHT
+        if balandlik <= 0:
+            balandlik = DEFAULT_HEIGHT
+
         # Siryo hisobi: agar lug'atda qalinlik bo'lsa o'shani, bo'lmasa 10cm koeffitsientini oladi
         coeff = SIRYO_COEFFICIENTS.get(thickness, Decimal('4'))
         siryo_val = kv * coeff
-        
-        # Boshqa hisoblar
-        list_val = kv * Decimal('2') # Har bir qatorda toza kvadrat * 2
-        zamok_val = int((kv * Decimal('6')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-        stakan_val = int((kv * Decimal('8')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-        boyi_val = kv / Decimal('0.96') if kv > 0 else 0
+
+        # List hisobi
+        list_val = kv * Decimal('2')  # Har bir qatorda toza kvadrat * 2
+
+        # Panel uzunligi (boyi) — kvadrat / balandlik orqali topiladi
+        boyi_val = (kv / balandlik) if kv > 0 else Decimal('0')
+        boyi_mm = boyi_val * 1000
+
+        # ZAMOK HISOBI — endi balandlikka (uzunlikka) qarab, kvadraturaga emas
+        eni_zamok = 4  # Eni bo'yicha doim 4 ta (boshida 2, oxirida 2)
+
+        # Bo'yi bo'yicha: boshidan va oxiridan 700mm chegara tashlanadi,
+        # qolgan qismda har 960mm da 1 tadan (2 tomon uchun)
+        ishchi_boyi = boyi_mm - Decimal('1400')
+        if ishchi_boyi > 0:
+            boyi_zamok_soni = (int((ishchi_boyi / Decimal('960')).to_integral_value(rounding=ROUND_HALF_UP)) + 1) * 2
+        else:
+            boyi_zamok_soni = 0
+
+        zamok_val = eni_zamok + boyi_zamok_soni
+
+        # STAKANCHIK — har bir zamokka bittadan
+        stakan_val = zamok_val
 
         calculated_data.append({
             'order': order,
             'thickness': thickness,
+            'balandligi': balandlik,
             'siryo': siryo_val,
             'list': list_val,
             'zamok': zamok_val,
@@ -4765,8 +4892,9 @@ def order_calculator_list(request):
         'total_zamok_all': total_zamok_all,
         'total_stakanchik_all': total_stakanchik_all,
     }
-    
+
     return render(request, 'orders/calculator.html', context)
+
 from django.shortcuts import render
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
@@ -6505,6 +6633,8 @@ def cash_dashboard(request):
     }
     
     return render(request, 'orders/cash_dashboard.html', context)
+
+
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def cash_transaction_create(request):
@@ -6842,6 +6972,10 @@ def export_cash_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.utils import timezone
     
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
@@ -6949,10 +7083,8 @@ def export_cash_report_excel(request):
     wb = openpyxl.Workbook()
     
     # ============ STILLAR ============
-    title_font = Font(name='Segoe UI', size=14, bold=True, color='FFFFFF')
     header_font = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
     stats_font = Font(name='Segoe UI', size=12, bold=True)
-    sub_header_font = Font(name='Segoe UI', size=10, bold=True)
     
     usd_header_fill = PatternFill(start_color="B45309", end_color="B45309", fill_type="solid")
     uzs_header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
@@ -6977,6 +7109,7 @@ def export_cash_report_excel(request):
     )
     
     money_format = '#,##0.00'
+    payment_headers = ['To\'lov usuli', 'Kirim', 'Chiqim', 'Sof']
     
     # ==============================================================
     # SHEET 1: USD (AQSH DOLLARI)
@@ -6985,66 +7118,62 @@ def export_cash_report_excel(request):
     ws_usd.title = "USD"
     
     # Sarlavha
-    ws_usd.merge_cells('A1:J1')
+    ws_usd.merge_cells('A1:H1')
     ws_usd['A1'] = f"USD (AQSH DOLLARI) OPERATSIYALARI"
     ws_usd['A1'].font = Font(bold=True, size=16, color='B45309')
     ws_usd['A1'].alignment = center_alignment
     
-    ws_usd.merge_cells('A2:J2')
+    ws_usd.merge_cells('A2:H2')
     ws_usd['A2'] = f"Davr: {start_date} - {end_date}"
     ws_usd['A2'].font = Font(size=11, color='666666')
     ws_usd['A2'].alignment = center_alignment
     
-    # Statistika - Kirim/Chiqim
-    ws_usd['A4'] = "JAMI KIRIM"
-    ws_usd['A4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_usd['A4'].fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
-    ws_usd['A4'].alignment = center_alignment
-    ws_usd.merge_cells('A4:B4')
+    # ======== 1. KATTA STATISTIKA (TEPADA) ========
+    row = 4
     
-    ws_usd['C4'] = f"{float(usd_income):,.2f} USD"
-    ws_usd['C4'].font = Font(bold=True, size=12, color='10B981')
-    ws_usd['C4'].alignment = right_alignment
-    ws_usd.merge_cells('C4:D4')
+    # JAMI KIRIM
+    ws_usd.merge_cells(f'A{row}:B{row}')
+    ws_usd.cell(row=row, column=1, value="JAMI KIRIM")
+    ws_usd.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_usd.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
+    ws_usd.cell(row=row, column=1).alignment = center_alignment
     
-    ws_usd['E4'] = "JAMI CHIQIM"
-    ws_usd['E4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_usd['E4'].fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
-    ws_usd['E4'].alignment = center_alignment
-    ws_usd.merge_cells('E4:F4')
+    ws_usd.merge_cells(f'C{row}:D{row}')
+    ws_usd.cell(row=row, column=3, value=f"{float(usd_income):,.2f}")
+    ws_usd.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
+    ws_usd.cell(row=row, column=3).alignment = right_alignment
     
-    ws_usd['G4'] = f"{float(usd_expense):,.2f} USD"
-    ws_usd['G4'].font = Font(bold=True, size=12, color='EF4444')
-    ws_usd['G4'].alignment = right_alignment
-    ws_usd.merge_cells('G4:H4')
+    # JAMI CHIQIM
+    ws_usd.merge_cells(f'E{row}:F{row}')
+    ws_usd.cell(row=row, column=5, value="JAMI CHIQIM")
+    ws_usd.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_usd.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
+    ws_usd.cell(row=row, column=5).alignment = center_alignment
     
-    ws_usd['I4'] = "SOF NATIJA"
-    ws_usd['I4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_usd['I4'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_usd['I4'].alignment = center_alignment
-    ws_usd.merge_cells('I4:J4')
+    ws_usd.merge_cells(f'G{row}:H{row}')
+    ws_usd.cell(row=row, column=7, value=f"{float(usd_expense):,.2f}")
+    ws_usd.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
+    ws_usd.cell(row=row, column=7).alignment = right_alignment
     
+    # SOF NATIJA
+    ws_usd.merge_cells(f'I{row}:J{row}')
+    ws_usd.cell(row=row, column=9, value="SOF NATIJA")
+    ws_usd.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_usd.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    ws_usd.cell(row=row, column=9).alignment = center_alignment
+    
+    ws_usd.merge_cells(f'K{row}:L{row}')
     net_color = "10B981" if usd_net >= 0 else "EF4444"
-    ws_usd['K4'] = f"{float(usd_net):,.2f} USD"
-    ws_usd['K4'].font = Font(bold=True, size=12, color=net_color)
-    ws_usd['K4'].alignment = right_alignment
-    ws_usd.merge_cells('K4:L4')
+    ws_usd.cell(row=row, column=11, value=f"{float(usd_net):,.2f}")
+    ws_usd.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color)
+    ws_usd.cell(row=row, column=11).alignment = right_alignment
     
-    # To'lov usullari bo'yicha statistika
-    row = 6
+    # ======== 2. TO'LOV USULLARI BO'YICHA STATISTIKA ========
+    row += 2
     ws_usd.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_usd.cell(row=row, column=1).font = stats_font
     ws_usd.merge_cells(f'A{row}:L{row}')
     row += 1
-    
-    payment_headers = ['To\'lov usuli', 'Kirim (USD)', 'Chiqim (USD)', 'Sof (USD)']
-    payment_data = [
-        ('Naqd pul 💵', float(usd_cash_income), float(usd_cash_expense), float(usd_cash_income - usd_cash_expense)),
-        ('Plastik karta 💳', float(usd_card_income), float(usd_card_expense), float(usd_card_income - usd_card_expense)),
-        ('Click 🖱️', float(usd_click_income), float(usd_click_expense), float(usd_click_income - usd_click_expense)),
-        ('Payme 📱', float(usd_payme_income), float(usd_payme_expense), float(usd_payme_income - usd_payme_expense)),
-        ('Bank 🏦', float(usd_bank_income), float(usd_bank_expense), float(usd_bank_income - usd_bank_expense)),
-    ]
     
     for col, header in enumerate(payment_headers, 1):
         cell = ws_usd.cell(row=row, column=col)
@@ -7054,8 +7183,16 @@ def export_cash_report_excel(request):
         cell.alignment = center_alignment
         cell.border = thin_border
     
+    usd_payment_data = [
+        ('Naqd pul', float(usd_cash_income), float(usd_cash_expense), float(usd_cash_income - usd_cash_expense)),
+        ('Plastik karta', float(usd_card_income), float(usd_card_expense), float(usd_card_income - usd_card_expense)),
+        ('Click', float(usd_click_income), float(usd_click_expense), float(usd_click_income - usd_click_expense)),
+        ('Payme', float(usd_payme_income), float(usd_payme_expense), float(usd_payme_income - usd_payme_expense)),
+        ('Bank', float(usd_bank_income), float(usd_bank_expense), float(usd_bank_income - usd_bank_expense)),
+    ]
+    
     row += 1
-    for idx, (name, inc, exp, net) in enumerate(payment_data):
+    for name, inc, exp, net in usd_payment_data:
         ws_usd.cell(row=row, column=1, value=name)
         ws_usd.cell(row=row, column=2, value=inc)
         ws_usd.cell(row=row, column=3, value=exp)
@@ -7092,7 +7229,7 @@ def export_cash_report_excel(request):
             ws_usd.cell(row=row, column=col).alignment = center_alignment
             ws_usd.cell(row=row, column=col).fill = total_bg_fill
     
-    # Operatsiyalar jadvali
+    # ======== 3. OPERATSIYALAR RO'YXATI (PASTDA) ========
     row += 2
     ws_usd.cell(row=row, column=1, value="USD OPERATSIYALARI RO'YXATI")
     ws_usd.cell(row=row, column=1).font = stats_font
@@ -7110,8 +7247,7 @@ def export_cash_report_excel(request):
     
     ws_usd.freeze_panes = ws_usd['A' + str(row + 1)]
     
-    usd_only = usd_transactions.order_by('-transaction_date')
-    for idx, trans in enumerate(usd_only, 1):
+    for idx, trans in enumerate(usd_transactions.order_by('-transaction_date'), 1):
         row += 1
         ws_usd.cell(row=row, column=1, value=idx)
         ws_usd.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
@@ -7119,10 +7255,7 @@ def export_cash_report_excel(request):
         
         tur = "Kirim" if trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME'] else "Chiqim"
         ws_usd.cell(row=row, column=4, value=tur)
-        if tur == "Kirim":
-            ws_usd.cell(row=row, column=4).fill = income_fill
-        else:
-            ws_usd.cell(row=row, column=4).fill = expense_fill
+        ws_usd.cell(row=row, column=4).fill = income_fill if tur == "Kirim" else expense_fill
         
         ws_usd.cell(row=row, column=5, value=trans.get_payment_method_display())
         ws_usd.cell(row=row, column=6, value=float(trans.amount))
@@ -7134,7 +7267,7 @@ def export_cash_report_excel(request):
             if col == 6:
                 ws_usd.cell(row=row, column=6).number_format = money_format
                 ws_usd.cell(row=row, column=6).alignment = right_alignment
-            elif col == 4 or col == 5:
+            elif col in [4, 5]:
                 ws_usd.cell(row=row, column=col).alignment = center_alignment
     
     # Ustun kengliklari
@@ -7148,57 +7281,63 @@ def export_cash_report_excel(request):
     ws_usd.column_dimensions['H'].width = 50
     
     # ==============================================================
-    # SHEET 2: UZS (SO'M)
+    # SHEET 2: UZS (SO'M) - RASMDAGIDEK
     # ==============================================================
     ws_uzs = wb.create_sheet("UZS")
     
-    ws_uzs.merge_cells('A1:J1')
+    # Sarlavha
+    ws_uzs.merge_cells('A1:H1')
     ws_uzs['A1'] = f"UZS (SO'M) OPERATSIYALARI"
     ws_uzs['A1'].font = Font(bold=True, size=16, color='1E40AF')
     ws_uzs['A1'].alignment = center_alignment
     
-    ws_uzs.merge_cells('A2:J2')
+    ws_uzs.merge_cells('A2:H2')
     ws_uzs['A2'] = f"Davr: {start_date} - {end_date}"
     ws_uzs['A2'].font = Font(size=11, color='666666')
     ws_uzs['A2'].alignment = center_alignment
     
-    # Statistika
-    ws_uzs['A4'] = "JAMI KIRIM"
-    ws_uzs['A4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_uzs['A4'].fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
-    ws_uzs['A4'].alignment = center_alignment
-    ws_uzs.merge_cells('A4:B4')
+    # ======== 1. KATTA STATISTIKA (TEPADA) ========
+    row = 4
     
-    ws_uzs['C4'] = f"{float(total_uzs_income):,.2f} UZS"
-    ws_uzs['C4'].font = Font(bold=True, size=12, color='10B981')
-    ws_uzs['C4'].alignment = right_alignment
-    ws_uzs.merge_cells('C4:D4')
+    # JAMI KIRIM
+    ws_uzs.merge_cells(f'A{row}:B{row}')
+    ws_uzs.cell(row=row, column=1, value="JAMI KIRIM")
+    ws_uzs.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_uzs.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
+    ws_uzs.cell(row=row, column=1).alignment = center_alignment
     
-    ws_uzs['E4'] = "JAMI CHIQIM"
-    ws_uzs['E4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_uzs['E4'].fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
-    ws_uzs['E4'].alignment = center_alignment
-    ws_uzs.merge_cells('E4:F4')
+    ws_uzs.merge_cells(f'C{row}:D{row}')
+    ws_uzs.cell(row=row, column=3, value=f"{float(total_uzs_income):,.2f}")
+    ws_uzs.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
+    ws_uzs.cell(row=row, column=3).alignment = right_alignment
     
-    ws_uzs['G4'] = f"{float(total_uzs_expense):,.2f} UZS"
-    ws_uzs['G4'].font = Font(bold=True, size=12, color='EF4444')
-    ws_uzs['G4'].alignment = right_alignment
-    ws_uzs.merge_cells('G4:H4')
+    # JAMI CHIQIM
+    ws_uzs.merge_cells(f'E{row}:F{row}')
+    ws_uzs.cell(row=row, column=5, value="JAMI CHIQIM")
+    ws_uzs.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_uzs.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
+    ws_uzs.cell(row=row, column=5).alignment = center_alignment
     
-    ws_uzs['I4'] = "SOF NATIJA"
-    ws_uzs['I4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_uzs['I4'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_uzs['I4'].alignment = center_alignment
-    ws_uzs.merge_cells('I4:J4')
+    ws_uzs.merge_cells(f'G{row}:H{row}')
+    ws_uzs.cell(row=row, column=7, value=f"{float(total_uzs_expense):,.2f}")
+    ws_uzs.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
+    ws_uzs.cell(row=row, column=7).alignment = right_alignment
     
+    # SOF NATIJA
+    ws_uzs.merge_cells(f'I{row}:J{row}')
+    ws_uzs.cell(row=row, column=9, value="SOF NATIJA")
+    ws_uzs.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_uzs.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    ws_uzs.cell(row=row, column=9).alignment = center_alignment
+    
+    ws_uzs.merge_cells(f'K{row}:L{row}')
     net_color_uzs = "10B981" if uzs_net >= 0 else "EF4444"
-    ws_uzs['K4'] = f"{float(uzs_net):,.2f} UZS"
-    ws_uzs['K4'].font = Font(bold=True, size=12, color=net_color_uzs)
-    ws_uzs['K4'].alignment = right_alignment
-    ws_uzs.merge_cells('K4:L4')
+    ws_uzs.cell(row=row, column=11, value=f"{float(uzs_net):,.2f}")
+    ws_uzs.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color_uzs)
+    ws_uzs.cell(row=row, column=11).alignment = right_alignment
     
-    # To'lov usullari bo'yicha statistika
-    row = 6
+    # ======== 2. TO'LOV USULLARI BO'YICHA STATISTIKA ========
+    row += 2
     ws_uzs.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_uzs.cell(row=row, column=1).font = stats_font
     ws_uzs.merge_cells(f'A{row}:L{row}')
@@ -7213,15 +7352,15 @@ def export_cash_report_excel(request):
         cell.border = thin_border
     
     uzs_payment_data = [
-        ('Naqd pul 💵', float(total_uzs_cash_income), float(total_uzs_cash_expense), float(total_uzs_cash_income - total_uzs_cash_expense)),
-        ('Plastik karta 💳', float(total_uzs_card_income), float(total_uzs_card_expense), float(total_uzs_card_income - total_uzs_card_expense)),
-        ('Click 🖱️', float(total_uzs_click_income), float(total_uzs_click_expense), float(total_uzs_click_income - total_uzs_click_expense)),
-        ('Payme 📱', float(total_uzs_payme_income), float(total_uzs_payme_expense), float(total_uzs_payme_income - total_uzs_payme_expense)),
-        ('Bank 🏦', float(total_uzs_bank_income), float(total_uzs_bank_expense), float(total_uzs_bank_income - total_uzs_bank_expense)),
+        ('Naqd pul', float(total_uzs_cash_income), float(total_uzs_cash_expense), float(total_uzs_cash_income - total_uzs_cash_expense)),
+        ('Plastik karta', float(total_uzs_card_income), float(total_uzs_card_expense), float(total_uzs_card_income - total_uzs_card_expense)),
+        ('Click', float(total_uzs_click_income), float(total_uzs_click_expense), float(total_uzs_click_income - total_uzs_click_expense)),
+        ('Payme', float(total_uzs_payme_income), float(total_uzs_payme_expense), float(total_uzs_payme_income - total_uzs_payme_expense)),
+        ('Bank', float(total_uzs_bank_income), float(total_uzs_bank_expense), float(total_uzs_bank_income - total_uzs_bank_expense)),
     ]
     
     row += 1
-    for idx, (name, inc, exp, net) in enumerate(uzs_payment_data):
+    for name, inc, exp, net in uzs_payment_data:
         ws_uzs.cell(row=row, column=1, value=name)
         ws_uzs.cell(row=row, column=2, value=inc)
         ws_uzs.cell(row=row, column=3, value=exp)
@@ -7242,6 +7381,7 @@ def export_cash_report_excel(request):
                 ws_uzs.cell(row=row, column=col).alignment = left_alignment
         row += 1
     
+    # Jami qator
     ws_uzs.cell(row=row, column=1, value="JAMI")
     ws_uzs.cell(row=row, column=1).font = Font(bold=True)
     ws_uzs.cell(row=row, column=2, value=float(total_uzs_income))
@@ -7257,7 +7397,7 @@ def export_cash_report_excel(request):
             ws_uzs.cell(row=row, column=col).alignment = center_alignment
             ws_uzs.cell(row=row, column=col).fill = total_bg_fill
     
-    # Operatsiyalar jadvali
+    # ======== 3. OPERATSIYALAR RO'YXATI (PASTDA) ========
     row += 2
     ws_uzs.cell(row=row, column=1, value="UZS OPERATSIYALARI RO'YXATI")
     ws_uzs.cell(row=row, column=1).font = stats_font
@@ -7285,10 +7425,7 @@ def export_cash_report_excel(request):
         
         tur = "Kirim" if trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME'] else "Chiqim"
         ws_uzs.cell(row=row, column=4, value=tur)
-        if tur == "Kirim":
-            ws_uzs.cell(row=row, column=4).fill = income_fill
-        else:
-            ws_uzs.cell(row=row, column=4).fill = expense_fill
+        ws_uzs.cell(row=row, column=4).fill = income_fill if tur == "Kirim" else expense_fill
         
         ws_uzs.cell(row=row, column=5, value=trans.get_payment_method_display())
         ws_uzs.cell(row=row, column=6, value=float(trans.amount))
@@ -7300,9 +7437,10 @@ def export_cash_report_excel(request):
             if col == 6:
                 ws_uzs.cell(row=row, column=6).number_format = money_format
                 ws_uzs.cell(row=row, column=6).alignment = right_alignment
-            elif col == 4 or col == 5:
+            elif col in [4, 5]:
                 ws_uzs.cell(row=row, column=col).alignment = center_alignment
     
+    # Ustun kengliklari
     ws_uzs.column_dimensions['A'].width = 6
     ws_uzs.column_dimensions['B'].width = 18
     ws_uzs.column_dimensions['C'].width = 22
@@ -7317,54 +7455,56 @@ def export_cash_report_excel(request):
     # ==============================================================
     ws_total = wb.create_sheet("JAMI")
     
-    ws_total.merge_cells('A1:J1')
+    ws_total.merge_cells('A1:H1')
     ws_total['A1'] = f"UMUMIY HISOBOT"
     ws_total['A1'].font = Font(bold=True, size=16, color='FFFFFF')
     ws_total['A1'].fill = total_header_fill
     ws_total['A1'].alignment = center_alignment
     
-    ws_total.merge_cells('A2:J2')
+    ws_total.merge_cells('A2:H2')
     ws_total['A2'] = f"Davr: {start_date} - {end_date}"
     ws_total['A2'].font = Font(size=11, color='666666')
     ws_total['A2'].alignment = center_alignment
     
-    # Statistika
-    ws_total['A4'] = "JAMI KIRIM"
-    ws_total['A4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_total['A4'].fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
-    ws_total['A4'].alignment = center_alignment
-    ws_total.merge_cells('A4:B4')
+    # ======== 1. KATTA STATISTIKA ========
+    row = 4
     
-    ws_total['C4'] = f"{float(total_income):,.2f}"
-    ws_total['C4'].font = Font(bold=True, size=12, color='10B981')
-    ws_total['C4'].alignment = right_alignment
-    ws_total.merge_cells('C4:D4')
+    ws_total.merge_cells(f'A{row}:B{row}')
+    ws_total.cell(row=row, column=1, value="JAMI KIRIM")
+    ws_total.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_total.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
+    ws_total.cell(row=row, column=1).alignment = center_alignment
     
-    ws_total['E4'] = "JAMI CHIQIM"
-    ws_total['E4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_total['E4'].fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
-    ws_total['E4'].alignment = center_alignment
-    ws_total.merge_cells('E4:F4')
+    ws_total.merge_cells(f'C{row}:D{row}')
+    ws_total.cell(row=row, column=3, value=f"{float(total_income):,.2f}")
+    ws_total.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
+    ws_total.cell(row=row, column=3).alignment = right_alignment
     
-    ws_total['G4'] = f"{float(total_expense):,.2f}"
-    ws_total['G4'].font = Font(bold=True, size=12, color='EF4444')
-    ws_total['G4'].alignment = right_alignment
-    ws_total.merge_cells('G4:H4')
+    ws_total.merge_cells(f'E{row}:F{row}')
+    ws_total.cell(row=row, column=5, value="JAMI CHIQIM")
+    ws_total.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_total.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
+    ws_total.cell(row=row, column=5).alignment = center_alignment
     
-    ws_total['I4'] = "SOF NATIJA"
-    ws_total['I4'].font = Font(bold=True, size=10, color='FFFFFF')
-    ws_total['I4'].fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_total['I4'].alignment = center_alignment
-    ws_total.merge_cells('I4:J4')
+    ws_total.merge_cells(f'G{row}:H{row}')
+    ws_total.cell(row=row, column=7, value=f"{float(total_expense):,.2f}")
+    ws_total.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
+    ws_total.cell(row=row, column=7).alignment = right_alignment
     
+    ws_total.merge_cells(f'I{row}:J{row}')
+    ws_total.cell(row=row, column=9, value="SOF NATIJA")
+    ws_total.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
+    ws_total.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    ws_total.cell(row=row, column=9).alignment = center_alignment
+    
+    ws_total.merge_cells(f'K{row}:L{row}')
     net_color_total = "10B981" if total_net >= 0 else "EF4444"
-    ws_total['K4'] = f"{float(total_net):,.2f}"
-    ws_total['K4'].font = Font(bold=True, size=12, color=net_color_total)
-    ws_total['K4'].alignment = right_alignment
-    ws_total.merge_cells('K4:L4')
+    ws_total.cell(row=row, column=11, value=f"{float(total_net):,.2f}")
+    ws_total.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color_total)
+    ws_total.cell(row=row, column=11).alignment = right_alignment
     
-    # To'lov usullari bo'yicha statistika
-    row = 6
+    # ======== 2. TO'LOV USULLARI BO'YICHA ========
+    row += 2
     ws_total.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_total.cell(row=row, column=1).font = stats_font
     ws_total.merge_cells(f'A{row}:L{row}')
@@ -7379,15 +7519,15 @@ def export_cash_report_excel(request):
         cell.border = thin_border
     
     total_payment_data = [
-        ('Naqd pul 💵', float(total_cash_income), float(total_cash_expense), float(total_cash_income - total_cash_expense)),
-        ('Plastik karta 💳', float(total_card_income), float(total_card_expense), float(total_card_income - total_card_expense)),
-        ('Click 🖱️', float(total_click_income), float(total_click_expense), float(total_click_income - total_click_expense)),
-        ('Payme 📱', float(total_payme_income), float(total_payme_expense), float(total_payme_income - total_payme_expense)),
-        ('Bank 🏦', float(total_bank_income), float(total_bank_expense), float(total_bank_income - total_bank_expense)),
+        ('Naqd pul', float(total_cash_income), float(total_cash_expense), float(total_cash_income - total_cash_expense)),
+        ('Plastik karta', float(total_card_income), float(total_card_expense), float(total_card_income - total_card_expense)),
+        ('Click', float(total_click_income), float(total_click_expense), float(total_click_income - total_click_expense)),
+        ('Payme', float(total_payme_income), float(total_payme_expense), float(total_payme_income - total_payme_expense)),
+        ('Bank', float(total_bank_income), float(total_bank_expense), float(total_bank_income - total_bank_expense)),
     ]
     
     row += 1
-    for idx, (name, inc, exp, net) in enumerate(total_payment_data):
+    for name, inc, exp, net in total_payment_data:
         ws_total.cell(row=row, column=1, value=name)
         ws_total.cell(row=row, column=2, value=inc)
         ws_total.cell(row=row, column=3, value=exp)
@@ -7423,7 +7563,7 @@ def export_cash_report_excel(request):
             ws_total.cell(row=row, column=col).alignment = center_alignment
             ws_total.cell(row=row, column=col).fill = total_bg_fill
     
-    # Valyutalar bo'yicha taqqoslash
+    # ======== 3. VALYUTALAR BO'YICHA TAQQOSLASH ========
     row += 2
     ws_total.cell(row=row, column=1, value="VALYUTALAR BO'YICHA TAQQOSLASH")
     ws_total.cell(row=row, column=1).font = stats_font
@@ -7482,6 +7622,8 @@ def export_cash_report_excel(request):
     wb.save(response)
     
     return response
+
+
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def order_payment_click(request, order_id):
@@ -8643,15 +8785,7 @@ def cash_api_debt_payment(request):
         })
     
     # 🔥 Kassa qoldig'iga kirim (qarz to'landi)
-    balance, _ = CashRegisterBalance.objects.get_or_create(id=1)
-    
-    if debt.currency == 'USD':
-        balance.cash_balance_usd += amount
-    else:
-        balance.cash_balance += amount
-    
-    balance.updated_by = request.user
-    balance.save()
+
     
     # Qolgan qarzni hisoblash
     old_remaining = debt.remaining
@@ -8780,3 +8914,291 @@ def cash_api_debtors_list(request):
     }
     
     return JsonResponse(data)
+
+
+# =======================================================================
+# OSHXONA (KITCHEN) VIEW'LARI
+# =======================================================================
+
+from decimal import Decimal
+from django.db.models import Sum
+from .models import (
+    KitchenIngredient, KitchenIngredientTransaction,
+    DailyMeal, DailyMealIngredient, KitchenOrder
+)
+from .forms import (
+    KitchenIngredientForm, DailyMealForm,
+    DailyMealIngredientFormSet, KitchenOrderForm
+)
+
+def is_kitchen_staff(user):
+    return user.groups.filter(name='Kitchen').exists() or user.is_superuser
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_dashboard(request):
+    """Oshxona bosh sahifasi"""
+    today = timezone.now().date()
+    today_meals = DailyMeal.objects.filter(date=today).order_by('meal_type')
+    ingredients = KitchenIngredient.objects.all().order_by('name')
+    low_ingredients = [ing for ing in ingredients if ing.is_low()]
+    today_total_persons = today_meals.aggregate(Sum('person_count'))['person_count__sum'] or 0
+    
+    context = {
+        'today_meals': today_meals,
+        'ingredients': ingredients,
+        'low_ingredients': low_ingredients,
+        'today_total_persons': today_total_persons,
+        'low_count': len(low_ingredients),
+    }
+    return render(request, 'orders/kitchen_dashboard.html', context)
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_ingredient_list(request):
+    """Masalliqlar ro'yxati"""
+    ingredients = KitchenIngredient.objects.all().order_by('name')
+    search = request.GET.get('search', '')
+    if search:
+        ingredients = ingredients.filter(name__icontains=search)
+    
+    filter_type = request.GET.get('filter', 'all')
+    if filter_type == 'low':
+        ingredients = [ing for ing in ingredients if ing.is_low()]
+    
+    context = {
+        'ingredients': ingredients,
+        'search': search,
+        'filter_type': filter_type,
+    }
+    return render(request, 'orders/kitchen_ingredient_list.html', context)
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_ingredient_add(request):
+    """Yangi masalliq qo'shish"""
+    if request.method == 'POST':
+        form = KitchenIngredientForm(request.POST)
+        if form.is_valid():
+            ingredient = form.save()
+            KitchenIngredientTransaction.objects.create(
+                ingredient=ingredient,
+                transaction_type='IN',
+                amount=ingredient.quantity,
+                previous_quantity=0,
+                new_quantity=ingredient.quantity,
+                description="Yangi masalliq qo'shildi",
+                created_by=request.user
+            )
+            messages.success(request, f"{ingredient.name} muvaffaqiyatli qo'shildi!")
+            return redirect('kitchen_ingredient_list')
+    else:
+        form = KitchenIngredientForm()
+    
+    return render(request, 'orders/kitchen_ingredient_form.html', {'form': form, 'title': 'Yangi masalliq'})
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_ingredient_edit(request, pk):
+    """Masalliq tahrirlash"""
+    ingredient = get_object_or_404(KitchenIngredient, pk=pk)
+    
+    if request.method == 'POST':
+        form = KitchenIngredientForm(request.POST, instance=ingredient)
+        if form.is_valid():
+            old_quantity = ingredient.quantity
+            ingredient = form.save()
+            
+            if old_quantity != ingredient.quantity:
+                KitchenIngredientTransaction.objects.create(
+                    ingredient=ingredient,
+                    transaction_type='IN' if ingredient.quantity > old_quantity else 'OUT',
+                    amount=abs(ingredient.quantity - old_quantity),
+                    previous_quantity=old_quantity,
+                    new_quantity=ingredient.quantity,
+                    description="Miqdor tahrirlandi",
+                    created_by=request.user
+                )
+            
+            messages.success(request, f"{ingredient.name} muvaffaqiyatli tahrirlandi!")
+            return redirect('kitchen_ingredient_list')
+    else:
+        form = KitchenIngredientForm(instance=ingredient)
+    
+    return render(request, 'orders/kitchen_ingredient_form.html', {'form': form, 'title': 'Masalliq tahrirlash', 'ingredient': ingredient})
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_ingredient_add_quantity(request, pk):
+    """Masalliq miqdorini oshirish"""
+    ingredient = get_object_or_404(KitchenIngredient, pk=pk)
+    
+    if request.method == 'POST':
+        amount = Decimal(request.POST.get('amount', 0))
+        description = request.POST.get('description', '')
+        
+        if amount <= 0:
+            messages.error(request, "Miqdor 0 dan katta bo'lishi kerak!")
+            return redirect('kitchen_ingredient_list')
+        
+        old_quantity = ingredient.quantity
+        ingredient.add_quantity(amount)
+        
+        KitchenIngredientTransaction.objects.create(
+            ingredient=ingredient,
+            transaction_type='IN',
+            amount=amount,
+            previous_quantity=old_quantity,
+            new_quantity=ingredient.quantity,
+            description=description or "Masalliq qo'shildi",
+            created_by=request.user
+        )
+        
+        messages.success(request, f"{ingredient.name} ga {amount} {ingredient.get_unit_display()} qo'shildi!")
+        return redirect('kitchen_ingredient_list')
+    
+    return render(request, 'orders/kitchen_ingredient_add_quantity.html', {'ingredient': ingredient})
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def daily_meal_create(request):
+    """Kunlik ovqat qo'shish"""
+    from django.utils import timezone
+    
+    if request.method == 'POST':
+        form = DailyMealForm(request.POST)
+        formset = DailyMealIngredientFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            meal = form.save(commit=False)
+            meal.created_by = request.user
+            meal.save()
+            
+            formset.instance = meal
+            formset.save()
+            
+            # Har bir masalliqni hisobdan chiqarish
+            for meal_ingredient in meal.ingredients.all():
+                ingredient = meal_ingredient.ingredient
+                total_quantity = meal_ingredient.total_quantity
+                old_quantity = ingredient.quantity
+                
+                if ingredient.subtract_quantity(total_quantity):
+                    KitchenIngredientTransaction.objects.create(
+                        ingredient=ingredient,
+                        transaction_type='OUT',
+                        amount=total_quantity,
+                        previous_quantity=old_quantity,
+                        new_quantity=ingredient.quantity,
+                        description=f"Ovqat uchun: {meal.meal_name} ({meal.get_meal_type_display()})",
+                        created_by=request.user
+                    )
+                else:
+                    messages.warning(request, f"{ingredient.name} da yetarli miqdor yo'q! Joriy: {ingredient.quantity}")
+            
+            messages.success(request, f"{meal.meal_name} muvaffaqiyatli qo'shildi!")
+            return redirect('kitchen_dashboard')
+        else:
+            messages.error(request, "Iltimos, formani to'g'ri to'ldiring!")
+    else:
+        form = DailyMealForm(initial={'date': timezone.now().date()})
+        formset = DailyMealIngredientFormSet()
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'title': 'Yangi ovqat qo\'shish',
+        'today': timezone.now().date(),  # ✅ today qo'shildi
+    }
+    return render(request, 'orders/kitchen_meal_form.html', context)
+
+
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def daily_meal_list(request):
+    """Ovqatlar ro'yxati"""
+    meals = DailyMeal.objects.all().order_by('-date', '-created_at')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    if date_from:
+        meals = meals.filter(date__gte=date_from)
+    if date_to:
+        meals = meals.filter(date__lte=date_to)
+    
+    context = {
+        'meals': meals,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    return render(request, 'orders/kitchen_meal_list.html', context)
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_order_create(request):
+    """Oshxonaga buyurtma berish"""
+    if request.method == 'POST':
+        form = KitchenOrderForm(request.POST)
+        if form.is_valid():
+            order = form.save(commit=False)
+            order.created_by = request.user
+            order.save()
+            messages.success(request, f"{order.order_number} buyurtma yaratildi!")
+            return redirect('kitchen_order_list')
+    else:
+        form = KitchenOrderForm()
+    
+    return render(request, 'orders/kitchen_order_form.html', {'form': form, 'title': 'Yangi buyurtma'})
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_order_list(request):
+    """Buyurtmalar ro'yxati"""
+    orders = KitchenOrder.objects.all().order_by('-created_at')
+    context = {'orders': orders}
+    return render(request, 'orders/kitchen_order_list.html', context)
+
+@login_required
+@user_passes_test(is_kitchen_staff, login_url='/login/')
+def kitchen_order_approve(request, pk):
+    """Buyurtmani tasdiqlash va qabul qilish"""
+    order = get_object_or_404(KitchenOrder, pk=pk)
+    
+    if request.method == 'POST':
+        received = Decimal(request.POST.get('received_quantity', 0))
+        
+        if received <= 0:
+            messages.error(request, "Qabul qilingan miqdor 0 dan katta bo'lishi kerak!")
+            return redirect('kitchen_order_list')
+        
+        order.received_quantity = received
+        order.status = 'COMPLETED'
+        order.approved_by = request.user
+        order.save()
+        
+        ingredient = order.ingredient
+        old_quantity = ingredient.quantity
+        ingredient.add_quantity(received)
+        
+        KitchenIngredientTransaction.objects.create(
+            ingredient=ingredient,
+            transaction_type='IN',
+            amount=received,
+            previous_quantity=old_quantity,
+            new_quantity=ingredient.quantity,
+            description=f"Buyurtma bo'yicha: {order.order_number}",
+            created_by=request.user
+        )
+        
+        messages.success(request, f"{order.order_number} buyurtma qabul qilindi!")
+        return redirect('kitchen_order_list')
+    
+    return render(request, 'orders/kitchen_order_approve.html', {'order': order})
+
+
+
+
+
+
+
