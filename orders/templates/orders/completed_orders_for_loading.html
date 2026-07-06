@@ -71,6 +71,109 @@
             margin-top: 0.1rem;
         }
 
+        /* Filter Section */
+        .filter-section {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 10px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+            background: white;
+            color: #1f2937;
+            width: 100%;
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+
+        .filter-group input::placeholder {
+            color: #9ca3af;
+        }
+
+        .btn-filter {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 46px;
+        }
+
+        .btn-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-filter-outline {
+            background: white;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 46px;
+        }
+
+        .btn-filter-outline:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-2px);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+        }
+
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -433,7 +536,7 @@
             margin: 0 auto;
         }
 
-        /* MODAL - FIXED */
+        /* MODAL */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -625,6 +728,20 @@
             border: 1px solid #fde68a;
         }
 
+        /* Search highlight */
+        .highlight {
+            background: #fef3c7;
+            padding: 0 4px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 992px) {
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 1rem;
@@ -642,6 +759,18 @@
 
             .page-title h1 {
                 font-size: 1.4rem;
+            }
+
+            .filter-section {
+                padding: 1rem;
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions {
+                flex-direction: column;
             }
 
             .stats-grid {
@@ -726,6 +855,34 @@
         </a>
     </div>
 
+    <!-- FILTER SECTION -->
+    <div class="filter-section">
+        <form method="GET" action="{% url 'completed_orders_for_loading' %}" id="filterForm">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label for="search"><i class="fas fa-search"></i> Mijoz nomi yoki ID</label>
+                    <input type="text" id="search" name="search" placeholder="Mijoz nomi yoki ID..." value="{{ search_query|default:'' }}">
+                </div>
+                <div class="filter-group">
+                    <label for="date_from"><i class="fas fa-calendar-alt"></i> Sanadan</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ date_from|default:'' }}">
+                </div>
+                <div class="filter-group">
+                    <label for="date_to"><i class="fas fa-calendar-alt"></i> Sanagacha</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ date_to|default:'' }}">
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn-filter">
+                        <i class="fas fa-filter"></i> Filtr
+                    </button>
+                    <a href="{% url 'completed_orders_for_loading' %}" class="btn-filter-outline">
+                        <i class="fas fa-times"></i> Tozalash
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
     <!-- Stats -->
     <div class="stats-grid">
         <div class="stat-card primary">
@@ -759,7 +916,11 @@
                 </div>
                 <div class="customer-name">
                     <i class="fas fa-user" style="font-size: 0.8rem; opacity: 0.7;"></i>
-                    {{ order.customer_name }}
+                    {% if search_query and search_query in order.customer_name %}
+                        {{ order.customer_name|safe }}
+                    {% else %}
+                        {{ order.customer_name }}
+                    {% endif %}
                 </div>
             </div>
 
@@ -838,7 +999,11 @@
                 </div>
                 <div class="customer-name">
                     <i class="fas fa-user" style="font-size: 0.8rem; opacity: 0.7;"></i>
-                    {{ order.customer_name }}
+                    {% if search_query and search_query in order.customer_name %}
+                        {{ order.customer_name|safe }}
+                    {% else %}
+                        {{ order.customer_name }}
+                    {% endif %}
                 </div>
                 <div class="loaded-time">
                     <i class="fas fa-calendar-check"></i>
@@ -887,7 +1052,7 @@
     {% endif %}
 </div>
 
-<!-- MODAL - FIXED -->
+<!-- MODAL -->
 <div class="modal-overlay" id="loadModal">
     <div class="modal">
         <div class="modal-header">
@@ -932,32 +1097,26 @@
             return;
         }
         
-        // URL ni yaratish
         var url = "{% url 'mark_order_as_loaded' 0 %}".replace('0', orderId);
         console.log('Form action URL:', url);
         
-        // Form action ni o'rnatish
         if (form) {
             form.action = url;
             console.log('Form action set to:', form.action);
         }
         
-        // Order number ni o'rnatish
         if (orderNumSpan) {
             orderNumSpan.textContent = orderNumber;
         }
         
-        // Izohni tozalash
         var notes = document.getElementById('loaded_notes');
         if (notes) {
             notes.value = '';
         }
         
-        // Modalni ko'rsatish
         modal.style.display = 'flex';
         modal.classList.add('active');
         
-        // Modal ichidagi content ko'rinishi uchun
         var modalContent = modal.querySelector('.modal');
         if (modalContent) {
             modalContent.style.display = 'block';
@@ -1014,7 +1173,6 @@
         }
     }
 
-    // DOM yuklanganda
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM loaded - initializing...');
         
@@ -1026,7 +1184,6 @@
             console.error('Modal not found!');
         }
         
-        // Modalni tashqariga bosganda yopish
         if (modal) {
             modal.addEventListener('click', function(e) {
                 if (e.target === this) {
@@ -1035,7 +1192,6 @@
             });
         }
         
-        // ESC tugmasi
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
