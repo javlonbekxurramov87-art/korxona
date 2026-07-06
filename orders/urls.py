@@ -3,6 +3,9 @@ from django.urls import path
 from . import views
 from django.contrib.auth.views import LogoutView
 
+# WorkerProfile importini olib tashladik, chunki views.py da kerak emas
+
+
 urlpatterns = [
     # ==================== KIRISH CHIQISH ====================
     path('login/', views.CustomLoginView.as_view(), name='login'),
@@ -97,7 +100,6 @@ urlpatterns = [
     path('patrol/', views.guard_patrol_view, name='guard_patrol'),
     
     # ==================== KONSTRUKTOR (CHIZMA) ====================
-    path('', views.constructor_index, name='index'),
     path('calculator/', views.constructor_index, name='calculator'),
     path('chizma/', views.constructor_index, name='chizma'),
     path('projects/', views.project_list, name='project_list'),
@@ -130,8 +132,27 @@ urlpatterns = [
     # ==================== TASHQI TO'LOVLAR ====================
     path('order/<int:order_id>/payment/click/', views.order_payment_click, name='order_payment_click'),
     path('order/<int:order_id>/payment/payme/', views.order_payment_payme, name='order_payment_payme'),
-    # urls.py ga qo'shimcha
+    
+    # ==================== HISOBOTLAR EKSPORT ====================
     path('export-sales-excel/', views.export_sales_report_excel, name='export_sales_excel'),
+    
     # ==================== OMBORCHI UCHUN ====================
     path('order/receive-warehouse/<int:pk>/', views.order_receive_warehouse, name='order_receive_warehouse'),
+    
+    # ==================== OSHXONA (KITCHEN) ====================
+    path('kitchen/', views.kitchen_dashboard, name='kitchen_dashboard'),
+    path('kitchen/ingredients/', views.kitchen_ingredient_list, name='kitchen_ingredient_list'),
+    path('kitchen/ingredients/add/', views.kitchen_ingredient_add, name='kitchen_ingredient_add'),
+    path('kitchen/ingredients/<int:pk>/edit/', views.kitchen_ingredient_edit, name='kitchen_ingredient_edit'),
+    path('kitchen/ingredients/<int:pk>/add-quantity/', views.kitchen_ingredient_add_quantity, name='kitchen_ingredient_add_quantity'),
+    path('kitchen/meals/', views.daily_meal_list, name='daily_meal_list'),
+    path('kitchen/meals/add/', views.daily_meal_create, name='daily_meal_create'),
+    path('kitchen/orders/', views.kitchen_order_list, name='kitchen_order_list'),
+    path('kitchen/orders/add/', views.kitchen_order_create, name='kitchen_order_create'),
+    path('kitchen/orders/<int:pk>/approve/', views.kitchen_order_approve, name='kitchen_order_approve'),
+    
+    # ==================== OMBORCHI UCHUN TUGATILGAN BUYURTMALAR ====================
+    path('completed-for-loading/', views.completed_orders_for_loading, name='completed_orders_for_loading'),
+    path('mark-loaded/<int:order_id>/', views.mark_order_as_loaded, name='mark_order_as_loaded'),
+    path('unload-order/<int:order_id>/', views.unload_order, name='unload_order'),
 ]
