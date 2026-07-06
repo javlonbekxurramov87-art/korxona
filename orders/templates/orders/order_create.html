@@ -1,238 +1,1175 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yangi Buyurtma Kiritish</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%);
+            min-height: 100vh;
+            padding: 24px;
+            color: #1f2937;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header-card {
+            background: linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%);
+            border-radius: 24px;
+            padding: 32px 40px;
+            margin-bottom: 32px;
+            box-shadow: 0 20px 40px -12px rgba(5, 150, 105, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+        
+        .header-card::after {
+            content: '';
+            position: absolute;
+            bottom: -40%;
+            left: -5%;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 50%;
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .header-icon i {
+            font-size: 28px;
+            color: white;
+        }
+        
+        .header-text h1 {
+            color: white;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+        
+        .header-text p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 15px;
+            margin: 4px 0 0 0;
+        }
+        
+        .header-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-back {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateX(-4px);
+        }
+        
+        .main-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        .main-card-body {
+            padding: 40px;
+        }
+        
+        .alert-danger {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border: 1px solid #fecaca;
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-bottom: 28px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        
+        .alert-danger i {
+            color: #dc2626;
+            font-size: 20px;
+            margin-top: 2px;
+        }
+        
+        .alert-danger h5 {
+            color: #991b1b;
+            font-weight: 700;
+            font-size: 15px;
+            margin: 0 0 4px 0;
+        }
+        
+        .alert-danger ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #7f1d1d;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .section-header .icon-box {
+            width: 40px;
+            height: 40px;
+            background: #d1fae5;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .section-header .icon-box i {
+            color: #065f46;
+            font-size: 18px;
+        }
+        
+        .section-header h4 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #065f46;
+            margin: 0;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .form-label .required {
+            color: #ef4444;
+            font-weight: 700;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+            background: white;
+            color: #1f2937;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+        
+        .form-control::placeholder {
+            color: #9ca3af;
+        }
+        
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 40px;
+        }
+        
+        textarea.form-control {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .row-single {
+            grid-template-columns: 1fr;
+        }
+        
+        .col-full {
+            grid-column: 1 / -1;
+        }
+        
+        .file-upload-wrapper {
+            border: 2px dashed #86efac;
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            background: #f0fdf4;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .file-upload-wrapper:hover {
+            border-color: #10b981;
+            background: #dcfce7;
+        }
+        
+        .file-upload-wrapper.drag-over {
+            border-color: #10b981;
+            background: #dcfce7;
+            transform: scale(1.02);
+        }
+        
+        .file-upload-wrapper input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .file-upload-wrapper input[type="file"]::-webkit-file-upload-button {
+            visibility: hidden;
+        }
+        
+        .file-upload-wrapper input[type="file"]::file-selector-button {
+            visibility: hidden;
+        }
+        
+        .file-upload-wrapper .upload-icon {
+            font-size: 48px;
+            color: #10b981;
+            margin-bottom: 12px;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .file-upload-wrapper .upload-text {
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 4px;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .file-upload-wrapper .upload-subtext {
+            font-size: 13px;
+            color: #6b7280;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .file-upload-wrapper .file-name {
+            color: #10b981;
+            font-weight: 600;
+            display: none;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .file-upload-wrapper.has-file {
+            border-color: #10b981;
+            background: #dcfce7;
+        }
+        
+        .file-upload-wrapper.has-file .upload-text {
+            display: none;
+        }
+        
+        .file-upload-wrapper.has-file .file-name {
+            display: block;
+        }
+        
+        .file-upload-wrapper.has-file .upload-icon {
+            color: #059669;
+        }
+        
+        .sub-card {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 12px;
+            border: 1px solid #e5e7eb;
+            display: none;
+        }
+        
+        .sub-card.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .sub-card-header {
+            font-weight: 700;
+            font-size: 14px;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+        
+        .sub-card-header.eshik {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        
+        .sub-card-header.panel {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .sub-card-header.komplekt {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        .sub-card .row {
+            gap: 12px;
+        }
+        
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-top: 8px;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #10b981;
+            cursor: pointer;
+        }
+        
+        .checkbox-wrapper label {
+            font-weight: 500;
+            color: #374151;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .price-section {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #86efac;
+            margin-top: 24px;
+        }
+        
+        .price-section .row {
+            gap: 16px;
+        }
+        
+        .debt-label {
+            font-size: 14px;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 10px;
+            margin-top: 8px;
+            display: inline-block;
+        }
+        
+        .debt-label.positive {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        .debt-label.zero {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .workers-wrapper {
+            border: 2px solid #d1fae5;
+            border-radius: 12px;
+            padding: 12px 16px;
+            background: white;
+        }
+        
+        .workers-wrapper select {
+            border: none !important;
+            padding: 4px 0 !important;
+        }
+        
+        .workers-wrapper select:focus {
+            box-shadow: none !important;
+        }
+        
+        .btn {
+            padding: 12px 28px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+            text-decoration: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-outline-secondary {
+            background: white;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-2px);
+        }
+        
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 2px solid #e5e7eb;
+        }
+        
+        .select2-container--default .select2-selection--single {
+            height: 46px !important;
+            border: 2px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .select2-container--default .select2-selection--single:hover {
+            border-color: #10b981 !important;
+        }
+        
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 44px !important;
+        }
+        
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 44px !important;
+            color: #1f2937;
+            font-size: 14px;
+        }
+        
+        .select2-container--default .select2-selection--single .select2-selection__placeholder {
+            color: #9ca3af;
+        }
+        
+        .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: #10b981 !important;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1) !important;
+        }
+        
+        .select2-dropdown {
+            border-radius: 12px !important;
+            border: 2px solid #e5e7eb !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .select2-results__option--highlighted {
+            background: #10b981 !important;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .main-card {
+            animation: slideUp 0.5s ease;
+        }
+        
+        @media (max-width: 992px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+            
+            .col-full {
+                grid-column: 1;
+            }
+            
+            .header-content {
+                flex-wrap: wrap;
+            }
+            
+            .header-actions {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .header-card {
+                padding: 24px 20px;
+            }
+            
+            .header-text h1 {
+                font-size: 22px;
+            }
+            
+            .main-card-body {
+                padding: 24px 20px;
+            }
+            
+            .price-section .row {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-actions {
+                flex-direction: column-reverse;
+            }
+            
+            .form-actions .btn {
+                justify-content: center;
+                width: 100%;
+            }
+            
+            .sub-card .row {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header-card {
+                padding: 16px;
+                border-radius: 16px;
+            }
+            
+            .header-icon {
+                width: 48px;
+                height: 48px;
+            }
+            
+            .header-icon i {
+                font-size: 20px;
+            }
+            
+            .header-text h1 {
+                font-size: 18px;
+            }
+            
+            .main-card-body {
+                padding: 16px;
+            }
+            
+            .section-header h4 {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
 
-{% block content %}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-
-<style>
-    /* Sizdagi mavjud stillar... */
-    .select2-container--default .select2-selection--single {
-        height: 45px !important;
-        border: 2px solid #86efac !important;
-        border-radius: 8px !important;
-        display: flex;
-        align-items: center;
-    }
-    .auto-filled {
-        background-color: #f0fdf4 !important;
-        border-color: #10b981 !important;
-        transition: all 0.3s ease;
-    }
-</style>
-
-<div class="container mt-4 mb-5">
-    <div class="card border-0 shadow-lg mb-4" style="background: linear-gradient(135deg, #14532d 0%, #166534 100%);">
-        <div class="card-body text-white p-4">
-            <div class="d-flex align-items-center">
-                <div class="bg-white bg-opacity-20 rounded-circle p-3 me-3">
-                    <i class="fas fa-plus-circle fa-2x text-white"></i>
-                </div>
-                <div>
-                    <h3 class="card-title mb-1 fw-bold">Yangi Buyurtma Kiritish</h3>
-                    <p class="mb-0 text-white-80">Mijozni tanlang yoki yangi ID kiriting</p>
-                </div>
+<div class="container">
+    <!-- ==========================================
+    HEADER
+    ========================================== -->
+    <div class="header-card">
+        <div class="header-content">
+            <div class="header-icon">
+                <i class="fas fa-plus-circle"></i>
+            </div>
+            <div class="header-text">
+                <h1>Yangi Buyurtma Kiritish</h1>
+                <p>Mijozni tanlang yoki yangi ID kiriting</p>
+            </div>
+            <div class="header-actions">
+                <a href="{% url 'order_list' %}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Orqaga
+                </a>
             </div>
         </div>
     </div>
 
-    <div class="card border-0 shadow-lg rounded-4">
-        <div class="card-body p-4">
+    <!-- ==========================================
+    MAIN CARD
+    ========================================== -->
+    <div class="main-card">
+        <div class="main-card-body">
+            
+            <!-- ERRORS -->
             {% if form.errors %}
-            <div class="alert alert-danger border-0 rounded-3 shadow-sm mb-4">
-                <h5 class="fw-bold"><i class="fas fa-times-circle me-2"></i>Xatoliklarni tuzating:</h5>
-                {{ form.errors }}
+            <div class="alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                <div>
+                    <h5>Iltimos, quyidagi xatoliklarni tuzating:</h5>
+                    <ul>
+                        {% for field, errors in form.errors.items %}
+                            {% for error in errors %}
+                                <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
             {% endif %}
 
             <form method="post" enctype="multipart/form-data" id="orderForm">
                 {% csrf_token %}
                 
+                <!-- ==========================================
+                ASOSIY MA'LUMOTLAR
+                ========================================== -->
+                <div class="section-header">
+                    <div class="icon-box"><i class="fas fa-info-circle"></i></div>
+                    <h4>Asosiy Ma'lumotlar</h4>
+                </div>
+
                 <div class="row">
-                    <div class="col-lg-6 pe-lg-4 border-end border-success border-opacity-25">
-                        <div class="d-flex align-items-center mb-4">
-                            <div class="rounded-3 p-2 me-3" style="background: #d1fae5;"><i class="fas fa-info-circle fa-lg text-emerald-700"></i></div>
-                            <h4 class="fw-bold mb-0 text-emerald-800">Asosiy Ma'lumotlar</h4>
-                        </div>
+                    <div class="col-full">
+                        <label class="form-label">
+                            <i class="fas fa-id-card"></i> Mijoz ID <span class="required">*</span>
+                        </label>
+                        <select name="customer_unique_id" id="id_customer_unique_id" class="form-control" style="width: 100%;" required>
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="form-label">
+                            <i class="fas fa-user"></i> Xaridor Nomi <span class="required">*</span>
+                        </label>
+                        {{ form.customer_name }}
+                    </div>
+                    
+                    <div>
+                        <label class="form-label">
+                            <i class="fas fa-phone"></i> Telefon
+                        </label>
+                        {{ form.customer_phone }}
+                    </div>
+                </div>
 
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-emerald-700">Mijoz ID</label>
-                                <select name="customer_unique_id" id="id_customer_unique_id" class="form-control" required>
-                                    <option value=""></option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-emerald-700">Xaridor Nomi</label>
-                                {{ form.customer_name }}
+                <!-- ==========================================
+                PDF FILE
+                ========================================== -->
+                <div style="margin-top: 20px;">
+                    <label class="form-label">
+                        <i class="fas fa-file-pdf" style="color: #dc2626;"></i> PDF Chizma
+                    </label>
+                    <div class="file-upload-wrapper" id="fileUploadWrapper">
+                        <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                        <div class="upload-text">PDF faylni tanlang yoki shu yerga tashlang</div>
+                        <div class="file-name" id="fileName"></div>
+                        <div class="upload-subtext">Faqat .pdf formatidagi fayllar qabul qilinadi</div>
+                        {{ form.pdf_file }}
+                    </div>
+                </div>
+
+                <!-- ==========================================
+                MAHSULOT VA ISH TURI
+                ========================================== -->
+                <div class="row" style="margin-top: 20px;">
+                    <div>
+                        <label class="form-label">
+                            <i class="fas fa-box"></i> Mahsulot Nomi
+                        </label>
+                        {{ form.product_name }}
+                    </div>
+                    
+                    <div>
+                        <label class="form-label">
+                            <i class="fas fa-hard-hat"></i> Ish Turi <span class="required">*</span>
+                        </label>
+                        {{ form.worker_type }}
+                    </div>
+                </div>
+
+                <!-- ==========================================
+                ESHIK MA'LUMOTLARI
+                ========================================== -->
+                <div class="sub-card" id="eshik_fields">
+                    <div class="sub-card-header eshik">
+                        <i class="fas fa-door-open me-2"></i> Eshik Ma'lumotlari
+                    </div>
+                    <div class="row">
+                        <div class="col-full">
+                            <label class="form-label">Eshik Turlari (soni bilan)</label>
+                            <div id="eshik_items_wrapper" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                            <button type="button" id="add_eshik_row" class="btn btn-outline-secondary" style="margin-top: 10px; padding: 8px 16px; font-size: 13px;">
+                                <i class="fas fa-plus"></i> Eshik turi qo'shish
+                            </button>
+                            {{ form.eshik_turi }}
+                        </div>
+                        <div>
+                            <label class="form-label">Parog Turi</label>
+                            {{ form.parog_turi }}
+                        </div>
+                        <div>
+                            <label class="form-label">Yo'nalishi</label>
+                            {{ form.eshik_yonalishi }}
+                        </div>
+                        <div>
+                            <div class="checkbox-wrapper">
+                                {{ form.zamokli_eshik }}
+                                <label for="{{ form.zamokli_eshik.id_for_label }}">Zamokli</label>
                             </div>
                         </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold d-flex align-items-center mb-2">
-                                <i class="fas fa-file-pdf text-danger me-2"></i>PDF Chizma
+                        <div>
+                            <label class="form-label">Balandligi (m)</label>
+                            {{ form.balandligi }}
+                        </div>
+                        <div>
+                            <label class="form-label">Eni (m)</label>
+                            {{ form.eni }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==========================================
+                PANEL MA'LUMOTLARI
+                ========================================== -->
+                <div class="sub-card" id="panel_fields">
+                    <div class="sub-card-header panel">
+                        <i class="fas fa-layer-group me-2"></i> Panel Ma'lumotlari
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label class="form-label">Panel Turi</label>
+                            {{ form.panel_type }}
+                        </div>
+                        <div id="subtype_container">
+                            <label class="form-label">Panel Sub-turi</label>
+                            {{ form.panel_subtype }}
+                        </div>
+                        <div>
+                            <label class="form-label">Qalinligi (sm)</label>
+                            {{ form.panel_thickness }}
+                        </div>
+                        <div>
+                            <label class="form-label">Balandligi (m)</label>
+                            {{ form.panel_balandligi }}
+                        </div>
+                        <div>
+                            <label class="form-label">Kvadrat (m²)</label>
+                            {{ form.panel_kvadrat }}
+                        </div>
+                    </div>
+                </div>
+                <!-- ==========================================
+                KOMPLEKT MA'LUMOTLARI
+                ========================================== -->
+                <div class="sub-card" id="komplekt_fields">
+                    <div class="sub-card-header komplekt">
+                        <i class="fas fa-box-open me-2"></i> Komplekt Ma'lumotlari
+                    </div>
+                    <div class="row">
+                        <div class="col-full">
+                            <label class="form-label">Komplekt Turi</label>
+                            <select id="id_komplekt_turi_select" class="form-control" style="width: 100%;"></select>
+                            {{ form.komplekt_turi }}
+                        </div>
+                    </div>
+                    <div class="row" id="komplekt_custom_fields" style="display:none; margin-top: 16px;">
+                        <div>
+                            <label class="form-label">Kengligi (m)</label>
+                            {{ form.komplekt_kenglik }}
+                        </div>
+                        <div>
+                            <label class="form-label">Balandligi (m)</label>
+                            {{ form.komplekt_balandligi }}
+                        </div>
+                        <div>
+                            <label class="form-label">Kvadrat (m²)</label>
+                            {{ form.komplekt_kvadrat }}
+                        </div>
+                    </div>
+                    {{ form.komplekt_custom }}
+                </div>
+
+                <!-- ==========================================
+                USTALAR
+                ========================================== -->
+                <div style="margin-top: 24px;">
+                    <label class="form-label">
+                        <i class="fas fa-users-cog"></i> Ustalar
+                    </label>
+                    <div class="workers-wrapper">
+                        {{ form.assigned_workers }}
+                    </div>
+                </div>
+
+                <!-- ==========================================
+                NARX VA MUDDAT
+                ========================================== -->
+                <div class="price-section">
+                    <div class="row">
+                        <div>
+                            <label class="form-label">
+                                <i class="fas fa-dollar-sign" style="color: #10b981;"></i> Umumiy Narx (USD)
                             </label>
-                            <div class="file-upload-wrapper border-2 border-dashed rounded-3 p-4 text-center" style="background: #f0fdf4; border-color: #86efac !important;">
-                                {{ form.pdf_file }}
-                                <div class="upload-placeholder" id="filePlaceholder">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-emerald-500 mb-3"></i>
-                                    <p class="fw-medium text-emerald-700 mb-2">PDF faylni tanlang</p>
-                                    <button type="button" class="btn btn-emerald-500 px-4 py-2 rounded-pill fw-semibold" id="fileBtn">
-                                        <i class="fas fa-folder-open me-2"></i>Fayl tanlash
-                                    </button>
-                                </div>
-                            </div>
+                            {{ form.total_price }}
                         </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-emerald-700">Mahsulot Nomi</label>
-                            {{ form.product_name }}
+                        <div>
+                            <label class="form-label">
+                                <i class="fas fa-hand-holding-usd" style="color: #f59e0b;"></i> Zalog (Prepayment)
+                            </label>
+                            {{ form.prepayment }}
+                            <div id="debt_label" class="debt-label" style="display: none;"></div>
                         </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-emerald-800">Ish Turi (Filtr)</label>
-                            <div class="input-group input-group-lg rounded-3 overflow-hidden border-emerald-300 border-2">
-                                <span class="input-group-text bg-success text-white border-0"><i class="fas fa-hard-hat"></i></span>
-                                {{ form.worker_type }} 
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-lg-6 ps-lg-4">
-                         <div class="d-flex align-items-center mb-4">
-                            <div class="rounded-3 p-2 me-3" style="background: #d1fae5;"><i class="fas fa-cogs fa-lg text-emerald-700"></i></div>
-                            <h4 class="fw-bold mb-0 text-emerald-800">Texnik Parametrlar</h4>
-                        </div>
-
-                        <div id="eshik_fields" style="display:none;" class="mb-4">
-                            <div class="card border-0 rounded-3 shadow-sm" style="background: #f8fafc;">
-                                <div class="card-header bg-primary text-white py-2 fw-bold">Eshik Ma'lumotlari</div>
-                                <div class="card-body p-3">
-                                    <div class="row g-2">
-                                        <div class="col-6">{{ form.eshik_turi }}</div>
-                                        <div class="col-6">{{ form.parog_turi }}</div>
-                                        <div class="col-6">{{ form.eshik_yonalishi }}</div>
-                                        <div class="col-6">Zamok: {{ form.zamokli_eshik }}</div>
-                                        <div class="col-6">Balandlik: {{ form.balandligi }}</div>
-                                        <div class="col-6">Eni: {{ form.eni }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="panel_fields" style="display:none;" class="mb-4">
-                            <div class="card border-0 rounded-3 shadow-sm" style="background: #f8fafc;">
-                                <div class="card-header bg-success text-white py-2 fw-bold">Panel Ma'lumotlari</div>
-                                <div class="card-body p-3">
-                                    <div class="row g-2">
-                                        <div class="col-6">{{ form.panel_type }}</div>
-                                        <div id="subtype_container" class="col-6">{{ form.panel_subtype }}</div>
-                                        <div class="col-6">Qalinlik: {{ form.panel_thickness }}</div>
-                                        <div class="col-6">Kvadrat: {{ form.panel_kvadrat }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <label class="form-label fw-bold text-emerald-800">Ustalar</label>
-                            <div class="border-2 border-emerald-200 rounded-3 p-2" style="background: white;">
-                                {{ form.assigned_workers }}
-                            </div>
+                        <div>
+                            <label class="form-label">
+                                <i class="fas fa-calendar-alt" style="color: #3b82f6;"></i> Muddati
+                            </label>
+                            {{ form.deadline }}
                         </div>
                     </div>
                 </div>
 
-                <div class="card mt-5 border-success border-opacity-25" style="background: #f0fdf4;">
-                    <div class="card-body p-4">
-                        <div class="row g-4">
-                            <div class="col-md-4">
-                                <label class="fw-bold">Umumiy Narx (USD)</label>
-                                {{ form.total_price }}
-                            </div>
-                            <div class="col-md-4">
-                                <label class="fw-bold">Zalog (Prepayment)</label>
-                                {{ form.prepayment }}
-                                <div id="debt_label" class="mt-2 fw-bold"></div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="fw-bold">Muddati</label>
-                                {{ form.deadline }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <label class="fw-bold">Admin Izohi</label>
+                <!-- ==========================================
+                IZOH
+                ========================================== -->
+                <div style="margin-top: 20px;">
+                    <label class="form-label">
+                        <i class="fas fa-comment-dots"></i> Admin Izohi
+                    </label>
                     {{ form.comment }}
                 </div>
 
-                <div class="d-flex justify-content-end gap-3 mt-5">
-                    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary px-5">Bekor qilish</a>
-                    <button type="submit" class="btn btn-success px-5 fw-bold shadow-lg">Buyurtmani Saqlash</button>
+                <!-- ==========================================
+                FORM ACTIONS
+                ========================================== -->
+                <div class="form-actions">
+                    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Bekor qilish
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Buyurtmani Saqlash
+                    </button>
                 </div>
+
             </form>
         </div>
     </div>
 </div>
 
+<!-- ==========================================
+SCRIPTS
+========================================== -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 $(document).ready(function() {
-    // 1. SELECT2 INIT - YANGILANGAN VA TO'G'RILANGAN
-    const rawData = {{ customers_list|safe }}; 
+    // ==========================================
+    // 1. CUSTOMER SELECT2 INIT
+    // ==========================================
+    const rawData = {{ customers_list|safe }};
     const customerSelect = $('#id_customer_unique_id');
     const customerNameInput = $('#id_customer_name');
-    
+
     customerSelect.select2({
         data: rawData,
-        tags: true, // Yangi ID yozishga ruxsat
+        tags: true,
         placeholder: "ID tanlang yoki yangi kiriting",
         allowClear: true,
         width: '100%',
-        // Yangi kiritilgan matnni rasmiy ID sifatida qabul qilish uchun:
-        createTag: function (params) {
+        createTag: function(params) {
             var term = $.trim(params.term);
-            if (term === '') { return null; }
-            return {
-                id: term,
-                text: term,
-                newTag: true
-            };
+            if (term === '') return null;
+            return { id: term, text: term, newTag: true };
         }
     });
 
-    // 2. AVTO-TO'LDIRISH (Tanlanganda ismni ajratib olish)
-    customerSelect.on('select2:select', function (e) {
+    // ==========================================
+    // 2. MIJOZ AVTO-TO'LDIRISH
+    // ==========================================
+    customerSelect.on('select2:select', function(e) {
         const data = e.params.data;
         const text = data.text;
-        
+
         if (text.includes(' - ')) {
-            // "ID - Ism" formatidan ismni olamiz
             const parts = text.split(' - ');
-            const realName = parts.slice(1).join(' - '); // Agar ismda ham '-' bo'lsa
+            const realName = parts.slice(1).join(' - ');
             customerNameInput.val(realName).addClass('auto-filled');
         } else if (data.newTag) {
-            // Yangi ID yozilganda ism maydonini bo'shatamiz va fokus beramiz
             customerNameInput.val('').removeClass('auto-filled').focus();
         }
     });
 
-    // Tozalaganda ismni ham o'chirish
     customerSelect.on('select2:unselect', function() {
         customerNameInput.val('').removeClass('auto-filled');
     });
 
-    // 3. WORKER TYPE FILTR VA BOSHQA LOGIKALAR (Sizdagi kod o'zgarishsiz qoladi)
+    // ==========================================
+    // 3. ESHIK TURLARI (miqdor bilan, cheklanmagan)
+    // ==========================================
+    const eshikTuriOptions = ['F1','F2','F3','F4','F5','F6','F7','F8'];
+    const eshikItemsWrapper = document.getElementById('eshik_items_wrapper');
+    const eshikHiddenInput = document.getElementById('id_eshik_turi_hidden');
+    const addEshikRowBtn = document.getElementById('add_eshik_row');
+
+    function buildEshikOptionsHtml(selectedValue) {
+        let html = '<option value="">-- Tanlang --</option>';
+        let found = eshikTuriOptions.includes(selectedValue);
+        eshikTuriOptions.forEach(opt => {
+            html += `<option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>${opt}</option>`;
+        });
+        if (selectedValue && !found) {
+            html += `<option value="${selectedValue}" selected>${selectedValue} (yangi)</option>`;
+        }
+        return html;
+    }
+
+    function createEshikRow(turi = '', soni = 1) {
+        const row = document.createElement('div');
+        row.className = 'eshik-item-row';
+        row.style.cssText = 'display: flex; gap: 10px; align-items: center;';
+
+        row.innerHTML = `
+            <select class="form-control eshik-turi-select" style="flex: 2;">
+                ${buildEshikOptionsHtml(turi)}
+            </select>
+            <input type="text" class="form-control eshik-yangi-nom" placeholder="Yangi nom yozing..." style="flex: 2; display: none;">
+            <input type="number" min="1" value="${soni}" class="form-control eshik-soni-input" placeholder="Soni" style="flex: 1;">
+            <button type="button" class="btn btn-outline-secondary eshik-remove-btn" style="padding: 8px 12px;">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+
+        const select = row.querySelector('.eshik-turi-select');
+        const yangiNomInput = row.querySelector('.eshik-yangi-nom');
+
+        const customOption = document.createElement('option');
+        customOption.value = '__custom__';
+        customOption.textContent = "+ Yangi tur kiritish";
+        select.appendChild(customOption);
+
+        select.addEventListener('change', function() {
+            if (this.value === '__custom__') {
+                yangiNomInput.style.display = 'block';
+                yangiNomInput.focus();
+            } else {
+                yangiNomInput.style.display = 'none';
+                yangiNomInput.value = '';
+            }
+            syncEshikHidden();
+        });
+
+        yangiNomInput.addEventListener('input', syncEshikHidden);
+        row.querySelector('.eshik-soni-input').addEventListener('input', syncEshikHidden);
+
+        row.querySelector('.eshik-remove-btn').addEventListener('click', function() {
+            row.remove();
+            syncEshikHidden();
+        });
+
+        return row;
+    }
+
+    function syncEshikHidden() {
+        const rows = eshikItemsWrapper.querySelectorAll('.eshik-item-row');
+        const parts = [];
+        rows.forEach(row => {
+            const select = row.querySelector('.eshik-turi-select');
+            const yangiNomInput = row.querySelector('.eshik-yangi-nom');
+            const soniInput = row.querySelector('.eshik-soni-input');
+
+            let turi = select.value;
+            if (turi === '__custom__') {
+                turi = yangiNomInput.value.trim();
+            }
+            const soni = parseInt(soniInput.value) || 1;
+
+            if (turi) {
+                parts.push(`${turi} x${soni}`);
+            }
+        });
+        eshikHiddenInput.value = parts.join(', ');
+    }
+
+    if (addEshikRowBtn) {
+        addEshikRowBtn.addEventListener('click', function() {
+            eshikItemsWrapper.appendChild(createEshikRow());
+            syncEshikHidden();
+        });
+    }
+
+    if (eshikItemsWrapper && eshikItemsWrapper.children.length === 0) {
+        eshikItemsWrapper.appendChild(createEshikRow());
+        syncEshikHidden();
+    }
+
+    // ==========================================
+    // 4. KOMPLEKT TURI SELECT2 (cheklanmagan)
+    // ==========================================
+    const komplektOptions = [
+        {id: 'Standart Komplekt', text: 'Standart Komplekt'},
+        {id: 'VIP Komplekt', text: 'VIP Komplekt'},
+    ];
+    const komplektSelect = $('#id_komplekt_turi_select');
+    const komplektHidden = $('#id_komplekt_turi_hidden');
+    const komplektCustomFields = $('#komplekt_custom_fields');
+    const komplektCustomHidden = $('#id_komplekt_custom');
+
+    komplektSelect.select2({
+        data: komplektOptions,
+        tags: true,
+        placeholder: "Komplektni tanlang yoki yangisini kiriting",
+        allowClear: true,
+        width: '100%',
+        createTag: function(params) {
+            var term = $.trim(params.term);
+            if (term === '') return null;
+            return { id: term, text: term, newTag: true };
+        }
+    });
+
+    komplektSelect.on('select2:select', function(e) {
+        const data = e.params.data;
+        komplektHidden.val(data.id);
+        if (data.newTag) {
+            komplektCustomFields.slideDown(200);
+            komplektCustomHidden.val('True');
+        } else {
+            komplektCustomFields.slideUp(200);
+            komplektCustomHidden.val('False');
+        }
+    });
+
+    komplektSelect.on('select2:unselect select2:clear', function() {
+        komplektHidden.val('');
+        komplektCustomFields.slideUp(200);
+        komplektCustomHidden.val('False');
+    });
+
+    // ==========================================
+    // 5. WORKER TYPE FILTER + PUR PANEL SUBTYPE YASHIRISH
+    // ==========================================
     const workerTypeSelect = document.getElementById('id_worker_type');
     const assignedWorkersSelect = document.getElementById('id_assigned_workers');
     const eshikFields = document.getElementById('eshik_fields');
     const panelFields = document.getElementById('panel_fields');
+    const komplektFields = document.getElementById('komplekt_fields');
+    const panelTypeSelect = document.getElementById('id_panel_type');
+    const subtypeContainer = document.getElementById('subtype_container');
+
+    function toggleSubtype() {
+        if (!panelTypeSelect || !subtypeContainer) return;
+        subtypeContainer.style.display = (panelTypeSelect.value === 'PUR') ? 'none' : 'block';
+    }
 
     function filterAndToggle() {
         const val = workerTypeSelect.value;
-        if (eshikFields) eshikFields.style.display = (val === 'ESHIK' || val === 'LIST_ESHIK') ? 'block' : 'none';
-        if (panelFields) panelFields.style.display = (val === 'LIST' || val === 'LIST_ESHIK') ? 'block' : 'none';
+
+        if (eshikFields) {
+            eshikFields.classList.toggle('show', val === 'ESHIK' || val === 'LIST_ESHIK');
+        }
+
+        if (panelFields) {
+            panelFields.classList.toggle('show', val === 'LIST' || val === 'LIST_ESHIK');
+        }
+
+        if (komplektFields) {
+            komplektFields.classList.toggle('show', val === 'KOMPLEKT');
+        }
 
         if (assignedWorkersSelect) {
             const options = assignedWorkersSelect.options;
@@ -250,49 +1187,140 @@ $(document).ready(function() {
                 }
             }
         }
+
+        toggleSubtype();
     }
 
-    // Qolgan hisob-kitoblar...
+    if (workerTypeSelect) {
+        workerTypeSelect.addEventListener('change', filterAndToggle);
+        filterAndToggle();
+    }
+
+    if (panelTypeSelect) {
+        panelTypeSelect.addEventListener('change', toggleSubtype);
+        toggleSubtype();
+    }
+
+    // ==========================================
+    // 6. QARZ HISOBI
+    // ==========================================
     const totalInput = document.getElementById('id_total_price');
     const prepayInput = document.getElementById('id_prepayment');
     const debtLabel = document.getElementById('debt_label');
 
     function calculateDebt() {
-        const total = parseFloat(totalInput.value) || 0;
-        const prepay = parseFloat(prepayInput.value) || 0;
+        const total = parseFloat(totalInput?.value) || 0;
+        const prepay = parseFloat(prepayInput?.value) || 0;
         const debt = total - prepay;
-        if (total > 0 && debtLabel) {
-            debtLabel.innerHTML = debt > 0 ? 
-                `<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Qarz: ${debt.toLocaleString()} USD</span>` : 
-                `<span class="text-success"><i class="fas fa-check-circle me-1"></i>To'liq to'landi</span>`;
-        } else if (debtLabel) {
-            debtLabel.innerHTML = "";
+
+        if (debtLabel) {
+            if (total > 0) {
+                debtLabel.style.display = 'inline-block';
+                if (debt > 0) {
+                    debtLabel.className = 'debt-label positive';
+                    debtLabel.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i> Qarz: ${debt.toLocaleString()} USD`;
+                } else {
+                    debtLabel.className = 'debt-label zero';
+                    debtLabel.innerHTML = `<i class="fas fa-check-circle me-1"></i> To'liq to'landi`;
+                }
+            } else {
+                debtLabel.style.display = 'none';
+            }
         }
     }
 
-    if (workerTypeSelect) workerTypeSelect.addEventListener('change', filterAndToggle);
     if (totalInput) totalInput.addEventListener('input', calculateDebt);
     if (prepayInput) prepayInput.addEventListener('input', calculateDebt);
-
-    // Initial calls
-    filterAndToggle();
     calculateDebt();
 
-    // File styling
-    const realFileBtn = document.querySelector('input[type="file"]');
-    const customFileBtn = document.getElementById('fileBtn');
-    if (realFileBtn && customFileBtn) {
-        realFileBtn.style.display = 'none';
-        customFileBtn.addEventListener('click', () => realFileBtn.click());
-        realFileBtn.addEventListener('change', function() {
+    // ==========================================
+    // 7. FILE UPLOAD
+    // ==========================================
+    const fileInput = document.querySelector('#fileUploadWrapper input[type="file"]');
+    const fileWrapper = document.getElementById('fileUploadWrapper');
+    const fileNameDisplay = document.getElementById('fileName');
+
+    if (fileInput && fileWrapper) {
+        fileInput.addEventListener('change', function(e) {
+            e.stopPropagation();
             if (this.files && this.files.length > 0) {
-                const placeholder = document.querySelector('#filePlaceholder p');
-                const icon = document.querySelector('#filePlaceholder i');
-                if (placeholder) placeholder.innerText = this.files[0].name;
-                if (icon) icon.className = 'fas fa-file-pdf fa-3x text-danger';
+                const file = this.files[0];
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    const fileSize = (file.size / 1024).toFixed(1);
+                    fileNameDisplay.textContent = `📄 ${file.name} (${fileSize} KB)`;
+                    fileWrapper.classList.add('has-file');
+                    fileWrapper.style.borderColor = '#10b981';
+                    fileWrapper.style.background = '#dcfce7';
+                } else {
+                    alert('Iltimos, faqat PDF formatidagi fayllarni yuklang!');
+                    this.value = '';
+                    fileNameDisplay.textContent = '';
+                    fileWrapper.classList.remove('has-file');
+                    fileWrapper.style.borderColor = '#86efac';
+                    fileWrapper.style.background = '#f0fdf4';
+                }
+            } else {
+                fileNameDisplay.textContent = '';
+                fileWrapper.classList.remove('has-file');
+                fileWrapper.style.borderColor = '#86efac';
+                fileWrapper.style.background = '#f0fdf4';
+            }
+        });
+
+        fileWrapper.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.add('drag-over');
+        });
+
+        fileWrapper.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.add('drag-over');
+        });
+
+        fileWrapper.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('drag-over');
+        });
+
+        fileWrapper.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    fileInput.files = dataTransfer.files;
+                    
+                    const event = new Event('change', { bubbles: true });
+                    fileInput.dispatchEvent(event);
+                } else {
+                    alert('Iltimos, faqat PDF formatidagi fayllarni yuklang!');
+                }
             }
         });
     }
+
+    // ==========================================
+    // 8. KEYBOARD SHORTCUT (Ctrl+Enter)
+    // ==========================================
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            const form = document.getElementById('orderForm');
+            if (form) {
+                e.preventDefault();
+                form.submit();
+            }
+        }
+    });
 });
 </script>
-{% endblock %}
+
+</body>
+</html>
