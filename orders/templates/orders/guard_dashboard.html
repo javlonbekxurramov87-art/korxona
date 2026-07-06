@@ -1,154 +1,736 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nazorat Punkti - Qorovul</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-{% block content %}
-<div class="container-fluid py-3">
-    <div class="row mb-4 align-items-center">
-        <div class="col-md-7">
-            <div class="d-flex align-items-center gap-3">
-                <div class="p-3 bg-primary rounded-circle shadow text-white">
-                    <i class="fas fa-shuttle-van fa-2x"></i>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            padding: 20px;
+            color: #1f2937;
+        }
+
+        .container-fluid {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px 32px;
+            margin-bottom: 28px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border: 1px solid #e5e7eb;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.8rem;
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+        }
+
+        .header-title h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #111827;
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        .header-title p {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .badge-count {
+            background: white;
+            border: 1px solid #e5e7eb;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #1f2937;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .badge-count i {
+            color: #f59e0b;
+        }
+
+        .btn-back {
+            background: white;
+            color: #6b7280;
+            border: 1px solid #e5e7eb;
+            padding: 8px 18px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-back:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        /* Cards */
+        .card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+        }
+
+        .card.border-start {
+            border-left: 4px solid #3b82f6 !important;
+        }
+
+        .card.border-danger {
+            border-left: 4px solid #ef4444 !important;
+            background: rgba(239, 68, 68, 0.05) !important;
+        }
+
+        .card.border-success {
+            border-left: 4px solid #10b981 !important;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* Order Cards Grid */
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+
+        /* Order Card */
+        .order-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .order-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+        }
+
+        .order-card.overdue {
+            border-left: 4px solid #ef4444;
+            background: rgba(239, 68, 68, 0.04);
+            animation: pulse-red 2s infinite;
+        }
+
+        .order-card.inside {
+            border-left: 4px solid #10b981;
+        }
+
+        .order-card.outside {
+            border-left: 4px solid #3b82f6;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .order-id {
+            background: #1f2937;
+            color: white;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .order-time {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .order-time.overdue-text {
+            color: #ef4444;
+        }
+
+        .blinker {
+            animation: blink 1.2s linear infinite;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #ef4444;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .order-comment {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+            font-size: 0.95rem;
+        }
+
+        .order-car {
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+
+        .order-car i {
+            margin-right: 6px;
+        }
+
+        .order-car strong {
+            color: #1f2937;
+        }
+
+        .order-status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .order-status-badge.outside {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .order-status-badge.inside {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        /* Form */
+        .form-label-custom {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+
+        .form-control-custom {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .form-control-custom:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-control-custom::file-selector-button {
+            background: #f3f4f6;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .form-control-custom::file-selector-button:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-success-custom {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-success-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-outline-custom {
+            background: white;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-outline-custom:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+
+        /* Sidebar History */
+        .history-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: sticky;
+            top: 20px;
+        }
+
+        .history-header {
+            background: white;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .history-header h5 {
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0;
+        }
+
+        .history-list {
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .history-list::-webkit-scrollbar-track {
+            background: #f3f4f6;
+        }
+
+        .history-list::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+        }
+
+        .history-item {
+            padding: 14px 20px;
+            border-bottom: 1px solid #f3f4f6;
+            transition: all 0.2s ease;
+        }
+
+        .history-item:hover {
+            background: #f9fafb;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-item-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-item-id {
+            font-weight: 700;
+            color: #1f2937;
+            font-size: 0.9rem;
+        }
+
+        .history-item-time {
+            color: #10b981;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .history-item-car {
+            color: #6b7280;
+            font-size: 0.8rem;
+            margin-top: 2px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #d1d5db;
+            margin-bottom: 16px;
+        }
+
+        .empty-state h5 {
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .orders-grid {
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            .header-card {
+                padding: 18px 20px;
+            }
+
+            .header-content {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .header-left {
+                gap: 14px;
+            }
+
+            .header-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 1.4rem;
+            }
+
+            .header-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .header-right {
+                justify-content: space-between;
+            }
+
+            .orders-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .history-card {
+                position: static;
+                margin-top: 20px;
+            }
+
+            .history-list {
+                max-height: 300px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-right {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .badge-count {
+                text-align: center;
+            }
+
+            .btn-back {
+                justify-content: center;
+            }
+
+            .order-header {
+                flex-direction: column;
+                gap: 6px;
+            }
+        }
+
+        /* Bootstrap grid override */
+        .row.g-3 {
+            --bs-gutter-y: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="header-card">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="header-icon">
+                    <i class="fas fa-shuttle-van"></i>
                 </div>
-                <div>
-                    <h1 class="h3 fw-bold text-dark mb-0">Nazorat Punkti (Qorovul)</h1>
-                    <p class="text-muted mb-0 small">{{ today|date:"d-F, Y" }} | 24/7 Monitoring</p>
+                <div class="header-title">
+                    <h1>Nazorat Punkti</h1>
+                    <p><i class="far fa-calendar-alt me-1"></i> {{ today|date:"d-F, Y" }} | 24/7 Monitoring</p>
                 </div>
             </div>
-        </div>
-        <div class="col-md-5 text-md-end mt-2">
-            <span class="badge bg-white text-dark border p-2 shadow-sm">
-                <i class="fas fa-clock text-warning"></i> Kutilmoqda: {{ orders|length }}
-            </span>
-            <a href="{% url 'order_list' %}" class="btn btn-secondary btn-sm ms-2">
-                <i class="fas fa-arrow-left"></i> Ortga
-            </a>
+            <div class="header-right">
+                <span class="badge-count">
+                    <i class="fas fa-clock me-1"></i> Kutilmoqda: {{ orders|length }}
+                </span>
+                <a href="{% url 'order_list' %}" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Orqaga
+                </a>
+            </div>
         </div>
     </div>
 
-    <div class="row">
+    <!-- Main Content -->
+    <div class="row g-4">
+        <!-- Orders Column -->
         <div class="col-lg-8">
-            <div class="row g-3">
+            <div class="orders-grid">
                 {% for order in orders %}
-                <div class="col-md-6">
-                    <div class="card h-100 border-start border-4 shadow-sm 
-                        {% if order.is_late %} border-danger bg-danger bg-opacity-10 animate-pulse-red 
-                        {% elif order.status == 'YUK_YUKLANDI' or order.work_started_at %} border-success 
-                        {% else %} border-primary {% endif %}">
-                        
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span class="badge bg-dark">#{{ order.id }}</span>
-                                <div class="text-end">
-                                    <span class="small fw-bold {% if order.is_late %} text-danger {% else %} text-muted {% endif %}">
-                                        Vaqt: {{ order.work_finished_at|date:"H:i" }}
-                                    </span>
-                                    {% if order.is_late %}
-                                        <br><small class="text-danger fw-bold blinker">KECHIKDI!</small>
-                                    {% endif %}
-                                </div>
+                <div class="order-card 
+                    {% if order.is_late %} overdue 
+                    {% elif order.status == 'YUK_YUKLANDI' or order.work_started_at %} inside 
+                    {% else %} outside {% endif %}">
+                    
+                    <div class="card-body">
+                        <!-- Header -->
+                        <div class="order-header">
+                            <span class="order-id">#{{ order.id }}</span>
+                            <div class="text-end">
+                                <span class="order-time {% if order.is_late %}overdue-text{% endif %}">
+                                    <i class="far fa-clock me-1"></i> {{ order.work_finished_at|date:"H:i" }}
+                                </span>
+                                {% if order.is_late %}
+                                    <br><span class="blinker"><i class="fas fa-exclamation-triangle me-1"></i> KECHIKDI!</span>
+                                {% endif %}
                             </div>
-
-                            <div class="mb-3">
-                                <h6 class="fw-bold mb-1">{{ order.worker_comment|default:"Izoh yo'q" }}</h6>
-                                <p class="text-muted small mb-0">
-                                    <i class="fas fa-car me-1"></i> <strong>{{ order.car_number|default:"Raqamsiz" }}</strong>
-                                </p>
-                            </div>
-
-                            <form method="POST" enctype="multipart/form-data" class="action-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="order_id" value="{{ order.id }}">
-                                
-                                <div class="mb-3">
-                                    <label class="form-label small fw-bold">Rasm yuklash:</label>
-                                    <input type="file" name="guard_img" class="form-control form-control-sm border-primary" 
-                                           accept="image/*" capture="environment" required>
-                                </div>
-
-                                <div class="d-grid gap-2">
-                                    {% if order.status == 'TAYYOR' and not order.work_started_at %}
-                                        <button type="submit" name="action" value="enter" class="btn btn-primary btn-sm fw-bold py-2">
-                                            <i class="fas fa-sign-in-alt me-2"></i> KIRISHNI TASDIQLASH
-                                        </button>
-                                        <span class="badge bg-primary bg-opacity-10 text-primary small">Holat: Tashqarida</span>
-                                    
-                                    {% elif order.status == 'YUK_YUKLANDI' or order.work_started_at %}
-                                        <button type="submit" name="action" value="exit" class="btn btn-success btn-sm fw-bold py-2">
-                                            <i class="fas fa-sign-out-alt me-2"></i> CHIQISHNI TASDIQLASH
-                                        </button>
-                                        <span class="badge bg-success bg-opacity-10 text-success small">Holat: Ichkarida</span>
-                                    {% endif %}
-                                </div>
-                            </form>
                         </div>
+
+                        <!-- Details -->
+                        <div class="order-comment">{{ order.worker_comment|default:"Izoh yo'q" }}</div>
+                        <div class="order-car">
+                            <i class="fas fa-car"></i> <strong>{{ order.car_number|default:"Raqamsiz" }}</strong>
+                        </div>
+
+                        <!-- Status Badge -->
+                        {% if order.status == 'TAYYOR' and not order.work_started_at %}
+                            <span class="order-status-badge outside">
+                                <i class="fas fa-sign-in-alt me-1"></i> Tashqarida
+                            </span>
+                        {% elif order.status == 'YUK_YUKLANDI' or order.work_started_at %}
+                            <span class="order-status-badge inside">
+                                <i class="fas fa-sign-out-alt me-1"></i> Ichkarida
+                            </span>
+                        {% endif %}
+
+                        <!-- Form -->
+                        <form method="POST" enctype="multipart/form-data" class="action-form mt-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="order_id" value="{{ order.id }}">
+                            
+                            <div class="mb-3">
+                                <label class="form-label-custom">
+                                    <i class="fas fa-camera me-1"></i> Rasm yuklash:
+                                </label>
+                                <input type="file" name="guard_img" class="form-control-custom" 
+                                       accept="image/*" capture="environment" required>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                {% if order.status == 'TAYYOR' and not order.work_started_at %}
+                                    <button type="submit" name="action" value="enter" class="btn-primary-custom">
+                                        <i class="fas fa-sign-in-alt"></i> KIRISHNI TASDIQLASH
+                                    </button>
+                                {% elif order.status == 'YUK_YUKLANDI' or order.work_started_at %}
+                                    <button type="submit" name="action" value="exit" class="btn-success-custom">
+                                        <i class="fas fa-sign-out-alt"></i> CHIQISHNI TASDIQLASH
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </form>
                     </div>
                 </div>
                 {% empty %}
-                <div class="col-12 text-center py-5">
-                    <h5 class="text-muted">Hozircha transportlar yo'q</h5>
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <i class="fas fa-shuttle-van"></i>
+                    <h5>Hozircha transportlar yo'q</h5>
+                    <p class="text-muted">Kutilayotgan transportlar ro'yxati bo'sh</p>
                 </div>
                 {% endfor %}
             </div>
         </div>
 
+        <!-- History Sidebar -->
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3">
-                    <h5 class="fw-bold mb-0 text-dark">Bugun chiqqanlar</h5>
+            <div class="history-card">
+                <div class="history-header">
+                    <h5><i class="fas fa-history me-2 text-muted"></i> Bugun chiqqanlar</h5>
                 </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
-                        {% for h in history %}
-                        <div class="list-group-item p-3 border-0 border-bottom">
-                            <div class="d-flex justify-content-between">
-                                <strong class="text-dark">#{{ h.id }} - {{ h.car_number }}</strong>
-                                <span class="text-success small fw-bold">{{ h.work_finished_at|date:"H:i" }}</span>
-                            </div>
-                            <small class="text-muted d-block mt-1">{{ h.worker_comment|truncatechars:35 }}</small>
+                <div class="history-list">
+                    {% for h in history %}
+                    <div class="history-item">
+                        <div class="history-item-top">
+                            <span class="history-item-id">#{{ h.id }} - {{ h.car_number|default:"Raqamsiz" }}</span>
+                            <span class="history-item-time">{{ h.work_finished_at|date:"H:i" }}</span>
                         </div>
-                        {% endfor %}
+                        <div class="history-item-car">
+                            <i class="fas fa-comment me-1"></i> {{ h.worker_comment|truncatechars:35|default:"Izoh yo'q" }}
+                        </div>
                     </div>
+                    {% empty %}
+                    <div class="empty-state" style="padding: 40px 20px;">
+                        <i class="fas fa-history" style="font-size: 2.5rem;"></i>
+                        <h6>Hozircha tarix yo'q</h6>
+                        <p class="text-muted small">Bugun chiqqan transportlar bu yerda ko'rsatiladi</p>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-    /* Kechikkanlar uchun qizil animatsiya */
-    .animate-pulse-red {
-        animation: pulse-red 2s infinite;
-    }
-    @keyframes pulse-red {
-        0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
-        70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
-    }
-    .blinker {
-        animation: blink 1.2s linear infinite;
-    }
-    @keyframes blink {
-        50% { opacity: 0; }
-    }
-    .card { transition: all 0.3s ease; }
-    .card:hover { transform: translateY(-3px); }
-</style>
-
+<!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     // SweetAlert tasdiqlash xabari
     document.querySelectorAll('.action-form').forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            const action = this.querySelector('button[type="submit"]').value;
-            const text = action === 'enter' ? "KIRISHNI" : "CHIQISHNI";
+            
+            // Qaysi tugma bosilganini aniqlash
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const action = submitBtn ? submitBtn.value : '';
+            
+            let title = '';
+            let confirmColor = '';
+            let icon = '';
+            
+            if (action === 'enter') {
+                title = 'KIRISHNI tasdiqlaysizmi?';
+                confirmColor = '#3b82f6';
+                icon = 'question';
+            } else if (action === 'exit') {
+                title = 'CHIQISHNI tasdiqlaysizmi?';
+                confirmColor = '#10b981';
+                icon = 'question';
+            } else {
+                title = 'Amalni tasdiqlaysizmi?';
+                confirmColor = '#3b82f6';
+                icon = 'question';
+            }
             
             Swal.fire({
-                title: `${text} tasdiqlaysizmi?`,
-                icon: 'question',
+                title: title,
+                text: "Rasm yuklanganligiga ishonch hosil qiling!",
+                icon: icon,
                 showCancelButton: true,
                 confirmButtonText: 'Ha, tasdiqlayman',
                 cancelButtonText: 'Bekor qilish',
-                confirmButtonColor: action === 'enter' ? '#0d6efd' : '#198754',
+                confirmButtonColor: confirmColor,
+                cancelButtonColor: '#6b7280',
+                reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
                     this.submit();
@@ -156,5 +738,12 @@
             });
         });
     });
+
+    // Auto-refresh every 30 seconds
+    setTimeout(function() {
+        location.reload();
+    }, 30000);
 </script>
-{% endblock %} 
+
+</body>
+</html>
