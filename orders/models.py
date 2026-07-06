@@ -187,7 +187,6 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-
 class Order(models.Model):
     STATUS_CHOICES = [
         ('KIRITILDI', "1. Kiritildi (Admin)"),
@@ -207,6 +206,7 @@ class Order(models.Model):
         ('LIST_ESHIK', 'List va Eshik Ustasi'),
         ('PANEL', 'Panel Ustasi'),
         ('UGOL', 'Ugol Ustasi'),
+        ('KOMPLEKT', 'Komplekt Sotuvi'),  # YANGI
     ]
 
     PANEL_TYPE_CHOICES = [
@@ -226,10 +226,98 @@ class Order(models.Model):
         ('10', '10 sm'),
         ('15', '15 sm')
     ]
+
+    ESHIK_TURI_CHOICES = [(f'F{i}', f'F{i}') for i in range(1, 9)]  # Endi faqat "tavsiya" sifatida, majburiy emas
+    PAROG_CHOICES = [('PAROGLI', 'Parogli'), ('PAROGSIZ', 'Parogsiz')]
+    DIRECTION_CHOICES = [('ONG', "O'ng"), ('CHAP', 'Chap')]
+
+    objects = models.Manager()  # Standart manager
+    active = ActiveOrderManager()  # Aktiv buyurtmalar uchun
+
+    product_name = models.CharField(max_length=255, verbose_name="Mahsulot nomi", blank=True, null=True)
+    worker_comment = models.TextField(blank=True, null=True, verbose_name="Usta izohi")
+    worker_started_at = models.DateTimeField(null=True, blank=True, verbose_name="Ish boshlangan vaqt")
+    worker_finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Ish yakunlangan vaqt")
+    needs_manager_approval = models.BooleanField(default=False, verbose_name="Menejer tasdig'i kerak")
+    parent_order = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_orders')
+
+    order_number = models.CharField(max_length=50, unique=True, verbose_name="Buyurtma Raqami", editable=False)
+    customer_unique_id = models.CharField(max_length=50, verbose_name="Mijoz ID", help_text="Ko'p martalik mijoz identifikatori")
+    customer_name = models.CharField(max_length=150, verbose_name="Xaridor Nomi")
+
+    worker_type = models.CharField(max_length=15, choices=WORKER_TYPE_CHOICES, default='LIST')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='KIRITILDI')
+    customer_chat_id = models.CharField(max_length=100, blank=True, null=True)
+    car_number = models.CharField(max_length=50, verbose_name="Moshina raqami", blank=True, null=True)
+    trip = models.ForeignKey('DriverTrip', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    trip_number = models.CharField(max_length=100, null=True, blank=True)
+
+    # Eshik parametrlari (endi CHOICES YO'Q — istalgan matn kiritish mumkin)
+    eshik_turi = models.CharField(max_length=255, blank=True, null=True, verbose_name="Eshik turi")
+    zamokli_eshik = models.BooleanField(default=False, verbose_name="Zamokli")
+    parog_turi = models.CharField(max_length=10, choices=PAROG_CHOICES, blank=True, null=True)
+    eshik_yonalishi = models.CharField(max_length=5, choices=DIRECTION_CHOICES, blank=True, null=True)
+    balandligi = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    eni = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # Panel parametrlari
+    panel_type = models.CharField(max_length=10, choices=PANEL_TYPE_CHOICES, blank=True, null=True)
+    panel_subtype = models.CharField(max_length=20, choices=PANEL_SUBTYPE_CHOICES, blank=True, null=True)
+    panel_thickness = models.CharField(max_length=3, choices=PANEL_THICKNESS_CHOICES, blank=True, null=True)
+    panel_kvadrat = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    panel_balandligi = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Panel balandligi (m)")  # YANGI
+
+    # Komplekt (Sotish) parametrlari — YANGI
+    komplekt_turi = models.CharField(max_length=255, blank=True, null=True, verbose_name="Komplekt turi")
+    komplekt_custom = models.BooleanField(default=False, verbose_name="Custom komplekt (o'lchov bo'yicha)")
+    komplekt_kenglik = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Komplekt kengligi (m)")
+    komplekt_balandligi = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Komplekt balandligi (m)")
+    komplekt_kvadrat = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Komplekt kvadrati (m²)")
+
+    total_price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Umumiy Narx")
+    prepayment = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Zalog (Oldindan to'lov)")
+    pdf_file = models.FileField(upload_to='order_pdfs/', verbose_name="PDF Chizma", blank=True, null=True)
+    deadline = models.DateTimeField(null=True, blank=True, verbose_name="Tugallanish muddati")
+
+    assigned_workers = models.ManyToManyField('Worker', related_name='assigned_orders', blank=True)
+    comment = models.TextField(blank=True, null=True, verbose_name="Admin izohi")
+
+    start_image = models.ImageField(upload_to='order_photos/start/', null=True, blank=True)
+    finish_image = models.ImageField(upload_to='order_photos/finish/', null=True, blank=True)
+
+    started_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='started_orders'
+    )
+    work_started_at = models.DateTimeField(null=True, blank=True)
+    start_confirmed = models.BooleanField(default=False)
+
+    finished_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='finished_orders'
+    )
+    work_finished_at = models.DateTimeField(null=True, blank=True)
+    finish_confirmed = models.BooleanField(default=False)
+    delivery_img_1 = models.ImageField(upload_to='order_photos/delivery/', null=True, blank=True)
+    delivery_img_2 = models.ImageField(upload_to='order_photos/delivery/', null=True, blank=True)
+    delivery_img_3 = models.ImageField(upload_to='order_photos/delivery/', null=True, blank=True)
+    start_telegram_sent = models.BooleanField(default=False)
+    finish_telegram_sent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    is_loaded = models.BooleanField(default=False, verbose_name="Ortildi")
+    loaded_at = models.DateTimeField(null=True, blank=True, verbose_name="Ortilgan vaqt")
+    loaded_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='loaded_orders',
+        verbose_name="Ortgan omborchi"
+    )
+    loaded_notes = models.TextField(blank=True, verbose_name="Ortish haqida izoh")
     def calculate_materials(self):
         """
         Buyurtma uchun ombordagi materiallar hisobini qaytaradi.
-        Hozirgi hisob-kitob order.panel_kvadrat asosida oddiy formulaga o‘tkazilgan.
+        Hozirgi hisob-kitob order.panel_kvadrat asosida oddiy formulaga o'tkazilgan.
         """
         from decimal import Decimal
 
@@ -241,45 +329,31 @@ class Order(models.Model):
             'foam_volume': (kvadrat * Decimal('0.20')).quantize(Decimal('0.001')),
             'sheets_area': (kvadrat * Decimal('0.50')).quantize(Decimal('0.001')),
         }
+
     def get_detailed_calculation(self):
         """
         Buyurtma uchun aniq sarf-xarajat kalkulyatsiyasi
         """
-        # Ma'lumotlarni olish
-        # panel_kvadrat orqali bo'yini hisoblab olamiz (Eni doim 0.96m deb olingan)
-        eni = Decimal('0.96') # 960 mm
+        import math
+        eni = Decimal('0.96')
         kvadratura = Decimal(str(self.panel_kvadrat))
         boyi_metr = kvadratura / eni
         boyi_mm = boyi_metr * 1000
         qalinlik = Decimal(str(self.panel_thickness or 10))
 
-        # 1. LIST HISOBI (2 tomonga)
         list_sarfi = kvadratura * 2
 
-        # 2. SIRYO HISOBI
-        # Formula: (Boyi(mm) * Eni(mm) * Qalinlik * 0.42) / 2.1
-        # Eslatma: 2.1 bu zichlik koeffitsienti bo'lishi mumkin
-        siryo_sarfi = (boyi_mm * 960 * qalinlik * Decimal('0.42')) / Decimal('2100') 
-        # (2.1 kg/m3 formatga moslash uchun 2100 ga bo'ldik)
+        siryo_sarfi = (boyi_mm * 960 * qalinlik * Decimal('0.42')) / Decimal('2100')
 
-        # 3. ZAMOK HISOBI
-        # Eni bo'yicha doim 4 ta (boshida 2, oxirida 2)
         eni_zamok = 4
-        
-        # Bo'yi bo'yicha: boshidan 70sm, oxiridan 70sm tashlab, har 960mm da 1 tadan
-        # Avval chegaralarni ayiramiz: jami boyi(mm) - 1400mm
         ishchi_boyi = boyi_mm - 1400
         if ishchi_boyi > 0:
-            boyi_zamok_soni = (math.floor(ishchi_boyi / 960) + 1) * 2 # 2 tomoni uchun
+            boyi_zamok_soni = (math.floor(ishchi_boyi / 960) + 1) * 2
         else:
             boyi_zamok_soni = 0
-            
-        jami_zamok = eni_zamok + boyi_zamok_soni
 
-        # 4. STAKANCHIK HISOBI
-        # Har bir zamok uchun bittadan yoki siz aytgandek har 8 taga 1 ta? 
-        # Odatda har zamokda bitta bo'ladi:
-        stakanchik = jami_zamok 
+        jami_zamok = eni_zamok + boyi_zamok_soni
+        stakanchik = jami_zamok
 
         return {
             'list': round(list_sarfi, 2),
@@ -292,7 +366,6 @@ class Order(models.Model):
     def decrement_stock(self):
         """
         Buyurtma uchun kerakli materiallarni ombordan ayirish.
-        Bu funksiya Order modeliga tegishli bo'lishi kerak.
         """
         requirements = self.calculate_materials()
         if not requirements:
@@ -336,110 +409,44 @@ class Order(models.Model):
         total = self.total_price or 0
         paid = self.prepayment or 0
         return total - paid
-    ESHIK_TURI_CHOICES  = [(f'F{i}', f'F{i}') for i in range(1, 9)]
-    PAROG_CHOICES = [('PAROGLI', 'Parogli'), ('PAROGSIZ', 'Parogsiz')]
-    DIRECTION_CHOICES = [('ONG', "O'ng"), ('CHAP', 'Chap')]
-    objects = models.Manager() # Standart manager
-    active = ActiveOrderManager() # Aktiv buyurtmalar uchun
-    product_name = models.CharField(max_length=255, verbose_name="Mahsulot nomi", blank=True, null=True)
-    worker_comment = models.TextField(blank=True, null=True, verbose_name="Usta izohi")
-    worker_started_at = models.DateTimeField(null=True, blank=True, verbose_name="Ish boshlangan vaqt")
-    worker_finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Ish yakunlangan vaqt")
-    needs_manager_approval = models.BooleanField(default=False, verbose_name="Menejer tasdig'i kerak")
-    parent_order = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_orders')
-    
-    order_number = models.CharField(max_length=50, unique=True, verbose_name="Buyurtma Raqami", editable=False)
-    customer_unique_id = models.CharField(max_length=50, verbose_name="Mijoz ID", help_text="Ko'p martalik mijoz identifikatori")
-    customer_name = models.CharField(max_length=150, verbose_name="Xaridor Nomi")
-    
-    worker_type = models.CharField(max_length=15, choices=WORKER_TYPE_CHOICES, default='LIST')
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='KIRITILDI')
-    customer_chat_id = models.CharField(max_length=100, blank=True, null=True)
-    car_number = models.CharField(max_length=50, verbose_name="Moshina raqami", blank=True, null=True)
-    trip = models.ForeignKey('DriverTrip', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
-    trip_number = models.CharField(max_length=100, null=True, blank=True)
-    # Eshik parametrlari
-    eshik_turi = models.CharField(max_length=255, choices=ESHIK_TURI_CHOICES , blank=True, null=True)
-    zamokli_eshik = models.BooleanField(default=False, verbose_name="Zamokli")
-    parog_turi = models.CharField(max_length=10, choices=PAROG_CHOICES, blank=True, null=True)
-    eshik_yonalishi = models.CharField(max_length=5, choices=DIRECTION_CHOICES, blank=True, null=True)
-    balandligi = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    eni = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-
-    # Panel parametrlari
-    panel_type = models.CharField(max_length=10, choices=PANEL_TYPE_CHOICES, blank=True, null=True)
-    panel_subtype = models.CharField(max_length=20, choices=PANEL_SUBTYPE_CHOICES, blank=True, null=True)
-    panel_thickness = models.CharField(max_length=3, choices=PANEL_THICKNESS_CHOICES, blank=True, null=True)
-    panel_kvadrat = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-
-    total_price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Umumiy Narx")
-    prepayment = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Zalog (Oldindan to'lov)")
-    pdf_file = models.FileField(upload_to='order_pdfs/', verbose_name="PDF Chizma", blank=True, null=True)
-    deadline = models.DateTimeField(null=True, blank=True, verbose_name="Tugallanish muddati")
-    
-    assigned_workers = models.ManyToManyField('Worker', related_name='assigned_orders', blank=True)
-    comment = models.TextField(blank=True, null=True, verbose_name="Admin izohi")
-    
-    start_image = models.ImageField(upload_to='order_photos/start/', null=True, blank=True)
-    finish_image = models.ImageField(upload_to='order_photos/finish/', null=True, blank=True)
-
-    started_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='started_orders'
-    )
-    work_started_at = models.DateTimeField(null=True, blank=True)
-    start_confirmed = models.BooleanField(default=False)  # Telegramga yuborilganligini belgilash
-
-    # Kim tugatdi / qachon
-    finished_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='finished_orders'
-    )
-    work_finished_at = models.DateTimeField(null=True, blank=True)
-    finish_confirmed = models.BooleanField(default=False)  # Telegramga yuborilganligini belgilash
-    delivery_img_1 = models.ImageField(upload_to='order_photos/delivery/', null=True, blank=True)
-    delivery_img_2 = models.ImageField(upload_to='order_photos/delivery/', null=True, blank=True)
-    delivery_img_3 = models.ImageField(upload_to='order_photos/delivery/', null=True, blank=True)
-    # Optional: agar kerak bo‘lsa log uchun
-    start_telegram_sent = models.BooleanField(default=False)
-    finish_telegram_sent = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
 
     def clean(self):
         super().clean()
-        
-        # 1. PUR uchun mantiq (Tanlanganda qalinliklari 5, 8, 10, 15 bo'lishi kerak)
+
+        # 1. PUR uchun mantiq
         if self.panel_type == 'PUR':
             if self.panel_thickness not in ['5', '8', '10', '15']:
                 raise ValidationError("PUR panel uchun faqat 5, 8, 10 yoki 15 sm tanlash mumkin.")
 
-        # 2. PIR uchun mantiq (Tom: 5sm, SecretFix: 5,8sm, Sovutgich: 5,10,15sm)
+        # 2. PIR uchun mantiq
         if self.panel_type == 'PIR':
             if self.panel_subtype == 'TOM' and self.panel_thickness != '5':
                 raise ValidationError("PIR Tom panel uchun faqat 5 sm qalinlik tanlash mumkin.")
-            
+
             if self.panel_subtype == 'SECRETPIR' and self.panel_thickness not in ['5', '8']:
                 raise ValidationError("PIR SecretFix uchun faqat 5 yoki 8 sm qalinlik tanlash mumkin.")
-            
+
             if self.panel_subtype == 'SOVUTGICH' and self.panel_thickness not in ['5', '10', '15']:
                 raise ValidationError("PIR Sovutgich uchun faqat 5, 10 yoki 15 sm qalinlik tanlash mumkin.")
 
         # 3. Eshik yoki LIST_ESHIK (Universal) mantiqi
         if self.worker_type in ['ESHIK', 'LIST_ESHIK']:
             if not self.eshik_turi:
-                raise ValidationError("Eshik turi tanlanishi shart.")
+                raise ValidationError("Eshik turi tanlanishi/kiritilishi shart.")
             if not self.parog_turi:
                 raise ValidationError("Parog turi tanlanishi shart.")
             if not self.eshik_yonalishi:
                 raise ValidationError("Eshik yo'nalishi (o'ng/chap) tanlanishi shart.")
             if self.balandligi is None or self.eni is None:
                 raise ValidationError("Eshik/Prayom o'lchamlari (balandlik va eni) kiritilishi shart.")
-            # Eshik qalinligi tekshiruvi
-            # TO‘G‘RISI — eshik_qalinligi tekshiriladi
-            # if self.eshik_qalinligi not in ['5', '8', '10', '15']:
-            #     raise ValidationError({
-            #         "eshik_qalinligi": "Eshik qalinligi uchun faqat 5, 8, 10 yoki 15 sm tanlash mumkin."
-            #     })
 
+        # 4. Komplekt mantiqi — YANGI
+        if self.worker_type == 'KOMPLEKT':
+            if not self.komplekt_turi:
+                raise ValidationError("Komplekt turi tanlanishi yoki kiritilishi shart.")
+            if self.komplekt_custom:
+                if self.komplekt_kenglik is None or self.komplekt_balandligi is None or self.komplekt_kvadrat is None:
+                    raise ValidationError("Custom komplekt uchun kenglik, balandlik va kvadrat kiritilishi shart.")
 
     def save(self, *args, **kwargs):
         # 1. Order Number yaratish
@@ -464,8 +471,7 @@ class Order(models.Model):
 
             if next_worker_type:
                 from .models import Worker
-                
-                # 1. Yangi sub-order (child) yaratish
+
                 new_order = Order.objects.create(
                     customer_unique_id=self.customer_unique_id,
                     customer_name=self.customer_name,
@@ -478,28 +484,23 @@ class Order(models.Model):
                     panel_kvadrat=self.panel_kvadrat,
                     eshik_turi=self.eshik_turi,
                     pdf_file=self.pdf_file,
-                    # SHU YERNI O'ZGARTIRDIK:
-                    status='TASDIQLANDI',  # Child uchun menejer tasdig'i shart emas
+                    status='TASDIQLANDI',
                     created_by=self.created_by
                 )
 
-                # 2. Ustalarni topish va biriktirish
                 target_workers = Worker.objects.filter(role=next_worker_type)
-                
+
                 if target_workers.exists():
                     new_order.assigned_workers.add(*target_workers)
-                    
-                    # 3. Child ustalarga bildirishnoma yuborish (ixtiyoriy)
-                    # Bu orqali usta o'z telefoniga yoki paneliga xabar oladi
+
                     for worker in target_workers:
                         if worker.user:
-                            from .models import Notification # Agar model boshqa joyda bo'lsa
+                            from .models import Notification
                             Notification.objects.create(
                                 user=worker.user,
                                 order=new_order,
                                 message=f"Yangi vazifa: №{new_order.order_number} ({next_worker_type}). Ishni boshlashingiz mumkin!"
                             )
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.db import models
@@ -904,7 +905,10 @@ class CashTransaction(models.Model):
     # Operatsiya ma'lumotlari
     description = models.TextField(verbose_name="Tavsif")
     receipt_number = models.CharField(max_length=50, blank=True, verbose_name="Chek raqami")
-    transaction_date = models.DateTimeField(default=timezone.now, verbose_name="Operatsiya vaqti")
+    transaction_date = models.DateTimeField(
+        default=timezone.localtime,  # ✅ MAHALLIY VAQT
+        verbose_name="Operatsiya vaqti"
+    )
     
     # Qo'shimcha ma'lumotlar
     external_payment_id = models.CharField(max_length=100, blank=True, verbose_name="Tashqi to'lov ID (Click/Payme)")
@@ -1052,3 +1056,175 @@ class CashRegisterBalance(models.Model):
     
     def __str__(self):
         return f"Joriy qoldiq: {self.cash_balance} so'm | {self.cash_balance_usd} USD"
+    
+
+# orders/models.py - Oshxona modellari (faylning oxiriga qo'shing)
+
+# =======================================================================
+# 7. OSHXONA MODELLARI (KITCHEN)
+# =======================================================================
+
+class KitchenIngredient(models.Model):
+    """Oshxona masalliqlari (warehouse)"""
+    UNIT_CHOICES = [
+        ('KG', 'Kilogramm'),
+        ('GR', 'Gramm'),
+        ('L', 'Litr'),
+        ('ML', 'Millilitr'),
+        ('DONA', 'Dona'),
+        ('PAKET', 'Paket'),
+        ('BANK', 'Bank'),
+    ]
+    
+    name = models.CharField(max_length=200, verbose_name="Masalliq nomi")
+    unit = models.CharField(max_length=20, choices=UNIT_CHOICES, default='KG', verbose_name="O'lchov birligi")
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Miqdori")
+    min_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1, verbose_name="Minimal miqdor")
+    price_per_unit = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Birlik narxi")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Oshxona masalliq"
+        verbose_name_plural = "Oshxona masalliqlari"
+        ordering = ['name']
+    
+    def __str__(self):
+        return f"{self.name} ({self.quantity} {self.get_unit_display()})"
+    
+    def is_low(self):
+        return self.quantity <= self.min_quantity
+    
+    def add_quantity(self, amount):
+        self.quantity += Decimal(str(amount))
+        self.save()
+    
+    def subtract_quantity(self, amount):
+        if self.quantity >= Decimal(str(amount)):
+            self.quantity -= Decimal(str(amount))
+            self.save()
+            return True
+        return False
+
+
+class KitchenIngredientTransaction(models.Model):
+    """Masalliq harakati tarixi"""
+    TRANSACTION_TYPES = [
+        ('IN', 'Kirim (Qo\'shish)'),
+        ('OUT', 'Chiqim (Ishlatish)'),
+        ('RETURN', 'Qaytarish'),
+        ('WRITE_OFF', 'Hisobdan chiqarish'),
+    ]
+    
+    ingredient = models.ForeignKey(KitchenIngredient, on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Harakat turi")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Miqdori")
+    previous_quantity = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Avvalgi miqdor")
+    new_quantity = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Yangi miqdor")
+    description = models.TextField(blank=True, null=True, verbose_name="Izoh")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Kim tomonidan")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Masalliq harakati"
+        verbose_name_plural = "Masalliq harakatlari"
+        ordering = ['-created_at']
+
+
+# models.py - DailyMeal modeli
+
+class DailyMeal(models.Model):
+    """Kunlik ovqat"""
+    MEAL_TYPES = [
+        ('BREAKFAST', 'Nonushta'),
+        ('LUNCH', 'Tushlik'),
+        ('DINNER', 'Kechki ovqat'),
+        ('SNACK', 'Perekus'),
+    ]
+    
+    date = models.DateField(default=timezone.now, verbose_name="Sana")  # ✅ Default qo'shildi
+    meal_type = models.CharField(max_length=20, choices=MEAL_TYPES, default='LUNCH', verbose_name="Ovqat turi")
+    meal_name = models.CharField(max_length=300, verbose_name="Ovqat nomi")
+    person_count = models.PositiveIntegerField(default=0, verbose_name="Odam soni")
+    description = models.TextField(blank=True, null=True, verbose_name="Izoh")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Kim tomonidan")
+    
+    class Meta:
+        verbose_name = "Kunlik ovqat"
+        verbose_name_plural = "Kunlik ovqatlar"
+        ordering = ['-date', '-created_at']
+        unique_together = ['date', 'meal_type']
+    
+    def __str__(self):
+        return f"{self.date} - {self.get_meal_type_display()} - {self.meal_name} ({self.person_count} kishi)"
+# models.py - DailyMealIngredient modeliga qo'shing
+
+class DailyMealIngredient(models.Model):
+    """Ovqat uchun ishlatilgan masalliqlar"""
+    meal = models.ForeignKey(DailyMeal, on_delete=models.CASCADE, related_name='ingredients')
+    ingredient = models.ForeignKey(KitchenIngredient, on_delete=models.CASCADE, verbose_name="Masalliq")
+    quantity_per_person = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="1 kishiga (birlik)")
+    total_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Jami miqdor")
+    
+    def save(self, *args, **kwargs):
+        # total_quantity ni avtomatik hisoblash
+        if self.meal and self.quantity_per_person:
+            self.total_quantity = self.quantity_per_person * self.meal.person_count
+        super().save(*args, **kwargs)
+    
+    class Meta:
+        verbose_name = "Ovqat masalliqi"
+        verbose_name_plural = "Ovqat masalliqlari"
+    
+    def __str__(self):
+        return f"{self.meal} - {self.ingredient.name} ({self.total_quantity} {self.ingredient.get_unit_display()})"
+
+class KitchenOrder(models.Model):
+    """Oshxonaga buyurtma (masalliq yetishmaganda)"""
+    STATUS_CHOICES = [
+        ('PENDING', 'Kutilmoqda'),
+        ('APPROVED', 'Tasdiqlangan'),
+        ('COMPLETED', 'Qabul qilingan'),
+        ('CANCELLED', 'Bekor qilingan'),
+    ]
+    
+    order_number = models.CharField(max_length=50, unique=True, verbose_name="Buyurtma raqami")
+    ingredient = models.ForeignKey(KitchenIngredient, on_delete=models.CASCADE, verbose_name="Masalliq")
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="So'ralgan miqdor")
+    received_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Qabul qilingan")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', verbose_name="Holat")
+    description = models.TextField(blank=True, null=True, verbose_name="Izoh")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='kitchen_orders_created', verbose_name="Kim tomonidan")
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='kitchen_orders_approved', verbose_name="Tasdiqlagan")
+    
+    class Meta:
+        verbose_name = "Oshxona buyurtmasi"
+        verbose_name_plural = "Oshxona buyurtmalari"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.order_number} - {self.ingredient.name} ({self.quantity})"
+    
+    def save(self, *args, **kwargs):
+        if not self.order_number:
+            self.order_number = f"KITCHEN-{timezone.now().strftime('%Y%m%d')}-{timezone.now().strftime('%H%M%S')}"
+        super().save(*args, **kwargs)
+
+
+
+
+
+
+
+
+
+
+
+    
