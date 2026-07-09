@@ -239,10 +239,43 @@ def order_list(request):
     page_number = request.GET.get('page', 1)
     
     # ================================================================
+    # 2.5. AVTOMATIK ARXIVGA O'TKAZISH (USTA_TUGATDI -> TAYYOR)
+    # ================================================================
+    # USTA_TUGATDI statusidagi buyurtmalarni avtomatik TAYYOR qilish
+    # (agar ular hali TAYYOR bo'lmasa va is_loaded bo'lmasa)
+    auto_archive_orders = Order.objects.filter(
+        status='USTA_TUGATDI',
+        is_loaded=False
+    )
+    
+    for order in auto_archive_orders:
+        # Agar tugatilgan vaqt bo'lmasa, hozirgi vaqtni qo'yamiz
+        if not order.work_finished_at:
+            order.work_finished_at = timezone.now()
+        order.status = 'TAYYOR'
+        order.save()
+        
+        # Omborchiga bildirishnoma yuborish (agar mavjud bo'lsa)
+        try:
+            omborchi = User.objects.filter(username__icontains='omborchi').first()
+            if omborchi:
+                from .models import Notification
+                Notification.objects.create(
+                    user=omborchi,
+                    order=order,
+                    message=f"Buyurtma #{order.order_number} ({order.customer_name}) tayyor. Yuklashga tayyor!"
+                )
+        except:
+            pass
+    
+    if auto_archive_orders.count() > 0:
+        messages.info(request, f"📦 {auto_archive_orders.count()} ta buyurtma avtomatik arxivga o'tkazildi (TAYYOR)")
+    
+    # ================================================================
     # 3. ARXIV BUYURTMALAR (HAMMA ROLLAR UCHUN)
     # ================================================================
     archived_orders_qs = Order.objects.filter(
-        status__in=['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
+        status__in=['BAJARILDI', 'TAYYOR']  # USTA_TUGATDI ni olib tashladik
     ).select_related('parent_order').prefetch_related('assigned_workers__user')
     
     # Usta faqat o'ziga biriktirilgan arxivlarni ko'radi
@@ -258,8 +291,8 @@ def order_list(request):
         'assigned_workers__user'
     )
     
-    # ORTILDI statusini chiqarib tashlash (barcha rollar uchun)
-    base_qs = base_qs.exclude(status='ORTILDI')
+    # ORTILDI va TAYYOR va BAJARILDI statuslarini chiqarib tashlash
+    base_qs = base_qs.exclude(status__in=['ORTILDI', 'TAYYOR', 'BAJARILDI'])
     
     # ================================================================
     # 5. QIDIRUV
@@ -360,7 +393,7 @@ def order_list(request):
     from django.db.models import Count, Sum, F, Q as DQ
     
     # Main orderlar uchun statistika
-    main_qs = Order.objects.filter(parent_order__isnull=True).exclude(status='ORTILDI')
+    main_qs = Order.objects.filter(parent_order__isnull=True).exclude(status__in=['ORTILDI', 'TAYYOR', 'BAJARILDI'])
     
     if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
         main_qs = main_qs.filter(assigned_workers__user=user).distinct()
@@ -376,7 +409,7 @@ def order_list(request):
     )
     
     # Child orderlar statistika
-    child_qs = Order.objects.filter(parent_order__isnull=False).exclude(status='ORTILDI')
+    child_qs = Order.objects.filter(parent_order__isnull=False).exclude(status__in=['ORTILDI', 'TAYYOR', 'BAJARILDI'])
     
     if is_worker and not (is_glavniy_admin or is_production_boss or is_manager or is_observer):
         child_qs = child_qs.filter(assigned_workers__user=user).distinct()
@@ -416,7 +449,7 @@ def order_list(request):
         unpaid_orders = Order.objects.filter(
             parent_order__isnull=True,
             total_price__gt=F('prepayment')
-        ).exclude(status__in=['BEKOR_QILINDI', 'ORTILDI'])
+        ).exclude(status__in=['BEKOR_QILINDI', 'ORTILDI', 'TAYYOR', 'BAJARILDI'])
         unpaid_orders_count = unpaid_orders.count()
         total_unpaid_amount = unpaid_orders.aggregate(
             total=Sum(F('total_price') - F('prepayment'))
@@ -510,6 +543,7 @@ def order_list(request):
     }
     
     return render(request, 'orders/order_list.html', context)
+
 @login_required
 def order_receive_warehouse(request, pk):
     """Omborchi buyurtmani omborga qabul qiladi (USTA_TUGATDI -> TAYYOR)"""
@@ -568,7 +602,8 @@ def order_archive(request):
     is_manager = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
     is_worker = is_in_group(request.user, 'Usta') or is_in_group(request.user, 'Eshik Ustasi')
     
-    archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR']
+    # ARXIV STATUSLARI - ORTILDI ni ham qo'shdik
+    archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR', 'ORTILDI']
     
     # ========== ASOSIY QUERYSET - TARTIB TUZATILDI ==========
     from django.db.models.functions import Coalesce
@@ -641,8 +676,10 @@ def order_archive(request):
     # --- USTA TURI FILTRI ---
     if not is_worker and worker_filter:
         worker_usernames = {
-            'list': 'list_usta', 'panel': 'panel_usta',
-            'eshik': 'eshik_usta', 'ugol': 'ugol_usta'
+            'list': 'list_usta', 
+            'panel': 'panel_usta',
+            'eshik': 'eshik_usta', 
+            'ugol': 'ugol_usta'
         }
         if worker_filter in worker_usernames:
             try:
@@ -654,6 +691,7 @@ def order_archive(request):
                 main_orders = main_orders.none()
     
     elif is_worker and not (is_glavniy_admin or is_manager):
+        # Usta faqat o'ziga biriktirilgan buyurtmalarni ko'radi
         main_orders = main_orders.filter(
             assigned_workers__user=request.user
         ).distinct()
@@ -680,12 +718,16 @@ def order_archive(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
     
-    # STATISTIKA
+    # ================================================================
+    # STATISTIKA - BARCHA USTALAR UCHUN
+    # ================================================================
     worker_stats = {'list': 0, 'panel': 0, 'eshik': 0, 'ugol': 0}
     if not is_worker:
         worker_usernames = {
-            'list': 'list_usta', 'panel': 'panel_usta',
-            'eshik': 'eshik_usta', 'ugol': 'ugol_usta'
+            'list': 'list_usta', 
+            'panel': 'panel_usta',
+            'eshik': 'eshik_usta', 
+            'ugol': 'ugol_usta'
         }
         for key, username in worker_usernames.items():
             try:
@@ -698,6 +740,9 @@ def order_archive(request):
             except User.DoesNotExist:
                 worker_stats[key] = 0
     
+    # ================================================================
+    # SHAXSIY STATISTIKA (USTA UCHUN)
+    # ================================================================
     personal_stats = {}
     if is_worker:
         worker_orders = Order.objects.filter(
@@ -709,7 +754,19 @@ def order_archive(request):
             'bajarildi': worker_orders.filter(status='BAJARILDI').count(),
             'usta_tugatdi': worker_orders.filter(status='USTA_TUGATDI').count(),
             'tayyor': worker_orders.filter(status='TAYYOR').count(),
+            'ortildi': worker_orders.filter(status='ORTILDI').count(),  # YANGI
         }
+    
+    # ================================================================
+    # STATUS BO'YICHA STATISTIKA (BARCHA UCHUN)
+    # ================================================================
+    status_stats = {
+        'total': total_count,
+        'bajarildi': main_orders.filter(status='BAJARILDI').count(),
+        'usta_tugatdi': main_orders.filter(status='USTA_TUGATDI').count(),
+        'tayyor': main_orders.filter(status='TAYYOR').count(),
+        'ortildi': main_orders.filter(status='ORTILDI').count(),  # YANGI
+    }
     
     context = {
         'main_orders': page_obj,
@@ -724,11 +781,10 @@ def order_archive(request):
         'is_glavniy_admin': is_glavniy_admin,
         'worker_stats': worker_stats,
         'personal_stats': personal_stats,
+        'status_stats': status_stats,  # YANGI
     }
     
     return render(request, 'orders/order_archive.html', context)
-
-
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -2100,14 +2156,46 @@ def order_worker_start(request, pk):
         
     return redirect('order_list')
 
+# orders/views.py - boshidagi import qismiga qo'shing
+
+from .models import (
+    Order, 
+    Notification, 
+    Worker,  # WorkerProfile o'rniga Worker
+    Material,
+    MaterialTransaction,
+    Category,
+    Customer,
+    DriverTrip,
+    TripPoint,
+    OrderItem,
+    MaterialOutput,
+    OrderHistory,
+    Project,
+    CashTransaction,
+    DailyCashReport,
+    Debt,
+    DebtTransaction,
+    CashRegisterBalance,
+    KitchenIngredient,
+    KitchenIngredientTransaction,
+    DailyMeal,
+    DailyMealIngredient,
+    KitchenOrder,
+    SalesLead,
+    SalesLeadSource,
+    SalesLeadLog,
+    GuardPatrol
+)
+# orders/views.py - order_worker_finish funksiyasi
 
 @login_required
 @user_passes_test(lambda u: is_in_group(u, 'Usta') or u.is_superuser, login_url='/login/')
 def order_worker_finish(request, pk):
-    """Usta ishni yakunlash va avtomatik ravishda keyingi bosqich ustalari uchun buyurtma ochish."""
+    """Usta ishni yakunlash va avtomatik ravishda keyingi bosqich uchun buyurtma ochish."""
     
     # 1. Kuzatuvchi (Observer) tekshiruvi
-    if is_observer(request.user):
+    if is_in_group(request.user, 'Kuzatuvchi'):
         messages.error(request, "Kuzatuvchi rejimida bu amalni bajarish mumkin emas.")
         return redirect('order_list')
         
@@ -2120,23 +2208,21 @@ def order_worker_finish(request, pk):
 
     # 3. Rasm yuklanganligini tekshirish
     if not order.finish_image:
-         messages.error(request, "Ishni tugatishdan oldin, yakuniy rasm (Tugatish Rasmi) yuklashingiz kerak.")
-         return redirect('order_detail', pk=order.pk)
+        messages.error(request, "Ishni tugatishdan oldin, yakuniy rasm (Tugatish Rasmi) yuklashingiz kerak.")
+        return redirect('order_detail', pk=order.pk)
         
     # 4. Statusni yangilash
     if order.status in ['USTA_BOSHLA', 'ISHDA']: 
         current_time = timezone.now()
         order.status = 'USTA_TUGATDI'
         order.worker_finished_at = current_time 
+        order.work_finished_at = current_time
         
         # Muddatdan o'tib ketgan bo'lsa ogohlantirish
         if order.deadline and current_time > order.deadline:
-            # Agar funksiya mavjud bo'lsa chaqiriladi
-            if 'check_and_create_overdue_alerts' in globals():
-                check_and_create_overdue_alerts(order)
             messages.warning(request, f"⚠️ Buyurtma #{order.order_number} muddatidan kech yakunlandi.")
             
-        order.save(update_fields=['status', 'worker_finished_at'])
+        order.save()
 
         # ================================================================
         # YANGI ZANJIRSIMON ALGORITM (List usta -> Panel/Ugol usta)
@@ -2145,25 +2231,30 @@ def order_worker_finish(request, pk):
         # Agar hozirgi foydalanuvchi "List usta" guruhida bo'lsa
         if is_in_group(request.user, "List usta"):
             # Keyingi bosqich ustalari (Panel va Ugol) guruhlarini bazadan topamiz
+            # Worker modelidan foydalanamiz
             next_workers = Worker.objects.filter(
-                Q(user__groups__name="Panel usta") | Q(user__groups__name="Ugol usta")
+                Q(role='PANEL') | Q(role='UGOL')
             )
             
             if next_workers.exists():
-                # Yangi order raqami (masalan: ORD-100 bo'lsa, ORD-100-PU bo'ladi)
+                # Yangi order raqami
                 new_order_number = f"{order.order_number}-PU"
                 
-                # Agar bunaqa raqamli buyurtma hali ochilmagan bo'lsa (dublikat bo'lmasligi uchun)
                 if not Order.objects.filter(order_number=new_order_number).exists():
                     new_order = Order.objects.create(
                         order_number=new_order_number,
-                        material=order.material,
-                        quantity=order.quantity,
-                        drawings_pdf=order.drawings_pdf, # List usta ishlatgan chizmani o'tkazamiz
-                        status='TASDIQLANDI',           # Avtomatik tasdiqlangan holatda
+                        customer_name=order.customer_name,
+                        customer_unique_id=order.customer_unique_id,
+                        product_name=f"{order.product_name} (Panel/Ugol)",
+                        panel_type=order.panel_type,
+                        panel_kvadrat=order.panel_kvadrat,
+                        panel_thickness=order.panel_thickness,
+                        pdf_file=order.pdf_file,
+                        status='TASDIQLANDI',
                         created_by=order.created_by,
-                        deadline=timezone.now() + timedelta(days=1), # 1 kun muddat
-                        notes=f"List usta #{order.order_number} ishini yakunlagani uchun avtomatik yaratildi."
+                        parent_order=order,
+                        deadline=timezone.now() + timedelta(days=1),
+                        comment=f"List usta #{order.order_number} ishini yakunlagani uchun avtomatik yaratildi."
                     )
                     
                     # Topilgan barcha Panel va Ugol ustalarni yangi buyurtmaga biriktiramiz
@@ -2174,18 +2265,37 @@ def order_worker_finish(request, pk):
                         Notification.objects.create(
                             user=worker.user,
                             order=new_order,
-                            message=f"Yangi ish: List usta #{order.order_number} chizmasini bitirdi. Panel/Ugol bosqichini boshlang."
+                            message=f"Yangi vazifa: №{new_order.order_number} ({worker.get_role_display()}). Ishni boshlashingiz mumkin!"
                         )
                     
-                    messages.success(request, "Panel va Ugol ustalari uchun avtomatik buyurtma yaratildi.")
-        # ================================================================
+                    messages.success(request, f"✅ Panel va Ugol ustalari uchun avtomatik buyurtma #{new_order_number} yaratildi.")
+                else:
+                    messages.warning(request, f"⚠️ {new_order_number} raqamli buyurtma allaqachon mavjud.")
+            else:
+                messages.info(request, "ℹ️ Keyingi bosqich uchun ustalar topilmadi.")
 
-        messages.success(request, f"Buyurtma #{order.order_number} yakunlandi.")
+        messages.success(request, f"✅ Buyurtma #{order.order_number} yakunlandi.")
+        
+        # AVTOMATIK ARXIVGA O'TKAZISH (TAYYOR QILISH)
+        order.status = 'TAYYOR'
+        order.save()
+        
+        # Omborchi uchun bildirishnoma yuborish
+        try:
+            omborchi = User.objects.filter(username__icontains='omborchi').first()
+            if omborchi:
+                Notification.objects.create(
+                    user=omborchi,
+                    order=order,
+                    message=f"Buyurtma #{order.order_number} ({order.customer_name}) tayyor. Yuklashga tayyor!"
+                )
+        except:
+            pass
+        
     else:
         messages.warning(request, "Ishni yakunlash uchun buyurtma 'Usta Boshladi' yoki 'Ishda' statusida bo'lishi kerak.")
         
     return redirect('order_list')
-
 # ----------------------------------------------------------------------
 # YANGI: USTALAR PANELI FUNKSIYALARI
 # ----------------------------------------------------------------------
@@ -6922,34 +7032,33 @@ def export_cash_report_excel(request):
     from django.contrib import messages
     from django.shortcuts import redirect
     from django.utils import timezone
-    
+
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
-    
+
     if not start_date or not end_date:
         messages.error(request, "Iltimos, sana oralig'ini tanlang!")
         return redirect('cash_transaction_list')
-    
+
     # Sana oralig'idagi operatsiyalar
     start = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
     end = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
-    
+
     all_transactions = CashTransaction.objects.filter(
         transaction_date__range=[start, end],
         status='COMPLETED'
     ).order_by('-transaction_date')
-    
+
     # ============ VALYUTALAR BO'YICHA ALOHIDA ============
     usd_transactions = all_transactions.filter(currency='USD')
     uzs_transactions = all_transactions.filter(currency='UZS')
     null_transactions = all_transactions.filter(currency__isnull=True)
-    
+
     # ============ USD HISOBLAR ============
     usd_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_net = usd_income - usd_expense
-    
-    # USD to'lov usullari bo'yicha
+
     usd_cash_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_cash_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_card_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
@@ -6960,19 +7069,18 @@ def export_cash_report_excel(request):
     usd_payme_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_bank_income = usd_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     usd_bank_expense = usd_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
+
     # ============ UZS HISOBLAR (null bilan birga) ============
     uzs_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     uzs_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
+
     null_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     null_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE']).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
+
     total_uzs_income = uzs_income + null_income
     total_uzs_expense = uzs_expense + null_expense
     uzs_net = total_uzs_income - total_uzs_expense
-    
-    # UZS to'lov usullari bo'yicha
+
     uzs_cash_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     uzs_cash_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     uzs_card_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
@@ -6983,8 +7091,7 @@ def export_cash_report_excel(request):
     uzs_payme_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     uzs_bank_income = uzs_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     uzs_bank_expense = uzs_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    # null bo'lganlarni qo'shamiz
+
     null_cash_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     null_cash_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='CASH').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     null_card_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='CARD').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
@@ -6995,8 +7102,7 @@ def export_cash_report_excel(request):
     null_payme_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='PAYME').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     null_bank_income = null_transactions.filter(transaction_type__in=['INCOME', 'EXTERNAL_INCOME'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
     null_bank_expense = null_transactions.filter(transaction_type__in=['EXPENSE', 'EXTERNAL_EXPENSE'], payment_method='BANK').aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
-    
-    # UZS ga null larni qo'shamiz
+
     total_uzs_cash_income = uzs_cash_income + null_cash_income
     total_uzs_cash_expense = uzs_cash_expense + null_cash_expense
     total_uzs_card_income = uzs_card_income + null_card_income
@@ -7007,13 +7113,12 @@ def export_cash_report_excel(request):
     total_uzs_payme_expense = uzs_payme_expense + null_payme_expense
     total_uzs_bank_income = uzs_bank_income + null_bank_income
     total_uzs_bank_expense = uzs_bank_expense + null_bank_expense
-    
+
     # ============ JAMI HISOBLAR ============
     total_income = usd_income + total_uzs_income
     total_expense = usd_expense + total_uzs_expense
     total_net = total_income - total_expense
-    
-    # Jami to'lov usullari bo'yicha
+
     total_cash_income = usd_cash_income + total_uzs_cash_income
     total_cash_expense = usd_cash_expense + total_uzs_cash_expense
     total_card_income = usd_card_income + total_uzs_card_income
@@ -7024,103 +7129,100 @@ def export_cash_report_excel(request):
     total_payme_expense = usd_payme_expense + total_uzs_payme_expense
     total_bank_income = usd_bank_income + total_uzs_bank_income
     total_bank_expense = usd_bank_expense + total_uzs_bank_expense
-    
+
     # ============ EXCEL FAYL YARATISH ============
     wb = openpyxl.Workbook()
-    
+
     # ============ STILLAR ============
     header_font = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
     stats_font = Font(name='Segoe UI', size=12, bold=True)
-    
+
     usd_header_fill = PatternFill(start_color="B45309", end_color="B45309", fill_type="solid")
     uzs_header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
     total_header_fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
     payment_header_fill = PatternFill(start_color="6B7280", end_color="6B7280", fill_type="solid")
-    
+
     income_fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
     expense_fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
     usd_bg_fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
     uzs_bg_fill = PatternFill(start_color="DBEAFE", end_color="DBEAFE", fill_type="solid")
     total_bg_fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
-    
+
     center_alignment = Alignment(horizontal="center", vertical="center")
     right_alignment = Alignment(horizontal="right", vertical="center")
     left_alignment = Alignment(horizontal="left", vertical="center")
-    
+
     thin_border = Border(
         left=Side(style='thin', color='D0D0D0'),
         right=Side(style='thin', color='D0D0D0'),
         top=Side(style='thin', color='D0D0D0'),
         bottom=Side(style='thin', color='D0D0D0')
     )
-    
+
     money_format = '#,##0.00'
     payment_headers = ['To\'lov usuli', 'Kirim', 'Chiqim', 'Sof']
-    
+
+    def write_big_stats(ws, row, income_val, expense_val, net_val):
+        """Katta KIRIM/CHIQIM/SOF NATIJA blokini yozadi (endi pastda chaqiriladi)"""
+        ws.merge_cells(f'A{row}:B{row}')
+        ws.cell(row=row, column=1, value="JAMI KIRIM")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
+        ws.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
+        ws.cell(row=row, column=1).alignment = center_alignment
+
+        ws.merge_cells(f'C{row}:D{row}')
+        ws.cell(row=row, column=3, value=f"{float(income_val):,.2f}")
+        ws.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
+        ws.cell(row=row, column=3).alignment = right_alignment
+
+        ws.merge_cells(f'E{row}:F{row}')
+        ws.cell(row=row, column=5, value="JAMI CHIQIM")
+        ws.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
+        ws.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
+        ws.cell(row=row, column=5).alignment = center_alignment
+
+        ws.merge_cells(f'G{row}:H{row}')
+        ws.cell(row=row, column=7, value=f"{float(expense_val):,.2f}")
+        ws.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
+        ws.cell(row=row, column=7).alignment = right_alignment
+
+        ws.merge_cells(f'I{row}:J{row}')
+        ws.cell(row=row, column=9, value="SOF NATIJA")
+        ws.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
+        ws.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+        ws.cell(row=row, column=9).alignment = center_alignment
+
+        ws.merge_cells(f'K{row}:L{row}')
+        net_color = "10B981" if net_val >= 0 else "EF4444"
+        ws.cell(row=row, column=11, value=f"{float(net_val):,.2f}")
+        ws.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color)
+        ws.cell(row=row, column=11).alignment = right_alignment
+
+        return row + 2  # keyingi bo'sh qator
+
     # ==============================================================
     # SHEET 1: USD (AQSH DOLLARI)
     # ==============================================================
     ws_usd = wb.active
     ws_usd.title = "USD"
-    
-    # Sarlavha
+
     ws_usd.merge_cells('A1:H1')
-    ws_usd['A1'] = f"USD (AQSH DOLLARI) OPERATSIYALARI"
+    ws_usd['A1'] = "USD (AQSH DOLLARI) OPERATSIYALARI"
     ws_usd['A1'].font = Font(bold=True, size=16, color='B45309')
     ws_usd['A1'].alignment = center_alignment
-    
+
     ws_usd.merge_cells('A2:H2')
     ws_usd['A2'] = f"Davr: {start_date} - {end_date}"
     ws_usd['A2'].font = Font(size=11, color='666666')
     ws_usd['A2'].alignment = center_alignment
-    
-    # ======== 1. KATTA STATISTIKA (TEPADA) ========
+
+    # ======== 1. TO'LOV USULLARI BO'YICHA STATISTIKA (TEPADA) ========
     row = 4
-    
-    # JAMI KIRIM
-    ws_usd.merge_cells(f'A{row}:B{row}')
-    ws_usd.cell(row=row, column=1, value="JAMI KIRIM")
-    ws_usd.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_usd.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
-    ws_usd.cell(row=row, column=1).alignment = center_alignment
-    
-    ws_usd.merge_cells(f'C{row}:D{row}')
-    ws_usd.cell(row=row, column=3, value=f"{float(usd_income):,.2f}")
-    ws_usd.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
-    ws_usd.cell(row=row, column=3).alignment = right_alignment
-    
-    # JAMI CHIQIM
-    ws_usd.merge_cells(f'E{row}:F{row}')
-    ws_usd.cell(row=row, column=5, value="JAMI CHIQIM")
-    ws_usd.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_usd.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
-    ws_usd.cell(row=row, column=5).alignment = center_alignment
-    
-    ws_usd.merge_cells(f'G{row}:H{row}')
-    ws_usd.cell(row=row, column=7, value=f"{float(usd_expense):,.2f}")
-    ws_usd.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
-    ws_usd.cell(row=row, column=7).alignment = right_alignment
-    
-    # SOF NATIJA
-    ws_usd.merge_cells(f'I{row}:J{row}')
-    ws_usd.cell(row=row, column=9, value="SOF NATIJA")
-    ws_usd.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_usd.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_usd.cell(row=row, column=9).alignment = center_alignment
-    
-    ws_usd.merge_cells(f'K{row}:L{row}')
-    net_color = "10B981" if usd_net >= 0 else "EF4444"
-    ws_usd.cell(row=row, column=11, value=f"{float(usd_net):,.2f}")
-    ws_usd.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color)
-    ws_usd.cell(row=row, column=11).alignment = right_alignment
-    
-    # ======== 2. TO'LOV USULLARI BO'YICHA STATISTIKA ========
-    row += 2
     ws_usd.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_usd.cell(row=row, column=1).font = stats_font
     ws_usd.merge_cells(f'A{row}:L{row}')
     row += 1
-    
+
     for col, header in enumerate(payment_headers, 1):
         cell = ws_usd.cell(row=row, column=col)
         cell.value = header
@@ -7128,7 +7230,7 @@ def export_cash_report_excel(request):
         cell.fill = payment_header_fill
         cell.alignment = center_alignment
         cell.border = thin_border
-    
+
     usd_payment_data = [
         ('Naqd pul', float(usd_cash_income), float(usd_cash_expense), float(usd_cash_income - usd_cash_expense)),
         ('Plastik karta', float(usd_card_income), float(usd_card_expense), float(usd_card_income - usd_card_expense)),
@@ -7136,20 +7238,20 @@ def export_cash_report_excel(request):
         ('Payme', float(usd_payme_income), float(usd_payme_expense), float(usd_payme_income - usd_payme_expense)),
         ('Bank', float(usd_bank_income), float(usd_bank_expense), float(usd_bank_income - usd_bank_expense)),
     ]
-    
+
     row += 1
     for name, inc, exp, net in usd_payment_data:
         ws_usd.cell(row=row, column=1, value=name)
         ws_usd.cell(row=row, column=2, value=inc)
         ws_usd.cell(row=row, column=3, value=exp)
         ws_usd.cell(row=row, column=4, value=net)
-        
+
         if inc > 0:
             ws_usd.cell(row=row, column=2).fill = income_fill
         if exp > 0:
             ws_usd.cell(row=row, column=3).fill = expense_fill
         ws_usd.cell(row=row, column=4).font = Font(bold=True, color='10B981' if net >= 0 else 'EF4444')
-        
+
         for col in range(1, 5):
             ws_usd.cell(row=row, column=col).border = thin_border
             if col > 1:
@@ -7158,8 +7260,7 @@ def export_cash_report_excel(request):
             else:
                 ws_usd.cell(row=row, column=col).alignment = left_alignment
         row += 1
-    
-    # Jami qator
+
     ws_usd.cell(row=row, column=1, value="JAMI")
     ws_usd.cell(row=row, column=1).font = Font(bold=True)
     ws_usd.cell(row=row, column=2, value=float(usd_income))
@@ -7174,14 +7275,14 @@ def export_cash_report_excel(request):
         else:
             ws_usd.cell(row=row, column=col).alignment = center_alignment
             ws_usd.cell(row=row, column=col).fill = total_bg_fill
-    
-    # ======== 3. OPERATSIYALAR RO'YXATI (PASTDA) ========
+
+    # ======== 2. OPERATSIYALAR RO'YXATI ========
     row += 2
     ws_usd.cell(row=row, column=1, value="USD OPERATSIYALARI RO'YXATI")
     ws_usd.cell(row=row, column=1).font = stats_font
     ws_usd.merge_cells(f'A{row}:L{row}')
     row += 1
-    
+
     headers = ['No', 'Sana', 'Operatsiya ID', 'Tur', "To'lov usuli", 'Summa (USD)', 'Kim oldi/berdi', 'Izoh']
     for col, header in enumerate(headers, 1):
         cell = ws_usd.cell(row=row, column=col)
@@ -7190,24 +7291,24 @@ def export_cash_report_excel(request):
         cell.fill = usd_header_fill
         cell.alignment = center_alignment
         cell.border = thin_border
-    
+
     ws_usd.freeze_panes = ws_usd['A' + str(row + 1)]
-    
+
     for idx, trans in enumerate(usd_transactions.order_by('-transaction_date'), 1):
         row += 1
         ws_usd.cell(row=row, column=1, value=idx)
         ws_usd.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
         ws_usd.cell(row=row, column=3, value=trans.transaction_id)
-        
+
         tur = "Kirim" if trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME'] else "Chiqim"
         ws_usd.cell(row=row, column=4, value=tur)
         ws_usd.cell(row=row, column=4).fill = income_fill if tur == "Kirim" else expense_fill
-        
+
         ws_usd.cell(row=row, column=5, value=trans.get_payment_method_display())
         ws_usd.cell(row=row, column=6, value=float(trans.amount))
         ws_usd.cell(row=row, column=7, value=trans.customer_name or '-')
         ws_usd.cell(row=row, column=8, value=trans.description[:60] if trans.description else '-')
-        
+
         for col in range(1, 9):
             ws_usd.cell(row=row, column=col).border = thin_border
             if col == 6:
@@ -7215,7 +7316,15 @@ def export_cash_report_excel(request):
                 ws_usd.cell(row=row, column=6).alignment = right_alignment
             elif col in [4, 5]:
                 ws_usd.cell(row=row, column=col).alignment = center_alignment
-    
+
+    # ======== 3. KATTA STATISTIKA (ENDI PASTDA) ========
+    row += 2
+    ws_usd.cell(row=row, column=1, value="UMUMIY NATIJA")
+    ws_usd.cell(row=row, column=1).font = stats_font
+    ws_usd.merge_cells(f'A{row}:L{row}')
+    row += 1
+    row = write_big_stats(ws_usd, row, usd_income, usd_expense, usd_net)
+
     # Ustun kengliklari
     ws_usd.column_dimensions['A'].width = 6
     ws_usd.column_dimensions['B'].width = 18
@@ -7225,70 +7334,29 @@ def export_cash_report_excel(request):
     ws_usd.column_dimensions['F'].width = 18
     ws_usd.column_dimensions['G'].width = 22
     ws_usd.column_dimensions['H'].width = 50
-    
+
     # ==============================================================
-    # SHEET 2: UZS (SO'M) - RASMDAGIDEK
+    # SHEET 2: UZS (SO'M)
     # ==============================================================
     ws_uzs = wb.create_sheet("UZS")
-    
-    # Sarlavha
+
     ws_uzs.merge_cells('A1:H1')
-    ws_uzs['A1'] = f"UZS (SO'M) OPERATSIYALARI"
+    ws_uzs['A1'] = "UZS (SO'M) OPERATSIYALARI"
     ws_uzs['A1'].font = Font(bold=True, size=16, color='1E40AF')
     ws_uzs['A1'].alignment = center_alignment
-    
+
     ws_uzs.merge_cells('A2:H2')
     ws_uzs['A2'] = f"Davr: {start_date} - {end_date}"
     ws_uzs['A2'].font = Font(size=11, color='666666')
     ws_uzs['A2'].alignment = center_alignment
-    
-    # ======== 1. KATTA STATISTIKA (TEPADA) ========
+
+    # ======== 1. TO'LOV USULLARI BO'YICHA STATISTIKA ========
     row = 4
-    
-    # JAMI KIRIM
-    ws_uzs.merge_cells(f'A{row}:B{row}')
-    ws_uzs.cell(row=row, column=1, value="JAMI KIRIM")
-    ws_uzs.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_uzs.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
-    ws_uzs.cell(row=row, column=1).alignment = center_alignment
-    
-    ws_uzs.merge_cells(f'C{row}:D{row}')
-    ws_uzs.cell(row=row, column=3, value=f"{float(total_uzs_income):,.2f}")
-    ws_uzs.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
-    ws_uzs.cell(row=row, column=3).alignment = right_alignment
-    
-    # JAMI CHIQIM
-    ws_uzs.merge_cells(f'E{row}:F{row}')
-    ws_uzs.cell(row=row, column=5, value="JAMI CHIQIM")
-    ws_uzs.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_uzs.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
-    ws_uzs.cell(row=row, column=5).alignment = center_alignment
-    
-    ws_uzs.merge_cells(f'G{row}:H{row}')
-    ws_uzs.cell(row=row, column=7, value=f"{float(total_uzs_expense):,.2f}")
-    ws_uzs.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
-    ws_uzs.cell(row=row, column=7).alignment = right_alignment
-    
-    # SOF NATIJA
-    ws_uzs.merge_cells(f'I{row}:J{row}')
-    ws_uzs.cell(row=row, column=9, value="SOF NATIJA")
-    ws_uzs.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_uzs.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_uzs.cell(row=row, column=9).alignment = center_alignment
-    
-    ws_uzs.merge_cells(f'K{row}:L{row}')
-    net_color_uzs = "10B981" if uzs_net >= 0 else "EF4444"
-    ws_uzs.cell(row=row, column=11, value=f"{float(uzs_net):,.2f}")
-    ws_uzs.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color_uzs)
-    ws_uzs.cell(row=row, column=11).alignment = right_alignment
-    
-    # ======== 2. TO'LOV USULLARI BO'YICHA STATISTIKA ========
-    row += 2
     ws_uzs.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_uzs.cell(row=row, column=1).font = stats_font
     ws_uzs.merge_cells(f'A{row}:L{row}')
     row += 1
-    
+
     for col, header in enumerate(payment_headers, 1):
         cell = ws_uzs.cell(row=row, column=col)
         cell.value = header
@@ -7296,7 +7364,7 @@ def export_cash_report_excel(request):
         cell.fill = payment_header_fill
         cell.alignment = center_alignment
         cell.border = thin_border
-    
+
     uzs_payment_data = [
         ('Naqd pul', float(total_uzs_cash_income), float(total_uzs_cash_expense), float(total_uzs_cash_income - total_uzs_cash_expense)),
         ('Plastik karta', float(total_uzs_card_income), float(total_uzs_card_expense), float(total_uzs_card_income - total_uzs_card_expense)),
@@ -7304,20 +7372,20 @@ def export_cash_report_excel(request):
         ('Payme', float(total_uzs_payme_income), float(total_uzs_payme_expense), float(total_uzs_payme_income - total_uzs_payme_expense)),
         ('Bank', float(total_uzs_bank_income), float(total_uzs_bank_expense), float(total_uzs_bank_income - total_uzs_bank_expense)),
     ]
-    
+
     row += 1
     for name, inc, exp, net in uzs_payment_data:
         ws_uzs.cell(row=row, column=1, value=name)
         ws_uzs.cell(row=row, column=2, value=inc)
         ws_uzs.cell(row=row, column=3, value=exp)
         ws_uzs.cell(row=row, column=4, value=net)
-        
+
         if inc > 0:
             ws_uzs.cell(row=row, column=2).fill = income_fill
         if exp > 0:
             ws_uzs.cell(row=row, column=3).fill = expense_fill
         ws_uzs.cell(row=row, column=4).font = Font(bold=True, color='10B981' if net >= 0 else 'EF4444')
-        
+
         for col in range(1, 5):
             ws_uzs.cell(row=row, column=col).border = thin_border
             if col > 1:
@@ -7326,8 +7394,7 @@ def export_cash_report_excel(request):
             else:
                 ws_uzs.cell(row=row, column=col).alignment = left_alignment
         row += 1
-    
-    # Jami qator
+
     ws_uzs.cell(row=row, column=1, value="JAMI")
     ws_uzs.cell(row=row, column=1).font = Font(bold=True)
     ws_uzs.cell(row=row, column=2, value=float(total_uzs_income))
@@ -7342,14 +7409,14 @@ def export_cash_report_excel(request):
         else:
             ws_uzs.cell(row=row, column=col).alignment = center_alignment
             ws_uzs.cell(row=row, column=col).fill = total_bg_fill
-    
-    # ======== 3. OPERATSIYALAR RO'YXATI (PASTDA) ========
+
+    # ======== 2. OPERATSIYALAR RO'YXATI ========
     row += 2
     ws_uzs.cell(row=row, column=1, value="UZS OPERATSIYALARI RO'YXATI")
     ws_uzs.cell(row=row, column=1).font = stats_font
     ws_uzs.merge_cells(f'A{row}:L{row}')
     row += 1
-    
+
     for col, header in enumerate(headers, 1):
         cell = ws_uzs.cell(row=row, column=col)
         cell.value = header
@@ -7357,27 +7424,27 @@ def export_cash_report_excel(request):
         cell.fill = uzs_header_fill
         cell.alignment = center_alignment
         cell.border = thin_border
-    
+
     ws_uzs.freeze_panes = ws_uzs['A' + str(row + 1)]
-    
+
     uzs_all = list(uzs_transactions) + list(null_transactions)
     uzs_all.sort(key=lambda x: x.transaction_date, reverse=True)
-    
+
     for idx, trans in enumerate(uzs_all, 1):
         row += 1
         ws_uzs.cell(row=row, column=1, value=idx)
         ws_uzs.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
         ws_uzs.cell(row=row, column=3, value=trans.transaction_id)
-        
+
         tur = "Kirim" if trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME'] else "Chiqim"
         ws_uzs.cell(row=row, column=4, value=tur)
         ws_uzs.cell(row=row, column=4).fill = income_fill if tur == "Kirim" else expense_fill
-        
+
         ws_uzs.cell(row=row, column=5, value=trans.get_payment_method_display())
         ws_uzs.cell(row=row, column=6, value=float(trans.amount))
         ws_uzs.cell(row=row, column=7, value=trans.customer_name or '-')
         ws_uzs.cell(row=row, column=8, value=trans.description[:60] if trans.description else '-')
-        
+
         for col in range(1, 9):
             ws_uzs.cell(row=row, column=col).border = thin_border
             if col == 6:
@@ -7385,7 +7452,15 @@ def export_cash_report_excel(request):
                 ws_uzs.cell(row=row, column=6).alignment = right_alignment
             elif col in [4, 5]:
                 ws_uzs.cell(row=row, column=col).alignment = center_alignment
-    
+
+    # ======== 3. KATTA STATISTIKA (ENDI PASTDA) ========
+    row += 2
+    ws_uzs.cell(row=row, column=1, value="UMUMIY NATIJA")
+    ws_uzs.cell(row=row, column=1).font = stats_font
+    ws_uzs.merge_cells(f'A{row}:L{row}')
+    row += 1
+    row = write_big_stats(ws_uzs, row, total_uzs_income, total_uzs_expense, uzs_net)
+
     # Ustun kengliklari
     ws_uzs.column_dimensions['A'].width = 6
     ws_uzs.column_dimensions['B'].width = 18
@@ -7395,67 +7470,30 @@ def export_cash_report_excel(request):
     ws_uzs.column_dimensions['F'].width = 18
     ws_uzs.column_dimensions['G'].width = 22
     ws_uzs.column_dimensions['H'].width = 50
-    
+
     # ==============================================================
     # SHEET 3: JAMI (UMUMIY)
     # ==============================================================
     ws_total = wb.create_sheet("JAMI")
-    
+
     ws_total.merge_cells('A1:H1')
-    ws_total['A1'] = f"UMUMIY HISOBOT"
+    ws_total['A1'] = "UMUMIY HISOBOT"
     ws_total['A1'].font = Font(bold=True, size=16, color='FFFFFF')
     ws_total['A1'].fill = total_header_fill
     ws_total['A1'].alignment = center_alignment
-    
+
     ws_total.merge_cells('A2:H2')
     ws_total['A2'] = f"Davr: {start_date} - {end_date}"
     ws_total['A2'].font = Font(size=11, color='666666')
     ws_total['A2'].alignment = center_alignment
-    
-    # ======== 1. KATTA STATISTIKA ========
+
+    # ======== 1. TO'LOV USULLARI BO'YICHA ========
     row = 4
-    
-    ws_total.merge_cells(f'A{row}:B{row}')
-    ws_total.cell(row=row, column=1, value="JAMI KIRIM")
-    ws_total.cell(row=row, column=1).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_total.cell(row=row, column=1).fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
-    ws_total.cell(row=row, column=1).alignment = center_alignment
-    
-    ws_total.merge_cells(f'C{row}:D{row}')
-    ws_total.cell(row=row, column=3, value=f"{float(total_income):,.2f}")
-    ws_total.cell(row=row, column=3).font = Font(bold=True, size=16, color='10B981')
-    ws_total.cell(row=row, column=3).alignment = right_alignment
-    
-    ws_total.merge_cells(f'E{row}:F{row}')
-    ws_total.cell(row=row, column=5, value="JAMI CHIQIM")
-    ws_total.cell(row=row, column=5).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_total.cell(row=row, column=5).fill = PatternFill(start_color="EF4444", end_color="EF4444", fill_type="solid")
-    ws_total.cell(row=row, column=5).alignment = center_alignment
-    
-    ws_total.merge_cells(f'G{row}:H{row}')
-    ws_total.cell(row=row, column=7, value=f"{float(total_expense):,.2f}")
-    ws_total.cell(row=row, column=7).font = Font(bold=True, size=16, color='EF4444')
-    ws_total.cell(row=row, column=7).alignment = right_alignment
-    
-    ws_total.merge_cells(f'I{row}:J{row}')
-    ws_total.cell(row=row, column=9, value="SOF NATIJA")
-    ws_total.cell(row=row, column=9).font = Font(bold=True, size=14, color='FFFFFF')
-    ws_total.cell(row=row, column=9).fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-    ws_total.cell(row=row, column=9).alignment = center_alignment
-    
-    ws_total.merge_cells(f'K{row}:L{row}')
-    net_color_total = "10B981" if total_net >= 0 else "EF4444"
-    ws_total.cell(row=row, column=11, value=f"{float(total_net):,.2f}")
-    ws_total.cell(row=row, column=11).font = Font(bold=True, size=16, color=net_color_total)
-    ws_total.cell(row=row, column=11).alignment = right_alignment
-    
-    # ======== 2. TO'LOV USULLARI BO'YICHA ========
-    row += 2
     ws_total.cell(row=row, column=1, value="TO'LOV USULLARI BO'YICHA STATISTIKA")
     ws_total.cell(row=row, column=1).font = stats_font
     ws_total.merge_cells(f'A{row}:L{row}')
     row += 1
-    
+
     for col, header in enumerate(payment_headers, 1):
         cell = ws_total.cell(row=row, column=col)
         cell.value = header
@@ -7463,7 +7501,7 @@ def export_cash_report_excel(request):
         cell.fill = payment_header_fill
         cell.alignment = center_alignment
         cell.border = thin_border
-    
+
     total_payment_data = [
         ('Naqd pul', float(total_cash_income), float(total_cash_expense), float(total_cash_income - total_cash_expense)),
         ('Plastik karta', float(total_card_income), float(total_card_expense), float(total_card_income - total_card_expense)),
@@ -7471,20 +7509,20 @@ def export_cash_report_excel(request):
         ('Payme', float(total_payme_income), float(total_payme_expense), float(total_payme_income - total_payme_expense)),
         ('Bank', float(total_bank_income), float(total_bank_expense), float(total_bank_income - total_bank_expense)),
     ]
-    
+
     row += 1
     for name, inc, exp, net in total_payment_data:
         ws_total.cell(row=row, column=1, value=name)
         ws_total.cell(row=row, column=2, value=inc)
         ws_total.cell(row=row, column=3, value=exp)
         ws_total.cell(row=row, column=4, value=net)
-        
+
         if inc > 0:
             ws_total.cell(row=row, column=2).fill = income_fill
         if exp > 0:
             ws_total.cell(row=row, column=3).fill = expense_fill
         ws_total.cell(row=row, column=4).font = Font(bold=True, color='10B981' if net >= 0 else 'EF4444')
-        
+
         for col in range(1, 5):
             ws_total.cell(row=row, column=col).border = thin_border
             if col > 1:
@@ -7493,7 +7531,7 @@ def export_cash_report_excel(request):
             else:
                 ws_total.cell(row=row, column=col).alignment = left_alignment
         row += 1
-    
+
     ws_total.cell(row=row, column=1, value="JAMI")
     ws_total.cell(row=row, column=1).font = Font(bold=True)
     ws_total.cell(row=row, column=2, value=float(total_income))
@@ -7508,14 +7546,14 @@ def export_cash_report_excel(request):
         else:
             ws_total.cell(row=row, column=col).alignment = center_alignment
             ws_total.cell(row=row, column=col).fill = total_bg_fill
-    
-    # ======== 3. VALYUTALAR BO'YICHA TAQQOSLASH ========
+
+    # ======== 2. VALYUTALAR BO'YICHA TAQQOSLASH ========
     row += 2
     ws_total.cell(row=row, column=1, value="VALYUTALAR BO'YICHA TAQQOSLASH")
     ws_total.cell(row=row, column=1).font = stats_font
     ws_total.merge_cells(f'A{row}:L{row}')
     row += 1
-    
+
     compare_headers = ['Valyuta', 'Jami kirim', 'Jami chiqim', 'Sof natija', 'Operatsiyalar soni']
     for col, header in enumerate(compare_headers, 1):
         cell = ws_total.cell(row=row, column=col)
@@ -7524,7 +7562,7 @@ def export_cash_report_excel(request):
         cell.fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
         cell.alignment = center_alignment
         cell.border = thin_border
-    
+
     row += 1
     ws_total.cell(row=row, column=1, value="USD")
     ws_total.cell(row=row, column=2, value=float(usd_income))
@@ -7532,7 +7570,7 @@ def export_cash_report_excel(request):
     ws_total.cell(row=row, column=4, value=float(usd_net))
     ws_total.cell(row=row, column=5, value=usd_transactions.count())
     ws_total.cell(row=row, column=1).fill = usd_bg_fill
-    
+
     row += 1
     ws_total.cell(row=row, column=1, value="UZS")
     ws_total.cell(row=row, column=2, value=float(total_uzs_income))
@@ -7540,7 +7578,7 @@ def export_cash_report_excel(request):
     ws_total.cell(row=row, column=4, value=float(uzs_net))
     ws_total.cell(row=row, column=5, value=uzs_transactions.count() + null_transactions.count())
     ws_total.cell(row=row, column=1).fill = uzs_bg_fill
-    
+
     row += 1
     ws_total.cell(row=row, column=1, value="JAMI")
     ws_total.cell(row=row, column=1).font = Font(bold=True)
@@ -7550,25 +7588,32 @@ def export_cash_report_excel(request):
     ws_total.cell(row=row, column=5, value=all_transactions.count())
     ws_total.cell(row=row, column=1).fill = total_bg_fill
     ws_total.cell(row=row, column=4).font = Font(bold=True, color='10B981' if total_net >= 0 else 'EF4444')
-    
-    for r in range(row-2, row+1):
+
+    for r in range(row - 2, row + 1):
         for col in range(2, 6):
             ws_total.cell(row=r, column=col).number_format = money_format
             ws_total.cell(row=r, column=col).alignment = right_alignment
         ws_total.cell(row=r, column=1).alignment = center_alignment
-    
+
+    # ======== 3. KATTA STATISTIKA (ENDI ENG PASTDA) ========
+    row += 2
+    ws_total.cell(row=row, column=1, value="UMUMIY NATIJA")
+    ws_total.cell(row=row, column=1).font = stats_font
+    ws_total.merge_cells(f'A{row}:L{row}')
+    row += 1
+    row = write_big_stats(ws_total, row, total_income, total_expense, total_net)
+
     # Ustun kengliklari
     for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']:
         ws_total.column_dimensions[col].width = 18
-    
+
     # Faylni yuborish
     filename = f"kassa_hisoboti_{start_date}_{end_date}.xlsx"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     wb.save(response)
-    
-    return response
 
+    return response
 
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
@@ -9147,4 +9192,873 @@ def kitchen_order_approve(request, pk):
 
 
 
+
+# =======================================================================
+# SOTUV BO'LIMI (SALES) VIEW'LARI
+# =======================================================================
+
+from decimal import Decimal
+from django.db.models import Sum, Count, Q, F
+from django.core.paginator import Paginator
+from django.utils import timezone
+from datetime import datetime, timedelta
+from .models import (
+    SalesLead, SalesLeadLog, SalesLeadSource,  # Sotuv modellari
+)
+
+# Sotuv bo'limi xodimlarini tekshirish
+def is_sales_staff(user):
+    """Foydalanuvchi sotuv bo'limida ekanligini tekshirish"""
+    if not user.is_authenticated:
+        return False
+    return (user.is_superuser or 
+            is_in_group(user, 'Glavniy Admin') or 
+            is_in_group(user, 'Sales Manager') or
+            is_in_group(user, 'Menejer/Tasdiqlovchi'))
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_dashboard(request):
+    """Sotuv bo'limi asosiy paneli"""
+    today = timezone.now().date()
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+    
+    # ========== STATISTIKA ==========
+    # Jami leadlar
+    total_leads = SalesLead.objects.count()
+    
+    # Bugungi yangi leadlar
+    today_leads = SalesLead.objects.filter(created_at__date=today).count()
+    
+    # Haftalik yangi leadlar
+    weekly_leads = SalesLead.objects.filter(created_at__date__gte=week_ago).count()
+    
+    # Holat bo'yicha statistika
+    status_stats = SalesLead.objects.values('status').annotate(count=Count('id'))
+    
+    # Qiziqish darajasi bo'yicha
+    interest_stats = SalesLead.objects.values('interest_level').annotate(count=Count('id'))
+    
+    # Yangi (hali telefon qilinmagan) leadlar
+    new_leads = SalesLead.objects.filter(
+        status='NEW'
+    ).order_by('-created_at')[:10]
+    
+    # Telefon qilingan (kutishda) leadlar
+    pending_leads = SalesLead.objects.filter(
+        status='CALLED'
+    ).order_by('-last_contact')[:10]
+    
+    # Qiziqqan leadlar
+    interested_leads = SalesLead.objects.filter(
+        status='INTERESTED'
+    ).order_by('-last_contact')[:10]
+    
+    # Mijozga aylanganlar
+    converted_leads = SalesLead.objects.filter(
+        status='CONVERTED'
+    ).order_by('-converted_at')[:10]
+    
+    # So'nggi faoliyatlar
+    recent_activities = SalesLeadLog.objects.select_related('lead', 'performed_by').order_by('-created_at')[:15]
+    
+    # Qiziqish darajalari bo'yicha
+    interest_summary = SalesLead.objects.values('interest_level').annotate(
+        count=Count('id')
+    ).order_by('interest_level')
+    
+    # Manbalar bo'yicha
+    source_stats = SalesLead.objects.values('source__name').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    context = {
+        'total_leads': total_leads,
+        'today_leads': today_leads,
+        'weekly_leads': weekly_leads,
+        'status_stats': status_stats,
+        'interest_stats': interest_stats,
+        'new_leads': new_leads,
+        'pending_leads': pending_leads,
+        'interested_leads': interested_leads,
+        'converted_leads': converted_leads,
+        'recent_activities': recent_activities,
+        'interest_summary': interest_summary,
+        'source_stats': source_stats,
+        'today': today,
+        'title': 'Sotuv bo\'limi',
+    }
+    
+    return render(request, 'orders/sales_dashboard.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_lead_list(request):
+    """Leadlar ro'yxati"""
+    
+    # ========== FILTRLAR ==========
+    status_filter = request.GET.get('status', '')
+    interest_filter = request.GET.get('interest', '')
+    source_filter = request.GET.get('source', '')
+    search_query = request.GET.get('search', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    # ========== ASOSIY QUERYSET ==========
+    leads = SalesLead.objects.select_related('source', 'assigned_to', 'converted_by')
+    
+    # Status bo'yicha filtr
+    if status_filter:
+        leads = leads.filter(status=status_filter)
+    
+    # Qiziqish darajasi bo'yicha
+    if interest_filter:
+        leads = leads.filter(interest_level=interest_filter)
+    
+    # Manba bo'yicha
+    if source_filter:
+        leads = leads.filter(source__id=source_filter)
+    
+    # Qidiruv
+    if search_query:
+        leads = leads.filter(
+            Q(full_name__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(company_name__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(notes__icontains=search_query)
+        )
+    
+    # Sana bo'yicha
+    if date_from:
+        leads = leads.filter(created_at__date__gte=date_from)
+    if date_to:
+        leads = leads.filter(created_at__date__lte=date_to)
+    
+    # ========== SORT ==========
+    sort_by = request.GET.get('sort', '-created_at')
+    allowed_sorts = ['-created_at', 'created_at', 'full_name', '-full_name', 'status', 'interest_level']
+    if sort_by in allowed_sorts:
+        leads = leads.order_by(sort_by)
+    else:
+        leads = leads.order_by('-created_at')
+    
+    # ========== PAGINATION ==========
+    paginator = Paginator(leads, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    
+    # ========== MANBALAR ==========
+    sources = SalesLeadSource.objects.all().order_by('name')
+    
+    context = {
+        'page_obj': page_obj,
+        'status_filter': status_filter,
+        'interest_filter': interest_filter,
+        'source_filter': source_filter,
+        'search_query': search_query,
+        'date_from': date_from,
+        'date_to': date_to,
+        'sort_by': sort_by,
+        'sources': sources,
+        'status_choices': SalesLead.STATUS_CHOICES,
+        'interest_choices': SalesLead.INTEREST_CHOICES,
+        'title': 'Leadlar ro\'yxati',
+    }
+    
+    return render(request, 'orders/sales_lead_list.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_lead_create(request):
+    """Yangi lead yaratish"""
+    
+    if request.method == 'POST':
+        full_name = request.POST.get('full_name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        company_name = request.POST.get('company_name', '').strip()
+        source_id = request.POST.get('source')
+        notes = request.POST.get('notes', '').strip()
+        interest_level = request.POST.get('interest_level', 'LOW')
+        
+        if not full_name:
+            messages.error(request, "❌ Iltimos, mijozning to'liq ismini kiriting!")
+            return redirect('sales_lead_create')
+        
+        if not phone:
+            messages.error(request, "❌ Iltimos, telefon raqamini kiriting!")
+            return redirect('sales_lead_create')
+        
+        try:
+            # Manbani olish
+            source = None
+            if source_id:
+                source = SalesLeadSource.objects.filter(id=source_id).first()
+            
+            # Yangi lead yaratish
+            lead = SalesLead.objects.create(
+                full_name=full_name,
+                phone=phone,
+                email=email or None,
+                company_name=company_name or None,
+                source=source,
+                notes=notes or None,
+                interest_level=interest_level,
+                assigned_to=request.user,
+                created_by=request.user
+            )
+            
+            # Faoliyat yozish
+            SalesLeadLog.objects.create(
+                lead=lead,
+                action_type='CREATED',
+                description=f"Yangi lead yaratildi. Manba: {source.name if source else 'Aniqlanmagan'}",
+                performed_by=request.user
+            )
+            
+            messages.success(request, f"✅ {full_name} muvaffaqiyatli qo'shildi!")
+            return redirect('sales_lead_detail', pk=lead.pk)
+            
+        except Exception as e:
+            messages.error(request, f"❌ Xatolik: {str(e)}")
+    
+    # GET so'rovi
+    sources = SalesLeadSource.objects.all().order_by('name')
+    context = {
+        'sources': sources,
+        'title': 'Yangi lead qo\'shish',
+    }
+    return render(request, 'orders/sales_lead_form.html', context)
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_lead_detail(request, pk):
+    """Lead tafsilotlari"""
+    
+    lead = get_object_or_404(SalesLead, pk=pk)
+    
+    # ====== TO'G'RILANGAN QISM ======
+    # Avval filter qo'llaniladi, keyin slice (kesim)
+    activities_qs = SalesLeadLog.objects.filter(lead=lead).select_related('performed_by')
+    
+    # Statistika uchun filter (slice dan oldin)
+    total_calls = activities_qs.filter(action_type='CALL').count()
+    total_notes = activities_qs.filter(action_type='NOTE').count()
+    
+    # So'nggi 30 ta faoliyat (slice eng oxirida)
+    activities = activities_qs.order_by('-created_at')[:30]
+    
+    # Qo'shimcha statistika
+    total_activities = activities_qs.count()
+    
+    # Bu lead bilan bog'liq buyurtmalar (agar mavjud bo'lsa)
+    orders = Order.objects.filter(customer_unique_id=lead.phone).order_by('-created_at')[:10]
+    
+    # BUYURTMA YARATISH UCHUN FORMA
+    if request.method == 'POST':
+        action_type = request.POST.get('action_type')
+        
+        if action_type == 'call':
+            # Telefon qilingan deb belgilash
+            lead.status = 'CALLED'
+            lead.last_contact = timezone.now()
+            lead.save()
+            
+            # Faoliyat yozish
+            SalesLeadLog.objects.create(
+                lead=lead,
+                action_type='CALL',
+                description=request.POST.get('call_notes', 'Telefon qilindi'),
+                performed_by=request.user
+            )
+            
+            messages.success(request, f"✅ {lead.full_name} ga telefon qilindi deb belgilandi!")
+            
+        elif action_type == 'interest':
+            # Qiziqish darajasini o'zgartirish
+            interest_level = request.POST.get('interest_level')
+            if interest_level in dict(SalesLead.INTEREST_CHOICES):
+                lead.interest_level = interest_level
+                lead.status = 'INTERESTED' if interest_level in ['HIGH', 'MEDIUM'] else 'CALLED'
+                lead.save()
+                
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='INTEREST_UPDATE',
+                    description=f"Qiziqish darajasi: {dict(SalesLead.INTEREST_CHOICES).get(interest_level, interest_level)}",
+                    performed_by=request.user
+                )
+                
+                messages.success(request, f"✅ Qiziqish darajasi yangilandi!")
+            
+        elif action_type == 'note':
+            # Izoh qo'shish
+            note_text = request.POST.get('note_text', '').strip()
+            if note_text:
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='NOTE',
+                    description=note_text,
+                    performed_by=request.user
+                )
+                messages.success(request, "✅ Izoh qo'shildi!")
+        
+        elif action_type == 'convert':
+            # Leadni mijozga aylantirish
+            try:
+                # Mijoz yaratish
+                customer = Customer.objects.create(
+                    unique_id=lead.phone,
+                    name=lead.full_name,
+                    phone=lead.phone,
+                    email=lead.email or '',
+                    company_name=lead.company_name or '',
+                )
+                
+                lead.status = 'CONVERTED'
+                lead.converted_at = timezone.now()
+                lead.converted_by = request.user
+                lead.save()
+                
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='CONVERTED',
+                    description="Lead mijozga aylantirildi",
+                    performed_by=request.user
+                )
+                
+                messages.success(request, f"✅ {lead.full_name} mijozga aylantirildi!")
+                return redirect('order_create')
+                
+            except Exception as e:
+                messages.error(request, f"❌ Xatolik: {str(e)}")
+        
+        elif action_type == 'not_interested':
+            # Qiziqmagan deb belgilash
+            lead.status = 'NOT_INTERESTED'
+            lead.save()
+            
+            SalesLeadLog.objects.create(
+                lead=lead,
+                action_type='NOT_INTERESTED',
+                description=request.POST.get('not_interested_reason', 'Mijoz qiziqmadi'),
+                performed_by=request.user
+            )
+            
+            messages.success(request, f"✅ {lead.full_name} qiziqmagan deb belgilandi!")
+        
+        elif action_type == 'status_update':
+            # Statusni qo'lda o'zgartirish
+            new_status = request.POST.get('new_status')
+            if new_status in dict(SalesLead.STATUS_CHOICES):
+                old_status = lead.status
+                lead.status = new_status
+                lead.save()
+                
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='STATUS_UPDATE',
+                    description=f"Status o'zgartirildi: {dict(SalesLead.STATUS_CHOICES).get(old_status, old_status)} -> {dict(SalesLead.STATUS_CHOICES).get(new_status, new_status)}",
+                    performed_by=request.user
+                )
+                
+                messages.success(request, f"✅ Status yangilandi!")
+        
+        return redirect('sales_lead_detail', pk=lead.pk)
+    
+    context = {
+        'lead': lead,
+        'activities': activities,
+        'total_calls': total_calls,
+        'total_notes': total_notes,
+        'total_activities': total_activities,
+        'orders': orders,
+        'status_choices': SalesLead.STATUS_CHOICES,
+        'interest_choices': SalesLead.INTEREST_CHOICES,
+        'title': f'Lead: {lead.full_name}',
+    }
+    
+    return render(request, 'orders/sales_lead_detail.html', context)
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_lead_edit(request, pk):
+    """Lead tahrirlash"""
+    
+    lead = get_object_or_404(SalesLead, pk=pk)
+    
+    if request.method == 'POST':
+        full_name = request.POST.get('full_name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        email = request.POST.get('email', '').strip()
+        company_name = request.POST.get('company_name', '').strip()
+        source_id = request.POST.get('source')
+        notes = request.POST.get('notes', '').strip()
+        interest_level = request.POST.get('interest_level', 'LOW')
+        
+        if not full_name:
+            messages.error(request, "❌ Iltimos, mijozning to'liq ismini kiriting!")
+            return redirect('sales_lead_edit', pk=lead.pk)
+        
+        if not phone:
+            messages.error(request, "❌ Iltimos, telefon raqamini kiriting!")
+            return redirect('sales_lead_edit', pk=lead.pk)
+        
+        try:
+            # Manbani olish
+            source = None
+            if source_id:
+                source = SalesLeadSource.objects.filter(id=source_id).first()
+            
+            # Eski ma'lumotlarni saqlash (log uchun)
+            old_data = {
+                'full_name': lead.full_name,
+                'phone': lead.phone,
+                'email': lead.email,
+                'company_name': lead.company_name,
+                'source': lead.source.name if lead.source else None,
+                'interest_level': lead.interest_level,
+            }
+            
+            # Yangilash
+            lead.full_name = full_name
+            lead.phone = phone
+            lead.email = email or None
+            lead.company_name = company_name or None
+            lead.source = source
+            lead.notes = notes or None
+            lead.interest_level = interest_level
+            lead.save()
+            
+            # Faoliyat yozish
+            changes = []
+            if old_data['full_name'] != full_name:
+                changes.append(f"Ism: {old_data['full_name']} -> {full_name}")
+            if old_data['phone'] != phone:
+                changes.append(f"Telefon: {old_data['phone']} -> {phone}")
+            if old_data['interest_level'] != interest_level:
+                changes.append(f"Qiziqish: {dict(SalesLead.INTEREST_CHOICES).get(old_data['interest_level'])} -> {dict(SalesLead.INTEREST_CHOICES).get(interest_level)}")
+            
+            if changes:
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='NOTE',
+                    description=f"Ma'lumotlar yangilandi: {', '.join(changes[:3])}",
+                    performed_by=request.user
+                )
+            
+            messages.success(request, f"✅ {full_name} ma'lumotlari yangilandi!")
+            return redirect('sales_lead_detail', pk=lead.pk)
+            
+        except Exception as e:
+            messages.error(request, f"❌ Xatolik: {str(e)}")
+    
+    # GET so'rovi
+    sources = SalesLeadSource.objects.all().order_by('name')
+    context = {
+        'lead': lead,
+        'sources': sources,
+        'title': f'Lead tahrirlash: {lead.full_name}',
+    }
+    return render(request, 'orders/sales_lead_form.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_lead_delete(request, pk):
+    """Lead o'chirish"""
+    
+    lead = get_object_or_404(SalesLead, pk=pk)
+    
+    if request.method == 'POST':
+        lead_name = lead.full_name
+        lead.delete()
+        messages.success(request, f"✅ {lead_name} o'chirildi!")
+        return redirect('sales_lead_list')
+    
+    context = {
+        'lead': lead,
+        'title': f'Lead o\'chirish: {lead.full_name}',
+    }
+    return render(request, 'orders/sales_lead_confirm_delete.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_lead_bulk_action(request):
+    """Leadlarga ommaviy amal"""
+    
+    if request.method != 'POST':
+        return redirect('sales_lead_list')
+    
+    lead_ids = request.POST.getlist('lead_ids')
+    action = request.POST.get('bulk_action')
+    
+    if not lead_ids:
+        messages.error(request, "❌ Iltimos, kamida bitta lead tanlang!")
+        return redirect('sales_lead_list')
+    
+    leads = SalesLead.objects.filter(id__in=lead_ids)
+    count = leads.count()
+    
+    try:
+        if action == 'call':
+            # Barchasini telefon qilingan deb belgilash
+            leads.update(status='CALLED', last_contact=timezone.now())
+            
+            # Har biriga log yozish
+            for lead in leads:
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='CALL',
+                    description="Ommaviy telefon qilingan deb belgilandi",
+                    performed_by=request.user
+                )
+            
+            messages.success(request, f"✅ {count} ta lead telefon qilingan deb belgilandi!")
+            
+        elif action == 'not_interested':
+            # Barchasini qiziqmagan deb belgilash
+            leads.update(status='NOT_INTERESTED')
+            
+            for lead in leads:
+                SalesLeadLog.objects.create(
+                    lead=lead,
+                    action_type='NOT_INTERESTED',
+                    description="Ommaviy qiziqmagan deb belgilandi",
+                    performed_by=request.user
+                )
+            
+            messages.success(request, f"✅ {count} ta lead qiziqmagan deb belgilandi!")
+            
+        elif action == 'delete':
+            # O'chirish
+            names = list(leads.values_list('full_name', flat=True))
+            leads.delete()
+            messages.success(request, f"✅ {count} ta lead o'chirildi!")
+            
+        else:
+            messages.error(request, "❌ Noto'g'ri amal!")
+            
+    except Exception as e:
+        messages.error(request, f"❌ Xatolik: {str(e)}")
+    
+    return redirect('sales_lead_list')
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_source_list(request):
+    """Manbalar ro'yxati"""
+    
+    sources = SalesLeadSource.objects.all().annotate(
+        lead_count=Count('saleslead'),
+        converted_count=Count('saleslead', filter=Q(saleslead__status='CONVERTED'))
+    ).order_by('name')
+    
+    context = {
+        'sources': sources,
+        'title': 'Manbalar ro\'yxati',
+    }
+    return render(request, 'orders/sales_source_list.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_source_create(request):
+    """Yangi manba yaratish"""
+    
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        
+        if not name:
+            messages.error(request, "❌ Iltimos, manba nomini kiriting!")
+            return redirect('sales_source_create')
+        
+        source, created = SalesLeadSource.objects.get_or_create(
+            name=name,
+            defaults={'description': description or None}
+        )
+        
+        if created:
+            messages.success(request, f"✅ '{name}' manbasi yaratildi!")
+        else:
+            messages.warning(request, f"⚠️ '{name}' manbasi allaqachon mavjud!")
+        
+        return redirect('sales_source_list')
+    
+    context = {
+        'title': 'Yangi manba qo\'shish',
+    }
+    return render(request, 'orders/sales_source_form.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_source_edit(request, pk):
+    """Manba tahrirlash"""
+    
+    source = get_object_or_404(SalesLeadSource, pk=pk)
+    
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        
+        if not name:
+            messages.error(request, "❌ Iltimos, manba nomini kiriting!")
+            return redirect('sales_source_edit', pk=source.pk)
+        
+        source.name = name
+        source.description = description or None
+        source.save()
+        
+        messages.success(request, f"✅ '{name}' manbasi yangilandi!")
+        return redirect('sales_source_list')
+    
+    context = {
+        'source': source,
+        'title': f'Manba tahrirlash: {source.name}',
+    }
+    return render(request, 'orders/sales_source_form.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_source_delete(request, pk):
+    """Manba o'chirish"""
+    
+    source = get_object_or_404(SalesLeadSource, pk=pk)
+    
+    if request.method == 'POST':
+        source_name = source.name
+        source.delete()
+        messages.success(request, f"✅ '{source_name}' manbasi o'chirildi!")
+        return redirect('sales_source_list')
+    
+    context = {
+        'source': source,
+        'title': f'Manba o\'chirish: {source.name}',
+    }
+    return render(request, 'orders/sales_source_confirm_delete.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_report(request):
+    """Sotuv bo'limi hisoboti"""
+    
+    # ========== FILTRLAR ==========
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    # Sana oralig'i
+    if not date_from:
+        date_from = (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    if not date_to:
+        date_to = timezone.now().strftime('%Y-%m-%d')
+    
+    # ========== STATISTIKA ==========
+    # Jami leadlar
+    total_leads = SalesLead.objects.filter(
+        created_at__date__gte=date_from,
+        created_at__date__lte=date_to
+    )
+    
+    # Holat bo'yicha
+    status_report = total_leads.values('status').annotate(
+        count=Count('id')
+    ).order_by('status')
+    
+    # Qiziqish darajasi bo'yicha
+    interest_report = total_leads.values('interest_level').annotate(
+        count=Count('id')
+    ).order_by('interest_level')
+    
+    # Manba bo'yicha
+    source_report = total_leads.values('source__name').annotate(
+        count=Count('id')
+    ).order_by('-count')[:10]
+    
+    # Oylik tendensiya
+    monthly_trend = []
+    start_date = datetime.strptime(date_from, '%Y-%m-%d').date()
+    end_date = datetime.strptime(date_to, '%Y-%m-%d').date()
+    
+    current = start_date
+    while current <= end_date:
+        month_start = current.replace(day=1)
+        if current.month == 12:
+            month_end = current.replace(year=current.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = current.replace(month=current.month + 1, day=1) - timedelta(days=1)
+        
+        month_leads = SalesLead.objects.filter(
+            created_at__date__gte=month_start,
+            created_at__date__lte=month_end
+        )
+        
+        monthly_trend.append({
+            'month': current.strftime('%B %Y'),
+            'total': month_leads.count(),
+            'converted': month_leads.filter(status='CONVERTED').count(),
+            'interested': month_leads.filter(status='INTERESTED').count(),
+        })
+        
+        # Keyingi oyga o'tish
+        if current.month == 12:
+            current = current.replace(year=current.year + 1, month=1, day=1)
+        else:
+            current = current.replace(month=current.month + 1, day=1)
+        
+        # Faqat end_date dan oshmaslik
+        if current > end_date:
+            break
+    
+    # ========== KONVERSIYA ==========
+    total_count = total_leads.count()
+    converted_count = total_leads.filter(status='CONVERTED').count()
+    conversion_rate = (converted_count / total_count * 100) if total_count > 0 else 0
+    
+    context = {
+        'date_from': date_from,
+        'date_to': date_to,
+        'total_leads': total_count,
+        'converted_leads': converted_count,
+        'conversion_rate': round(conversion_rate, 1),
+        'status_report': status_report,
+        'interest_report': interest_report,
+        'source_report': source_report,
+        'monthly_trend': monthly_trend,
+        'title': 'Sotuv bo\'limi hisoboti',
+    }
+    
+    return render(request, 'orders/sales_report.html', context)
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_export_csv(request):
+    """Leadlarni CSV formatida eksport qilish"""
+    
+    import csv
+    
+    # ========== FILTRLAR ==========
+    status_filter = request.GET.get('status', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    # ========== QUERYSET ==========
+    leads = SalesLead.objects.select_related('source', 'assigned_to')
+    
+    if status_filter:
+        leads = leads.filter(status=status_filter)
+    if date_from:
+        leads = leads.filter(created_at__date__gte=date_from)
+    if date_to:
+        leads = leads.filter(created_at__date__lte=date_to)
+    
+    # ========== RESPONSE ==========
+    response = HttpResponse(content_type='text/csv')
+    filename = f"leads_export_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    writer = csv.writer(response)
+    
+    # Sarlavhalar
+    writer.writerow([
+        '№', 
+        'To\'liq ism', 
+        'Telefon', 
+        'Email', 
+        'Kompaniya', 
+        'Manba', 
+        'Holat', 
+        'Qiziqish darajasi',
+        'Yaratilgan sana',
+        'Oxirgi kontakt',
+        'Mijozga aylantirilgan sana',
+        'Mas\'ul xodim',
+        'Izohlar'
+    ])
+    
+    # Ma'lumotlar
+    status_dict = dict(SalesLead.STATUS_CHOICES)
+    interest_dict = dict(SalesLead.INTEREST_CHOICES)
+    
+    for idx, lead in enumerate(leads, 1):
+        writer.writerow([
+            idx,
+            lead.full_name,
+            lead.phone,
+            lead.email or '',
+            lead.company_name or '',
+            lead.source.name if lead.source else '',
+            status_dict.get(lead.status, lead.status),
+            interest_dict.get(lead.interest_level, lead.interest_level),
+            lead.created_at.strftime('%d.%m.%Y %H:%M') if lead.created_at else '',
+            lead.last_contact.strftime('%d.%m.%Y %H:%M') if lead.last_contact else '',
+            lead.converted_at.strftime('%d.%m.%Y %H:%M') if lead.converted_at else '',
+            lead.assigned_to.get_full_name() if lead.assigned_to else lead.assigned_to.username if lead.assigned_to else '',
+            lead.notes or '',
+        ])
+    
+    return response
+
+
+@login_required
+@user_passes_test(is_sales_staff, login_url='/login/')
+def sales_quick_add_lead(request):
+    """Tez lead qo'shish (AJAX uchun)"""
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Faqat POST so\'rovi qabul qilinadi'}, status=405)
+    
+    full_name = request.POST.get('full_name', '').strip()
+    phone = request.POST.get('phone', '').strip()
+    source_id = request.POST.get('source')
+    
+    if not full_name:
+        return JsonResponse({'success': False, 'message': 'To\'liq ism majburiy!'})
+    
+    if not phone:
+        return JsonResponse({'success': False, 'message': 'Telefon raqami majburiy!'})
+    
+    try:
+        # Manbani olish
+        source = None
+        if source_id:
+            source = SalesLeadSource.objects.filter(id=source_id).first()
+        
+        # Lead yaratish
+        lead = SalesLead.objects.create(
+            full_name=full_name,
+            phone=phone,
+            source=source,
+            assigned_to=request.user,
+            created_by=request.user
+        )
+        
+        # Faoliyat yozish
+        SalesLeadLog.objects.create(
+            lead=lead,
+            action_type='CREATED',
+            description="Tez qo'shildi",
+            performed_by=request.user
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"✅ {full_name} qo'shildi!",
+            'lead_id': lead.id,
+            'full_name': lead.full_name,
+            'phone': lead.phone
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Xatolik: {str(e)}'})
 
