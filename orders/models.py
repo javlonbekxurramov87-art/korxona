@@ -1219,7 +1219,201 @@ class KitchenOrder(models.Model):
 
 
 
+class SalesLeadSource(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name='Manba nomi')
+    description = models.TextField(blank=True, null=True, verbose_name='Tavsif')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Lead manbasi'
+        verbose_name_plural = 'Lead manbalari'
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
 
+
+class SalesLead(models.Model):
+    STATUS_CHOICES = [
+        ('NEW', 'Yangi (hali telefon qilinmagan)'),
+        ('CALLED', 'Telefon qilingan (kutishda)'),
+        ('INTERESTED', 'Qiziqqan'),
+        ('NOT_INTERESTED', 'Qiziqmagan'),
+        ('CONVERTED', 'Mijozga aylangan'),
+    ]
+    
+    INTEREST_CHOICES = [
+        ('LOW', 'Past'),
+        ('MEDIUM', 'O\'rta'),
+        ('HIGH', 'Yuqori'),
+    ]
+    
+    full_name = models.CharField(max_length=200, verbose_name='To\'liq ism')
+    phone = models.CharField(max_length=50, verbose_name='Telefon raqami', db_index=True)
+    email = models.EmailField(blank=True, null=True, verbose_name='Email')
+    company_name = models.CharField(max_length=200, blank=True, null=True, verbose_name='Kompaniya nomi')
+    
+    source = models.ForeignKey(
+        SalesLeadSource, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        verbose_name='Manba'
+    )
+    
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='NEW',
+        verbose_name='Holat',
+        db_index=True
+    )
+    
+    interest_level = models.CharField(
+        max_length=10, 
+        choices=INTEREST_CHOICES, 
+        default='LOW',
+        verbose_name='Qiziqish darajasi'
+    )
+    
+    notes = models.TextField(blank=True, null=True, verbose_name='Izohlar')
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Yaratilgan sana')
+    last_contact = models.DateTimeField(null=True, blank=True, verbose_name='Oxirgi kontakt')
+    converted_at = models.DateTimeField(null=True, blank=True, verbose_name='Mijozga aylantirilgan sana')
+    
+    assigned_to = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='assigned_leads',
+        verbose_name='Mas\'ul xodim'
+    )
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='created_leads',
+        verbose_name='Yaratgan'
+    )
+    converted_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='converted_leads',
+        verbose_name='Mijozga aylantirgan'
+    )
+    
+    class Meta:
+        verbose_name = 'Lead'
+        verbose_name_plural = 'Leadlar'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['phone']),
+            models.Index(fields=['status']),
+            models.Index(fields=['-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.full_name} ({self.phone})"
+    
+    def get_status_display(self):
+        return dict(self.STATUS_CHOICES).get(self.status, self.status)
+
+
+class SalesLeadLog(models.Model):
+    
+    ACTION_CHOICES = [
+        ('CREATED', 'Yaratildi'),
+        ('CALL', 'Telefon qilindi'),
+        ('INTEREST_UPDATE', 'Qiziqish darajasi yangilandi'),
+        ('STATUS_UPDATE', 'Holat yangilandi'),
+        ('NOTE', 'Izoh qo\'shildi'),
+        ('CONVERTED', 'Mijozga aylantirildi'),
+        ('NOT_INTERESTED', 'Qiziqmagan deb belgilandi'),
+    ]
+    
+    lead = models.ForeignKey(SalesLead, on_delete=models.CASCADE, related_name='logs', verbose_name='Lead')
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES, verbose_name='Harakat turi')
+    description = models.TextField(verbose_name='Tavsif')
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name='Bajargan')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Vaqti')
+    
+    class Meta:
+        verbose_name = 'Lead faoliyati'
+        verbose_name_plural = 'Lead faoliyatlari'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.lead.full_name} - {self.get_action_type_display()} ({self.created_at})"
+    
+    def get_action_type_display(self):
+        return dict(self.ACTION_CHOICES).get(self.action_type, self.action_type)
+"""
+
+# =======================================================================
+# ADMIN (admin.py ga qo'shimcha)
+# =======================================================================
+
+"""
+# orders/admin.py ga qo'shimcha:
+
+from django.contrib import admin
+from .models import SalesLead, SalesLeadSource, SalesLeadLog
+
+@admin.register(SalesLeadSource)
+class SalesLeadSourceAdmin(admin.ModelAdmin):
+    list_display = ['name', 'created_at']
+    search_fields = ['name']
+    ordering = ['name']
+
+
+class SalesLeadLogInline(admin.TabularInline):
+    model = SalesLeadLog
+    fields = ['action_type', 'description', 'performed_by', 'created_at']
+    readonly_fields = ['created_at']
+    extra = 0
+    can_delete = False
+    max_num = 50
+
+
+@admin.register(SalesLead)
+class SalesLeadAdmin(admin.ModelAdmin):
+    list_display = [
+        'full_name', 'phone', 'status', 'interest_level', 
+        'source', 'assigned_to', 'created_at', 'converted_at'
+    ]
+    list_filter = ['status', 'interest_level', 'source', 'assigned_to']
+    search_fields = ['full_name', 'phone', 'email', 'company_name', 'notes']
+    readonly_fields = ['created_at', 'last_contact', 'converted_at']
+    inlines = [SalesLeadLogInline]
+    
+    fieldsets = (
+        ('Asosiy ma\'lumotlar', {
+            'fields': ('full_name', 'phone', 'email', 'company_name')
+        }),
+        ('Kontakt ma\'lumotlari', {
+            'fields': ('source', 'assigned_to')
+        }),
+        ('Holat va qiziqish', {
+            'fields': ('status', 'interest_level', 'notes')
+        }),
+        ('Tizim ma\'lumotlari', {
+            'fields': ('created_by', 'converted_by', 'converted_at', 'last_contact'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(SalesLeadLog)
+class SalesLeadLogAdmin(admin.ModelAdmin):
+    list_display = ['lead', 'action_type', 'description', 'performed_by', 'created_at']
+    list_filter = ['action_type', 'performed_by']
+    search_fields = ['lead__full_name', 'lead__phone', 'description']
+    readonly_fields = ['created_at']
+    date_hierarchy = 'created_at'
 
 
 
