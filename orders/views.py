@@ -7206,12 +7206,12 @@ def export_cash_report_excel(request):
     ws_usd = wb.active
     ws_usd.title = "USD"
 
-    ws_usd.merge_cells('A1:H1')
+    ws_usd.merge_cells('A1:I1')
     ws_usd['A1'] = "USD (AQSH DOLLARI) OPERATSIYALARI"
     ws_usd['A1'].font = Font(bold=True, size=16, color='B45309')
     ws_usd['A1'].alignment = center_alignment
 
-    ws_usd.merge_cells('A2:H2')
+    ws_usd.merge_cells('A2:I2')
     ws_usd['A2'] = f"Davr: {start_date} - {end_date}"
     ws_usd['A2'].font = Font(size=11, color='666666')
     ws_usd['A2'].alignment = center_alignment
@@ -7276,14 +7276,15 @@ def export_cash_report_excel(request):
             ws_usd.cell(row=row, column=col).alignment = center_alignment
             ws_usd.cell(row=row, column=col).fill = total_bg_fill
 
-    # ======== 2. OPERATSIYALAR RO'YXATI ========
+    # ======== 2. OPERATSIYALAR RO'YXATI (Kirim va Chiqim alohida ustunlar) ========
     row += 2
     ws_usd.cell(row=row, column=1, value="USD OPERATSIYALARI RO'YXATI")
     ws_usd.cell(row=row, column=1).font = stats_font
     ws_usd.merge_cells(f'A{row}:L{row}')
     row += 1
 
-    headers = ['No', 'Sana', 'Operatsiya ID', 'Tur', "To'lov usuli", 'Summa (USD)', 'Kim oldi/berdi', 'Izoh']
+    # Yangi sarlavhalar - Kirim va Chiqim alohida
+    headers = ['No', 'Sana', 'Operatsiya ID', "To'lov usuli", 'Kirim (USD)', 'Chiqim (USD)', 'Kim oldi/berdi', 'Izoh']
     for col, header in enumerate(headers, 1):
         cell = ws_usd.cell(row=row, column=col)
         cell.value = header
@@ -7296,25 +7297,36 @@ def export_cash_report_excel(request):
 
     for idx, trans in enumerate(usd_transactions.order_by('-transaction_date'), 1):
         row += 1
+        is_income = trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME']
+        
         ws_usd.cell(row=row, column=1, value=idx)
         ws_usd.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
         ws_usd.cell(row=row, column=3, value=trans.transaction_id)
-
-        tur = "Kirim" if trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME'] else "Chiqim"
-        ws_usd.cell(row=row, column=4, value=tur)
-        ws_usd.cell(row=row, column=4).fill = income_fill if tur == "Kirim" else expense_fill
-
-        ws_usd.cell(row=row, column=5, value=trans.get_payment_method_display())
-        ws_usd.cell(row=row, column=6, value=float(trans.amount))
+        ws_usd.cell(row=row, column=4, value=trans.get_payment_method_display())
+        
+        # Kirim ustuni
+        if is_income:
+            ws_usd.cell(row=row, column=5, value=float(trans.amount))
+            ws_usd.cell(row=row, column=5).fill = income_fill
+        else:
+            ws_usd.cell(row=row, column=5, value=0)
+        
+        # Chiqim ustuni
+        if not is_income:
+            ws_usd.cell(row=row, column=6, value=float(trans.amount))
+            ws_usd.cell(row=row, column=6).fill = expense_fill
+        else:
+            ws_usd.cell(row=row, column=6, value=0)
+        
         ws_usd.cell(row=row, column=7, value=trans.customer_name or '-')
         ws_usd.cell(row=row, column=8, value=trans.description[:60] if trans.description else '-')
 
         for col in range(1, 9):
             ws_usd.cell(row=row, column=col).border = thin_border
-            if col == 6:
-                ws_usd.cell(row=row, column=6).number_format = money_format
-                ws_usd.cell(row=row, column=6).alignment = right_alignment
-            elif col in [4, 5]:
+            if col in [5, 6]:
+                ws_usd.cell(row=row, column=col).number_format = money_format
+                ws_usd.cell(row=row, column=col).alignment = right_alignment
+            elif col in [4]:
                 ws_usd.cell(row=row, column=col).alignment = center_alignment
 
     # ======== 3. KATTA STATISTIKA (ENDI PASTDA) ========
@@ -7329,8 +7341,8 @@ def export_cash_report_excel(request):
     ws_usd.column_dimensions['A'].width = 6
     ws_usd.column_dimensions['B'].width = 18
     ws_usd.column_dimensions['C'].width = 22
-    ws_usd.column_dimensions['D'].width = 10
-    ws_usd.column_dimensions['E'].width = 16
+    ws_usd.column_dimensions['D'].width = 16
+    ws_usd.column_dimensions['E'].width = 18
     ws_usd.column_dimensions['F'].width = 18
     ws_usd.column_dimensions['G'].width = 22
     ws_usd.column_dimensions['H'].width = 50
@@ -7340,12 +7352,12 @@ def export_cash_report_excel(request):
     # ==============================================================
     ws_uzs = wb.create_sheet("UZS")
 
-    ws_uzs.merge_cells('A1:H1')
+    ws_uzs.merge_cells('A1:I1')
     ws_uzs['A1'] = "UZS (SO'M) OPERATSIYALARI"
     ws_uzs['A1'].font = Font(bold=True, size=16, color='1E40AF')
     ws_uzs['A1'].alignment = center_alignment
 
-    ws_uzs.merge_cells('A2:H2')
+    ws_uzs.merge_cells('A2:I2')
     ws_uzs['A2'] = f"Davr: {start_date} - {end_date}"
     ws_uzs['A2'].font = Font(size=11, color='666666')
     ws_uzs['A2'].alignment = center_alignment
@@ -7410,13 +7422,15 @@ def export_cash_report_excel(request):
             ws_uzs.cell(row=row, column=col).alignment = center_alignment
             ws_uzs.cell(row=row, column=col).fill = total_bg_fill
 
-    # ======== 2. OPERATSIYALAR RO'YXATI ========
+    # ======== 2. OPERATSIYALAR RO'YXATI (Kirim va Chiqim alohida) ========
     row += 2
     ws_uzs.cell(row=row, column=1, value="UZS OPERATSIYALARI RO'YXATI")
     ws_uzs.cell(row=row, column=1).font = stats_font
     ws_uzs.merge_cells(f'A{row}:L{row}')
     row += 1
 
+    # Yangi sarlavhalar - Kirim va Chiqim alohida
+    headers = ['No', 'Sana', 'Operatsiya ID', "To'lov usuli", 'Kirim (UZS)', 'Chiqim (UZS)', 'Kim oldi/berdi', 'Izoh']
     for col, header in enumerate(headers, 1):
         cell = ws_uzs.cell(row=row, column=col)
         cell.value = header
@@ -7432,25 +7446,36 @@ def export_cash_report_excel(request):
 
     for idx, trans in enumerate(uzs_all, 1):
         row += 1
+        is_income = trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME']
+        
         ws_uzs.cell(row=row, column=1, value=idx)
         ws_uzs.cell(row=row, column=2, value=trans.transaction_date.strftime('%d.%m.%Y %H:%M'))
         ws_uzs.cell(row=row, column=3, value=trans.transaction_id)
-
-        tur = "Kirim" if trans.transaction_type in ['INCOME', 'EXTERNAL_INCOME'] else "Chiqim"
-        ws_uzs.cell(row=row, column=4, value=tur)
-        ws_uzs.cell(row=row, column=4).fill = income_fill if tur == "Kirim" else expense_fill
-
-        ws_uzs.cell(row=row, column=5, value=trans.get_payment_method_display())
-        ws_uzs.cell(row=row, column=6, value=float(trans.amount))
+        ws_uzs.cell(row=row, column=4, value=trans.get_payment_method_display())
+        
+        # Kirim ustuni
+        if is_income:
+            ws_uzs.cell(row=row, column=5, value=float(trans.amount))
+            ws_uzs.cell(row=row, column=5).fill = income_fill
+        else:
+            ws_uzs.cell(row=row, column=5, value=0)
+        
+        # Chiqim ustuni
+        if not is_income:
+            ws_uzs.cell(row=row, column=6, value=float(trans.amount))
+            ws_uzs.cell(row=row, column=6).fill = expense_fill
+        else:
+            ws_uzs.cell(row=row, column=6, value=0)
+        
         ws_uzs.cell(row=row, column=7, value=trans.customer_name or '-')
         ws_uzs.cell(row=row, column=8, value=trans.description[:60] if trans.description else '-')
 
         for col in range(1, 9):
             ws_uzs.cell(row=row, column=col).border = thin_border
-            if col == 6:
-                ws_uzs.cell(row=row, column=6).number_format = money_format
-                ws_uzs.cell(row=row, column=6).alignment = right_alignment
-            elif col in [4, 5]:
+            if col in [5, 6]:
+                ws_uzs.cell(row=row, column=col).number_format = money_format
+                ws_uzs.cell(row=row, column=col).alignment = right_alignment
+            elif col in [4]:
                 ws_uzs.cell(row=row, column=col).alignment = center_alignment
 
     # ======== 3. KATTA STATISTIKA (ENDI PASTDA) ========
@@ -7465,8 +7490,8 @@ def export_cash_report_excel(request):
     ws_uzs.column_dimensions['A'].width = 6
     ws_uzs.column_dimensions['B'].width = 18
     ws_uzs.column_dimensions['C'].width = 22
-    ws_uzs.column_dimensions['D'].width = 10
-    ws_uzs.column_dimensions['E'].width = 16
+    ws_uzs.column_dimensions['D'].width = 16
+    ws_uzs.column_dimensions['E'].width = 18
     ws_uzs.column_dimensions['F'].width = 18
     ws_uzs.column_dimensions['G'].width = 22
     ws_uzs.column_dimensions['H'].width = 50
@@ -7614,7 +7639,6 @@ def export_cash_report_excel(request):
     wb.save(response)
 
     return response
-
 @login_required
 @user_passes_test(is_cashier, login_url='/login/')
 def order_payment_click(request, order_id):
