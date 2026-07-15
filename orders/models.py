@@ -671,14 +671,45 @@ from django.contrib.auth.models import User
 
 class MaterialOutput(models.Model):
     """Material chiqarish modeli"""
+    
+    # ✅ CHIQARISH MANBAI
+    SOURCE_CHOICES = [
+        ('WAREHOUSE', 'Ombordan'),
+        ('BAG', 'Qopdan'),
+    ]
+    
     material = models.ForeignKey(Material, on_delete=models.CASCADE, related_name='outputs')
     quantity = models.DecimalField(max_digits=10, decimal_places=3)
-    recipient = models.CharField(max_length=255, blank=True, default='')  # ✅ Qabul qilgan shaxs
+    recipient = models.CharField(max_length=255, blank=True, default='')
     reason = models.TextField(blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    output_date = models.DateField(null=True, blank=True)  # Chiqarish sanasi
-    output_time = models.TimeField(null=True, blank=True)  # Chiqarish vaqti
-
+    output_date = models.DateField(null=True, blank=True)
+    output_time = models.TimeField(null=True, blank=True)
+    
+    # ✅ YANGI: Qayerdan chiqarilganligi
+    source_type = models.CharField(
+        max_length=20, 
+        choices=SOURCE_CHOICES, 
+        default='WAREHOUSE',
+        verbose_name="Chiqarish manbai"
+    )
+    
+    # ✅ YANGI: Chiqarilgan birlik (qo'lda tanlash uchun)
+    output_unit = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True,
+        verbose_name="Chiqarilgan birlik"
+    )
+    
+    # ✅ YANGI: Qop egasi (faqat QOP dan chiqarilganda)
+    bag_owner = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True,
+        verbose_name="Qop egasi"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -687,7 +718,9 @@ class MaterialOutput(models.Model):
         verbose_name_plural = "Material chiqarishlar"
     
     def __str__(self):
-        return f"{self.material.name} - {self.quantity} {self.material.unit} ({self.created_at.strftime('%d.%m.%Y')})"
+        source = "Qopdan" if self.source_type == 'BAG' else "Ombordan"
+        unit = self.output_unit or self.material.unit
+        return f"{self.material.name} - {self.quantity} {unit} ({source}) - {self.created_at.strftime('%d.%m.%Y')}"
 # orders/models.py ichida
 class OrderHistory(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='history')
