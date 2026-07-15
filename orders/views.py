@@ -1225,7 +1225,7 @@ from .models import Material, MaterialOutput
 @login_required
 @staff_member_required
 def material_output(request):
-    """Materialni ombordan chiqarish"""
+    """Materialni ombordan yoki qopdan chiqarish"""
     
     if request.method == "POST":
         m_id = request.POST.get('material_id')
@@ -1250,10 +1250,9 @@ def material_output(request):
                 return redirect('material_output')
             
             # Forma ma'lumotlari
-            recipient = request.POST.get('recipient', '').strip()  # ✅ Qabul qilgan shaxs
+            source_type = request.POST.get('source_type', 'WAREHOUSE')  # ✅ YANGI: qayerdan chiqarilmoqda
+            recipient = request.POST.get('recipient', '').strip()
             reason = request.POST.get('reason', '').strip()
-            
-            # Sana va vaqt
             output_date = request.POST.get('output_date')
             output_time = request.POST.get('output_time')
             
@@ -1262,36 +1261,79 @@ def material_output(request):
                 messages.error(request, "Chiqarish miqdori 0 dan katta bo'lishi kerak!")
                 return redirect('material_output')
             
-            # Ombordagi joriy qoldiqni tekshirish
-            current_quantity = material.quantity
-            if quantity > current_quantity:
-                messages.error(
-                    request, 
-                    f"Omborda yetarli emas! Joriy qoldiq: {current_quantity:.3f} {material.unit}. "
-                    f"So'ralgan: {quantity:.3f}"
+            # ============ OMBORDAN CHIQARISH ============
+            if source_type == 'WAREHOUSE':
+                current_quantity = material.quantity
+                if quantity > current_quantity:
+                    messages.error(
+                        request, 
+                        f"❌ Omborda yetarli emas! Joriy qoldiq: {current_quantity:.3f} {material.unit}. "
+                        f"So'ralgan: {quantity:.3f}"
+                    )
+                    return redirect('material_output')
+                
+                # Ombordan ayirish
+                material.quantity = material.quantity - quantity
+                material.save()
+                
+                # Transaction yozish
+                MaterialTransaction.objects.create(
+                    material=material,
+                    transaction_type='OUT',
+                    quantity_change=quantity,
+                    received_by=recipient,
+                    notes=f"Ombordan chiqarish. Qabul qilgan: {recipient}. Izoh: {reason or 'Yo\'q'}",
+                    performed_by=request.user
                 )
-                return redirect('material_output')
-
-            # Ombordan ayirish
-            material.quantity = material.quantity - quantity
-            material.save()
+                
+                success_msg = f"✅ {material.name} dan {quantity:.3f} {material.unit} OMBORDAN muvaffaqiyatli chiqarildi! Yangi qoldiq: {material.quantity:.3f} {material.unit}"
             
-            # Tarixga yozish
+            # ============ QOPDAN CHIQARISH ============
+            elif source_type == 'BAG':
+                current_bag_qty = material.bag_quantity if hasattr(material, 'bag_quantity') else 0
+                
+                if quantity > current_bag_qty:
+                    messages.error(
+                        request, 
+                        f"❌ Qopda yetarli emas! Joriy qoldiq: {current_bag_qty:.3f} {material.unit}. "
+                        f"So'ralgan: {quantity:.3f}"
+                    )
+                    return redirect('material_output')
+                
+                # Qopdan ayirish
+                material.bag_quantity = material.bag_quantity - quantity
+                material.save()
+                
+                # Transaction yozish
+                MaterialTransaction.objects.create(
+                    material=material,
+                    transaction_type='OUT',
+                    quantity_change=quantity,
+                    received_by=recipient,
+                    notes=f"Qopdan chiqarish. Qabul qilgan: {recipient}. Izoh: {reason or 'Yo\'q'}",
+                    performed_by=request.user
+                )
+                
+                success_msg = f"✅ {material.name} dan {quantity:.3f} {material.unit} QOPDAN muvaffaqiyatli chiqarildi! Yangi qoldiq: {material.bag_quantity:.3f} {material.unit}"
+            
+            else:
+                messages.error(request, "❌ Noto'g'ri manba tanlandi!")
+                return redirect('material_output')
+            
+            # ============ MATERIAL OUTPUT GA YOZISH ============
             MaterialOutput.objects.create(
                 material=material,
                 quantity=quantity,
-                recipient=recipient,  # ✅ Qabul qilgan shaxs
+                recipient=recipient,
                 reason=reason,
                 user=request.user,
-                output_date=output_date,
-                output_time=output_time,
+                output_date=output_date or timezone.now().date(),
+                output_time=output_time or timezone.now().time(),
+                source_type=source_type,  # ✅ YANGI
+                bag_owner='' if source_type == 'WAREHOUSE' else recipient  # Qopdan bo'lsa qabul qilgan shaxs
             )
             
-            messages.success(
-                request, 
-                f"✅ {material.name} dan {quantity:.3f} {material.unit} muvaffaqiyatli chiqarildi! "
-                f"Yangi qoldiq: {material.quantity:.3f} {material.unit}"
-            )
+            messages.success(request, success_msg)
             return redirect('warehouse_dashboard')
             
         except Material.DoesNotExist:
@@ -1300,6 +1342,8 @@ def material_output(request):
             
         except Exception as e:
             print(f"❌ Xatolik: {str(e)}")
+            import traceback
+            traceback.print_exc()
             messages.error(request, f"Tizimda xatolik: {str(e)}")
             return redirect('material_output')
     
