@@ -602,19 +602,30 @@ def order_archive(request):
     is_manager = is_in_group(request.user, 'Menejer/Tasdiqlovchi')
     is_worker = is_in_group(request.user, 'Usta') or is_in_group(request.user, 'Eshik Ustasi')
     
-    # ARXIV STATUSLARI - ORTILDI ni ham qo'shdik
-    archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR', 'ORTILDI']
-    
-    # ========== ASOSIY QUERYSET - TARTIB TUZATILDI ==========
+    # ================================================================
+    # ARXIV STATUSLARI - BAZADAGI BARCHA STATUSLAR
+    # ================================================================
     from django.db.models.functions import Coalesce
     from django.db.models import Q
+    from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+    from django.utils import timezone
+    from datetime import datetime, timedelta
+    from django.contrib.auth.models import User
     
+    # Bazadagi barcha unique statuslarni olamiz
+    all_statuses = Order.objects.values_list('status', flat=True).distinct()
+    archived_statuses = list(all_statuses)
+    
+    # Agar statuslar bo'lmasa (baza bo'sh bo'lsa)
+    if not archived_statuses:
+        archived_statuses = ['BAJARILDI', 'USTA_TUGATDI', 'TAYYOR', 'ORTILDI']
+    
+    # ========== ASOSIY QUERYSET ==========
     main_orders = Order.objects.filter(
         status__in=archived_statuses
     ).annotate(
-        # worker_finished_at NULL bo'lsa created_at ishlatiladi
         sort_date=Coalesce('worker_finished_at', 'created_at')
-    ).order_by('-sort_date')  # Eng yangisi birinchi
+    ).order_by('-sort_date')
     
     # ==================== FILTRLAR ====================
     search_query = request.GET.get('q', '').strip()
@@ -622,10 +633,12 @@ def order_archive(request):
     date_from_str = request.GET.get('date_from', '').strip()
     date_to_str = request.GET.get('date_to', '').strip()
     custom_period = request.GET.get('custom_period', '').strip()
+    status_filter = request.GET.get('status', '').strip()
     
     date_from = None
     date_to = None
     
+    # --- SANALARNI PARSLASH ---
     if custom_period:
         today = timezone.now().date()
         
@@ -666,12 +679,16 @@ def order_archive(request):
             except (ValueError, TypeError):
                 date_to = None
     
-    # --- SANA FILTRI (sort_date bo'yicha) ---
+    # --- SANA FILTRI ---
     if date_from:
         main_orders = main_orders.filter(sort_date__date__gte=date_from)
     
     if date_to:
         main_orders = main_orders.filter(sort_date__date__lte=date_to)
+    
+    # --- STATUS FILTRI ---
+    if status_filter:
+        main_orders = main_orders.filter(status=status_filter)
     
     # --- USTA TURI FILTRI ---
     if not is_worker and worker_filter:
@@ -707,7 +724,9 @@ def order_archive(request):
     
     total_count = main_orders.count()
     
+    # ================================================================
     # PAGINATION
+    # ================================================================
     paginator = Paginator(main_orders, 12)
     page_number = request.GET.get('page', '1')
     
@@ -743,31 +762,57 @@ def order_archive(request):
     # ================================================================
     # SHAXSIY STATISTIKA (USTA UCHUN)
     # ================================================================
-    personal_stats = {}
+    personal_stats = {'total': 0}
     if is_worker:
         worker_orders = Order.objects.filter(
             assigned_workers__user=request.user,
             status__in=archived_statuses
         ).distinct()
-        personal_stats = {
-            'total': worker_orders.count(),
-            'bajarildi': worker_orders.filter(status='BAJARILDI').count(),
-            'usta_tugatdi': worker_orders.filter(status='USTA_TUGATDI').count(),
-            'tayyor': worker_orders.filter(status='TAYYOR').count(),
-            'ortildi': worker_orders.filter(status='ORTILDI').count(),  # YANGI
-        }
+        
+        personal_stats = {'total': worker_orders.count()}
+        for status in archived_statuses:
+            status_key = status.lower().replace(' ', '_').replace('-', '_')
+            personal_stats[status_key] = worker_orders.filter(status=status).count()
     
     # ================================================================
     # STATUS BO'YICHA STATISTIKA (BARCHA UCHUN)
     # ================================================================
-    status_stats = {
-        'total': total_count,
-        'bajarildi': main_orders.filter(status='BAJARILDI').count(),
-        'usta_tugatdi': main_orders.filter(status='USTA_TUGATDI').count(),
-        'tayyor': main_orders.filter(status='TAYYOR').count(),
-        'ortildi': main_orders.filter(status='ORTILDI').count(),  # YANGI
-    }
+    status_stats = {'total': total_count}
     
+    for status in archived_statuses:
+        status_key = status.lower().replace(' ', '_').replace('-', '_')
+        status_stats[status_key] = main_orders.filter(status=status).count()
+    
+    # ================================================================
+    # STATUS CHOICES (FILTER UCHUN)
+    # ================================================================
+    status_choices = []
+    if hasattr(Order, 'STATUS_CHOICES'):
+        status_choices = Order.STATUS_CHOICES
+    else:
+        # Status choices bo'lmasa, archived_statuses dan yaratamiz
+        status_choices = [(status, status) for status in archived_statuses]
+    
+    # ================================================================
+    # DEBUG MA'LUMOTLARI (FAQAT ADMIN UCHUN)
+    # ================================================================
+    debug_info = {}
+    if is_glavniy_admin:
+        debug_info = {
+            'total_orders': Order.objects.count(),
+            'archived_statuses': archived_statuses,
+            'all_statuses': list(Order.objects.values_list('status', flat=True).distinct()),
+            'filtered_count': total_count,
+            'date_from': date_from,
+            'date_to': date_to,
+            'status_filter': status_filter,
+            'worker_filter': worker_filter,
+            'search_query': search_query,
+        }
+    
+    # ================================================================
+    # CONTEXT
+    # ================================================================
     context = {
         'main_orders': page_obj,
         'main_orders_count': total_count,
@@ -776,16 +821,19 @@ def order_archive(request):
         'date_from': date_from_str,
         'date_to': date_to_str,
         'selected_custom_date': custom_period,
+        'status_filter': status_filter,
         'is_worker': is_worker,
         'is_manager': is_manager,
         'is_glavniy_admin': is_glavniy_admin,
         'worker_stats': worker_stats,
         'personal_stats': personal_stats,
-        'status_stats': status_stats,  # YANGI
+        'status_stats': status_stats,
+        'status_choices': status_choices,
+        'archived_statuses': archived_statuses,
+        'debug_info': debug_info,  # DEBUG UCHUN
     }
     
     return render(request, 'orders/order_archive.html', context)
-
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import DriverTrip, TripPoint
